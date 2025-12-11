@@ -1,0 +1,456 @@
+// prisma/schema.prisma
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL") // Required in Prisma v6
+}
+
+/**
+ * ============================================================
+ * ENUMS
+ * ==============================================================
+ */
+
+enum RoleName {
+    OWNER
+    ADMIN
+    AGENT
+}
+
+enum SubscriptionStatus {
+    active
+    paused
+    cancelled
+}
+
+enum PaymentStatus {
+    created
+    paid
+    failed
+}
+
+enum RazorpaySubscriptionEventType {
+    activated
+    charged_at
+    completed
+    halted
+    cancelled
+}
+
+/**
+ * ============================================================
+ * AUTH MODELS (ADDED)
+ * ==============================================================
+ */
+
+model UserSession {
+    id                      Int       @id @default(autoincrement())
+    session_id              String    @unique
+    user_id                 Int
+    org_id                  Int?
+    device_info             Json?
+    ip_address              String?
+    refresh_token_hash      String
+    refresh_token_encrypted String?
+    created_at              DateTime  @default(now())
+    expires_at              DateTime
+    last_used_at            DateTime?
+    revoked                 Boolean   @default(false)
+
+    user User @relation(fields: [user_id], references: [id])
+}
+
+model Otp {
+    id          Int      @id @default(autoincrement())
+    delivery_id String   @unique
+    destination String
+    channel     String // sms | whatsapp | email
+    purpose     String // login | signup | verification
+    otp_hash    String
+    attempts    Int      @default(0)
+    created_at  DateTime @default(now())
+    expires_at  DateTime
+    used        Boolean  @default(false)
+    meta        Json?
+}
+
+/**
+ * ============================================================
+ * ROLE
+ * ==============================================================
+ */
+
+model Role {
+    id          Int      @id @default(autoincrement())
+    name        RoleName @unique
+    description String?
+    created_at  DateTime @default(now())
+
+    organizationUsers OrganizationUser[]
+}
+
+/**
+ * ============================================================
+ * USER
+ * ==============================================================
+ */
+
+model User {
+    id            Int      @id @default(autoincrement())
+    full_name     String
+    email         String?  @unique
+    phone         String?
+    pan_number    String?
+    kyc_status    Boolean  @default(false)
+    password_hash String
+    created_at    DateTime @default(now())
+
+    organizations        Organization[]           @relation("OrgCreatedBy")
+    orgUsers             OrganizationUser[]
+    customers            Customer[]               @relation("CustomerCreatedBy")
+    loanDetails          ProductLoanTable[]
+    sipDetails           ProductSipTable[]
+    mfDetails            ProductMutualFundTable[]
+    fdDetails            ProductFdTable[]
+    insuranceDetails     ProductInsuranceTable[]
+    agentProductEntities AgentProductEntity[]
+    sessions             UserSession[]
+}
+
+/**
+ * ============================================================
+ * ORGANIZATION
+ * ==============================================================
+ */
+
+model Organization {
+    id            Int      @id @default(autoincrement())
+    name          String
+    gst_number    String?
+    pan_number    String?
+    contact_email String?
+    contact_phone String?
+    created_by    Int
+    createdAt     DateTime @default(now())
+
+    createdByUser  User               @relation("OrgCreatedBy", fields: [created_by], references: [id])
+    subscription   Subscription?
+    users          OrganizationUser[]
+    customers      Customer[]
+    razorpayOrders RazorpayOrder[]
+}
+
+/**
+ * ============================================================
+ * ORGANIZATION USER (PIVOT)
+ * ==============================================================
+ */
+
+model OrganizationUser {
+    id         Int      @id @default(autoincrement())
+    org_id     Int
+    user_id    Int
+    role_id    Int
+    status     String   @default("ACTIVE")
+    is_owner   Boolean  @default(false)
+    created_at DateTime @default(now())
+
+    organization Organization @relation(fields: [org_id], references: [id])
+    user         User         @relation(fields: [user_id], references: [id])
+    role         Role         @relation(fields: [role_id], references: [id])
+
+    @@unique([org_id, user_id])
+}
+
+/**
+ * ============================================================
+ * SUBSCRIPTION PLAN
+ * ==============================================================
+ */
+
+model SubscriptionPlan {
+    id             Int      @id @default(autoincrement())
+    name           String   @unique
+    max_customers  Int
+    price          Float
+    billing_cycle  String   @default("MONTHLY")
+    razorpayPlanId String?  @unique
+    created_at     DateTime @default(now())
+
+    subscriptions Subscription[]
+}
+
+/**
+ * ============================================================
+ * SUBSCRIPTION
+ * ==============================================================
+ */
+
+model Subscription {
+    id                     Int                @id @default(autoincrement())
+    org_id                 Int                @unique
+    plan_id                Int
+    razorpaySubscriptionId String?            @unique
+    current_status         SubscriptionStatus @default(active)
+    start_date             DateTime
+    end_date               DateTime
+    auto_renew             Boolean            @default(true)
+    created_at             DateTime           @default(now())
+
+    organization Organization                @relation(fields: [org_id], references: [id])
+    plan         SubscriptionPlan            @relation(fields: [plan_id], references: [id])
+    events       RazorpaySubscriptionEvent[]
+}
+
+/**
+ * ============================================================
+ * CUSTOMER
+ * ==============================================================
+ */
+
+model Customer {
+    id             Int      @id @default(autoincrement())
+    org_id         Int
+    created_by     Int
+    full_name      String
+    email          String?
+    phone          String?
+    aadhaar_number String?
+    pan_number     String?
+    address        String?
+    created_at     DateTime @default(now())
+
+    organization Organization @relation(fields: [org_id], references: [id])
+    createdBy    User         @relation("CustomerCreatedBy", fields: [created_by], references: [id])
+
+    loanDetails      ProductLoanTable[]
+    sipDetails       ProductSipTable[]
+    mfDetails        ProductMutualFundTable[]
+    fdDetails        ProductFdTable[]
+    insuranceDetails ProductInsuranceTable[]
+}
+
+/**
+ * ============================================================
+ * PRODUCT TYPE
+ * ==============================================================
+ */
+
+model ProductType {
+    id         Int      @id @default(autoincrement())
+    name       String   @unique
+    status     String   @default("ACTIVE")
+    created_at DateTime @default(now())
+
+    entities ProductEntity[]
+}
+
+/**
+ * ============================================================
+ * PRODUCT ENTITY
+ * ==============================================================
+ */
+
+model ProductEntity {
+    id              Int      @id @default(autoincrement())
+    name            String
+    product_type_id Int
+    status          String   @default("ACTIVE")
+    created_at      DateTime @default(now())
+
+    productType          ProductType          @relation(fields: [product_type_id], references: [id])
+    agentProductEntities AgentProductEntity[]
+
+    loanDetails      ProductLoanTable[]
+    sipDetails       ProductSipTable[]
+    mfDetails        ProductMutualFundTable[]
+    fdDetails        ProductFdTable[]
+    insuranceDetails ProductInsuranceTable[]
+}
+
+/**
+ * ============================================================
+ * AGENT PRODUCT ENTITY (PIVOT)
+ * ==============================================================
+ */
+
+model AgentProductEntity {
+    id                Int      @id @default(autoincrement())
+    agent_id          Int
+    product_entity_id Int
+    created_at        DateTime @default(now())
+
+    agent         User          @relation(fields: [agent_id], references: [id])
+    productEntity ProductEntity @relation(fields: [product_entity_id], references: [id])
+
+    @@unique([agent_id, product_entity_id])
+}
+
+/**
+ * ============================================================
+ * PRODUCT DETAILS TABLES
+ * ==============================================================
+ */
+
+model ProductLoanTable {
+    id                Int @id @default(autoincrement())
+    customer_id       Int
+    product_entity_id Int
+    agent_id          Int
+
+    loan_type          String?
+    loan_amount        Float?
+    interest_rate      Float?
+    tenure_months      Int?
+    emi_amount         Float?
+    emi_due_day        Int?
+    start_date         DateTime?
+    end_date           DateTime?
+    collateral_details String?
+    status             String    @default("active")
+    notes              String?
+    created_at         DateTime  @default(now())
+
+    customer      Customer      @relation(fields: [customer_id], references: [id])
+    productEntity ProductEntity @relation(fields: [product_entity_id], references: [id])
+    agent         User          @relation(fields: [agent_id], references: [id])
+}
+
+model ProductSipTable {
+    id                Int @id @default(autoincrement())
+    customer_id       Int
+    product_entity_id Int
+    agent_id          Int
+
+    folio_number            String?
+    scheme_name             String?
+    start_date              DateTime?
+    sip_amount              Float?
+    frequency               String?
+    tenure_months           Int?
+    expected_maturity_value Float?
+    risk_profile            String?
+    notes                   String?
+    created_at              DateTime  @default(now())
+
+    customer      Customer      @relation(fields: [customer_id], references: [id])
+    productEntity ProductEntity @relation(fields: [product_entity_id], references: [id])
+    agent         User          @relation(fields: [agent_id], references: [id])
+}
+
+model ProductMutualFundTable {
+    id                Int @id @default(autoincrement())
+    customer_id       Int
+    product_entity_id Int
+    agent_id          Int
+
+    folio_number      String?
+    scheme_name       String?
+    nav               Float?
+    units             Float?
+    investment_amount Float?
+    purchase_date     DateTime?
+    investment_type   String?
+    risk_profile      String?
+    notes             String?
+    created_at        DateTime  @default(now())
+
+    customer      Customer      @relation(fields: [customer_id], references: [id])
+    productEntity ProductEntity @relation(fields: [product_entity_id], references: [id])
+    agent         User          @relation(fields: [agent_id], references: [id])
+}
+
+model ProductFdTable {
+    id                Int @id @default(autoincrement())
+    customer_id       Int
+    product_entity_id Int
+    agent_id          Int
+
+    fd_number        String?
+    amount           Float?
+    interest_rate    Float?
+    tenure_months    Int?
+    start_date       DateTime?
+    maturity_date    DateTime?
+    maturity_amount  Float?
+    payout_frequency String?
+    nominee_name     String?
+    notes            String?
+    created_at       DateTime  @default(now())
+
+    customer      Customer      @relation(fields: [customer_id], references: [id])
+    productEntity ProductEntity @relation(fields: [product_entity_id], references: [id])
+    agent         User          @relation(fields: [agent_id], references: [id])
+}
+
+model ProductInsuranceTable {
+    id                Int @id @default(autoincrement())
+    customer_id       Int
+    product_entity_id Int
+    agent_id          Int
+
+    policy_number     String?
+    policy_type       String?
+    sum_assured       Float?
+    premium_amount    Float?
+    premium_frequency String?
+    issue_date        DateTime?
+    start_date        DateTime?
+    end_date          DateTime?
+    nominee_name      String?
+    status            String    @default("active")
+    notes             String?
+    created_at        DateTime  @default(now())
+
+    customer      Customer      @relation(fields: [customer_id], references: [id])
+    productEntity ProductEntity @relation(fields: [product_entity_id], references: [id])
+    agent         User          @relation(fields: [agent_id], references: [id])
+}
+
+/**
+ * ============================================================
+ * RAZORPAY
+ * ==============================================================
+ */
+
+model RazorpayOrder {
+    id         Int           @id @default(autoincrement())
+    org_id     Int
+    order_id   String        @unique
+    amount     Float
+    currency   String        @default("INR")
+    status     PaymentStatus @default(created)
+    receipt    String?
+    created_at DateTime      @default(now())
+
+    organization Organization      @relation(fields: [org_id], references: [id])
+    payments     RazorpayPayment[]
+}
+
+model RazorpayPayment {
+    id                  Int      @id @default(autoincrement())
+    order_id            Int
+    razorpay_payment_id String   @unique
+    amount              Float?
+    status              String?
+    method              String?
+    email               String?
+    contact             String?
+    created_at          DateTime @default(now())
+
+    order RazorpayOrder @relation(fields: [order_id], references: [id])
+}
+
+model RazorpaySubscriptionEvent {
+    id                       Int                           @id @default(autoincrement())
+    razorpay_subscription_id String?
+    event_type               RazorpaySubscriptionEventType
+    payload                  Json
+    created_at               DateTime                      @default(now())
+
+    subscription Subscription? @relation(fields: [razorpay_subscription_id], references: [razorpaySubscriptionId])
+}
