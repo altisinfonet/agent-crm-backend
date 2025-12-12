@@ -1,12 +1,18 @@
 // prisma/schema.prisma
 
+// generator client {
+//     provider = "prisma-client-js"
+// }
+
 generator client {
-    provider = "prisma-client-js"
+    provider        = "prisma-client-js"
+    output          = "../generated/prisma"
+    previewFeatures = ["fullTextSearchPostgres"]
 }
 
 datasource db {
     provider = "postgresql"
-    url      = env("DATABASE_URL") // Required in Prisma v6
+    url      = env("DATABASE_URL")
 }
 
 /**
@@ -21,6 +27,23 @@ enum RoleName {
     AGENT
 }
 
+enum Status {
+    ACTIVE
+    INACTIVE
+}
+
+enum OtpChannel {
+    sms
+    whatsapp
+    email
+}
+
+enum OtpPurpose {
+    login
+    signup
+    verification
+}
+
 enum SubscriptionStatus {
     active
     paused
@@ -31,6 +54,12 @@ enum PaymentStatus {
     created
     paid
     failed
+}
+
+enum SubscriptionCycle {
+    WEEKLY
+    MONTHLY
+    YEARLY
 }
 
 enum RazorpaySubscriptionEventType {
@@ -48,10 +77,11 @@ enum RazorpaySubscriptionEventType {
  */
 
 model UserSession {
-    id                      Int       @id @default(autoincrement())
+    id                      BigInt    @id @default(autoincrement())
     session_id              String    @unique
-    user_id                 Int
-    org_id                  Int?
+    user_id                 BigInt
+    user                    User      @relation(fields: [user_id], references: [id])
+    org_id                  BigInt?
     device_info             Json?
     ip_address              String?
     refresh_token_hash      String
@@ -61,21 +91,25 @@ model UserSession {
     last_used_at            DateTime?
     revoked                 Boolean   @default(false)
 
-    user User @relation(fields: [user_id], references: [id])
+    @@index([session_id, user_id, org_id, ip_address, revoked])
+    @@map("tbl_user_session")
 }
 
 model Otp {
-    id          Int      @id @default(autoincrement())
-    delivery_id String   @unique
+    id          BigInt     @id @default(autoincrement())
+    delivery_id String     @unique
     destination String
-    channel     String // sms | whatsapp | email
-    purpose     String // login | signup | verification
+    channel     OtpChannel
+    purpose     OtpPurpose
     otp_hash    String
-    attempts    Int      @default(0)
-    created_at  DateTime @default(now())
+    attempts    Int        @default(0)
+    created_at  DateTime   @default(now())
     expires_at  DateTime
-    used        Boolean  @default(false)
+    used        Boolean    @default(false)
     meta        Json?
+
+    @@index([delivery_id, destination, channel, purpose, used])
+    @@map("tbl_otp")
 }
 
 /**
@@ -85,12 +119,14 @@ model Otp {
  */
 
 model Role {
-    id          Int      @id @default(autoincrement())
-    name        RoleName @unique
-    description String?
-    created_at  DateTime @default(now())
-
+    id                BigInt             @id @default(autoincrement())
+    name              RoleName           @unique
+    description       String?
+    created_at        DateTime           @default(now())
     organizationUsers OrganizationUser[]
+
+    @@index([name])
+    @@map("tbl_role")
 }
 
 /**
@@ -100,25 +136,29 @@ model Role {
  */
 
 model User {
-    id            Int      @id @default(autoincrement())
-    full_name     String
-    email         String?  @unique
-    phone         String?
-    pan_number    String?
-    kyc_status    Boolean  @default(false)
-    password_hash String
-    created_at    DateTime @default(now())
-
-    organizations        Organization[]           @relation("OrgCreatedBy")
+    id                   BigInt               @id @default(autoincrement())
+    first_name           String?
+    last_name            String?
+    email                String?              @unique
+    phone                String?
+    pan_number           String?
+    kyc_status           Boolean              @default(false)
+    password             String?              @db.Text()
+    created_at           DateTime             @default(now())
+    updated_at           DateTime             @updatedAt
+    organizations        Organization[]       @relation("OrgCreatedBy")
     orgUsers             OrganizationUser[]
-    customers            Customer[]               @relation("CustomerCreatedBy")
-    loanDetails          ProductLoanTable[]
-    sipDetails           ProductSipTable[]
-    mfDetails            ProductMutualFundTable[]
-    fdDetails            ProductFdTable[]
-    insuranceDetails     ProductInsuranceTable[]
+    customers            Customer[]           @relation("CustomerCreatedBy")
+    loanDetails          ProductLoan[]
+    sipDetails           ProductSip[]
+    mfDetails            ProductMutualFund[]
+    fdDetails            ProductFd[]
+    insuranceDetails     ProductInsurance[]
     agentProductEntities AgentProductEntity[]
     sessions             UserSession[]
+
+    @@index([first_name, last_name, email, phone, pan_number, kyc_status])
+    @@map("tbl_user")
 }
 
 /**
@@ -128,20 +168,23 @@ model User {
  */
 
 model Organization {
-    id            Int      @id @default(autoincrement())
-    name          String
-    gst_number    String?
-    pan_number    String?
-    contact_email String?
-    contact_phone String?
-    created_by    Int
-    createdAt     DateTime @default(now())
-
+    id             BigInt             @id @default(autoincrement())
+    name           String
+    gst_number     String?
+    pan_number     String?
+    contact_email  String?
+    contact_phone  String?
+    created_by     BigInt
     createdByUser  User               @relation("OrgCreatedBy", fields: [created_by], references: [id])
+    created_at     DateTime           @default(now())
+    updated_at     DateTime           @updatedAt
     subscription   Subscription?
     users          OrganizationUser[]
     customers      Customer[]
     razorpayOrders RazorpayOrder[]
+
+    @@index([name, gst_number, pan_number, contact_email, contact_phone])
+    @@map("tbl_organization")
 }
 
 /**
@@ -151,19 +194,21 @@ model Organization {
  */
 
 model OrganizationUser {
-    id         Int      @id @default(autoincrement())
-    org_id     Int
-    user_id    Int
-    role_id    Int
-    status     String   @default("ACTIVE")
-    is_owner   Boolean  @default(false)
-    created_at DateTime @default(now())
-
+    id           BigInt       @id @default(autoincrement())
+    org_id       BigInt
     organization Organization @relation(fields: [org_id], references: [id])
+    user_id      BigInt
     user         User         @relation(fields: [user_id], references: [id])
+    role_id      BigInt
     role         Role         @relation(fields: [role_id], references: [id])
+    status       Status       @default(ACTIVE)
+    is_owner     Boolean      @default(false)
+    created_at   DateTime     @default(now())
+    updated_at   DateTime     @updatedAt
 
     @@unique([org_id, user_id])
+    @@index([org_id, user_id, role_id, status])
+    @@map("tbl_organization_user")
 }
 
 /**
@@ -173,15 +218,18 @@ model OrganizationUser {
  */
 
 model SubscriptionPlan {
-    id             Int      @id @default(autoincrement())
-    name           String   @unique
+    id             BigInt            @id @default(autoincrement())
+    name           String            @unique
     max_customers  Int
     price          Float
-    billing_cycle  String   @default("MONTHLY")
-    razorpayPlanId String?  @unique
-    created_at     DateTime @default(now())
+    billing_cycle  SubscriptionCycle @default(MONTHLY)
+    razorpayPlanId String?           @unique
+    created_at     DateTime          @default(now())
+    updated_at     DateTime          @updatedAt
+    subscriptions  Subscription[]
 
-    subscriptions Subscription[]
+    @@index([name, billing_cycle, razorpayPlanId])
+    @@map("tbl_subscription_plan")
 }
 
 /**
@@ -191,19 +239,22 @@ model SubscriptionPlan {
  */
 
 model Subscription {
-    id                     Int                @id @default(autoincrement())
-    org_id                 Int                @unique
-    plan_id                Int
-    razorpaySubscriptionId String?            @unique
-    current_status         SubscriptionStatus @default(active)
+    id                     BigInt                      @id @default(autoincrement())
+    org_id                 BigInt                      @unique
+    organization           Organization                @relation(fields: [org_id], references: [id])
+    plan_id                BigInt
+    plan                   SubscriptionPlan            @relation(fields: [plan_id], references: [id])
+    razorpaySubscriptionId String?                     @unique
+    current_status         SubscriptionStatus          @default(active)
     start_date             DateTime
     end_date               DateTime
-    auto_renew             Boolean            @default(true)
-    created_at             DateTime           @default(now())
+    auto_renew             Boolean                     @default(true)
+    created_at             DateTime                    @default(now())
+    updated_at             DateTime                    @updatedAt
+    events                 RazorpaySubscriptionEvent[]
 
-    organization Organization                @relation(fields: [org_id], references: [id])
-    plan         SubscriptionPlan            @relation(fields: [plan_id], references: [id])
-    events       RazorpaySubscriptionEvent[]
+    @@index([org_id, plan_id, razorpaySubscriptionId, current_status, auto_renew])
+    @@map("tbl_subscription")
 }
 
 /**
@@ -213,25 +264,28 @@ model Subscription {
  */
 
 model Customer {
-    id             Int      @id @default(autoincrement())
-    org_id         Int
-    created_by     Int
-    full_name      String
-    email          String?
-    phone          String?
-    aadhaar_number String?
-    pan_number     String?
-    address        String?
-    created_at     DateTime @default(now())
+    id               BigInt              @id @default(autoincrement())
+    org_id           BigInt
+    created_by       BigInt
+    createdByUser    User                @relation("CustomerCreatedBy", fields: [created_by], references: [id])
+    first_name       String?
+    last_name        String?
+    email            String?
+    phone            String?
+    aadhaar_number   String?
+    pan_number       String?
+    address          String?
+    created_at       DateTime            @default(now())
+    updated_at       DateTime            @updatedAt
+    organization     Organization        @relation(fields: [org_id], references: [id])
+    loanDetails      ProductLoan[]
+    sipDetails       ProductSip[]
+    mfDetails        ProductMutualFund[]
+    fdDetails        ProductFd[]
+    insuranceDetails ProductInsurance[]
 
-    organization Organization @relation(fields: [org_id], references: [id])
-    createdBy    User         @relation("CustomerCreatedBy", fields: [created_by], references: [id])
-
-    loanDetails      ProductLoanTable[]
-    sipDetails       ProductSipTable[]
-    mfDetails        ProductMutualFundTable[]
-    fdDetails        ProductFdTable[]
-    insuranceDetails ProductInsuranceTable[]
+    @@index([first_name, last_name, email, phone, aadhaar_number, pan_number])
+    @@map("tbl_customer")
 }
 
 /**
@@ -241,12 +295,15 @@ model Customer {
  */
 
 model ProductType {
-    id         Int      @id @default(autoincrement())
-    name       String   @unique
-    status     String   @default("ACTIVE")
-    created_at DateTime @default(now())
+    id         BigInt          @id @default(autoincrement())
+    name       String          @unique
+    status     Status          @default(ACTIVE)
+    created_at DateTime        @default(now())
+    updated_at DateTime        @updatedAt
+    entities   ProductEntity[]
 
-    entities ProductEntity[]
+    @@index([name, status])
+    @@map("tbl_product_type")
 }
 
 /**
@@ -256,20 +313,22 @@ model ProductType {
  */
 
 model ProductEntity {
-    id              Int      @id @default(autoincrement())
-    name            String
-    product_type_id Int
-    status          String   @default("ACTIVE")
-    created_at      DateTime @default(now())
-
+    id                   BigInt               @id @default(autoincrement())
+    name                 String
+    product_type_id      BigInt
     productType          ProductType          @relation(fields: [product_type_id], references: [id])
+    status               Status               @default(ACTIVE)
+    created_at           DateTime             @default(now())
+    updated_at           DateTime             @updatedAt
     agentProductEntities AgentProductEntity[]
+    loanDetails          ProductLoan[]
+    sipDetails           ProductSip[]
+    mfDetails            ProductMutualFund[]
+    fdDetails            ProductFd[]
+    insuranceDetails     ProductInsurance[]
 
-    loanDetails      ProductLoanTable[]
-    sipDetails       ProductSipTable[]
-    mfDetails        ProductMutualFundTable[]
-    fdDetails        ProductFdTable[]
-    insuranceDetails ProductInsuranceTable[]
+    @@index([name, product_type_id, status])
+    @@map("tbl_product_entity")
 }
 
 /**
@@ -279,15 +338,17 @@ model ProductEntity {
  */
 
 model AgentProductEntity {
-    id                Int      @id @default(autoincrement())
-    agent_id          Int
-    product_entity_id Int
-    created_at        DateTime @default(now())
-
-    agent         User          @relation(fields: [agent_id], references: [id])
-    productEntity ProductEntity @relation(fields: [product_entity_id], references: [id])
+    id                BigInt        @id @default(autoincrement())
+    agent_id          BigInt
+    agent             User          @relation(fields: [agent_id], references: [id])
+    product_entity_id BigInt
+    productEntity     ProductEntity @relation(fields: [product_entity_id], references: [id])
+    created_at        DateTime      @default(now())
+    updated_at        DateTime      @updatedAt
 
     @@unique([agent_id, product_entity_id])
+    @@index([agent_id, product_entity_id])
+    @@map("tbl_agent_product_entity")
 }
 
 /**
@@ -296,12 +357,14 @@ model AgentProductEntity {
  * ==============================================================
  */
 
-model ProductLoanTable {
-    id                Int @id @default(autoincrement())
-    customer_id       Int
-    product_entity_id Int
-    agent_id          Int
-
+model ProductLoan {
+    id                 BigInt        @id @default(autoincrement())
+    customer_id        BigInt
+    customer           Customer      @relation(fields: [customer_id], references: [id])
+    product_entity_id  BigInt
+    productEntity      ProductEntity @relation(fields: [product_entity_id], references: [id])
+    agent_id           BigInt
+    agent              User          @relation(fields: [agent_id], references: [id])
     loan_type          String?
     loan_amount        Float?
     interest_rate      Float?
@@ -311,21 +374,23 @@ model ProductLoanTable {
     start_date         DateTime?
     end_date           DateTime?
     collateral_details String?
-    status             String    @default("active")
+    status             Status        @default(ACTIVE)
     notes              String?
-    created_at         DateTime  @default(now())
+    created_at         DateTime      @default(now())
+    updated_at         DateTime      @updatedAt
 
-    customer      Customer      @relation(fields: [customer_id], references: [id])
-    productEntity ProductEntity @relation(fields: [product_entity_id], references: [id])
-    agent         User          @relation(fields: [agent_id], references: [id])
+    @@index([customer_id, product_entity_id, agent_id, loan_type, status])
+    @@map("tbl_product_loan")
 }
 
-model ProductSipTable {
-    id                Int @id @default(autoincrement())
-    customer_id       Int
-    product_entity_id Int
-    agent_id          Int
-
+model ProductSip {
+    id                      BigInt        @id @default(autoincrement())
+    customer_id             BigInt
+    customer                Customer      @relation(fields: [customer_id], references: [id])
+    product_entity_id       BigInt
+    productEntity           ProductEntity @relation(fields: [product_entity_id], references: [id])
+    agent_id                BigInt
+    agent                   User          @relation(fields: [agent_id], references: [id])
     folio_number            String?
     scheme_name             String?
     start_date              DateTime?
@@ -335,19 +400,21 @@ model ProductSipTable {
     expected_maturity_value Float?
     risk_profile            String?
     notes                   String?
-    created_at              DateTime  @default(now())
+    created_at              DateTime      @default(now())
+    updated_at              DateTime      @updatedAt
 
-    customer      Customer      @relation(fields: [customer_id], references: [id])
-    productEntity ProductEntity @relation(fields: [product_entity_id], references: [id])
-    agent         User          @relation(fields: [agent_id], references: [id])
+    @@index([customer_id, product_entity_id, agent_id, scheme_name, frequency])
+    @@map("tbl_product_sip")
 }
 
-model ProductMutualFundTable {
-    id                Int @id @default(autoincrement())
-    customer_id       Int
-    product_entity_id Int
-    agent_id          Int
-
+model ProductMutualFund {
+    id                BigInt        @id @default(autoincrement())
+    customer_id       BigInt
+    customer          Customer      @relation(fields: [customer_id], references: [id])
+    product_entity_id BigInt
+    productEntity     ProductEntity @relation(fields: [product_entity_id], references: [id])
+    agent_id          BigInt
+    agent             User          @relation(fields: [agent_id], references: [id])
     folio_number      String?
     scheme_name       String?
     nav               Float?
@@ -357,42 +424,46 @@ model ProductMutualFundTable {
     investment_type   String?
     risk_profile      String?
     notes             String?
-    created_at        DateTime  @default(now())
+    created_at        DateTime      @default(now())
+    updated_at        DateTime      @updatedAt
 
-    customer      Customer      @relation(fields: [customer_id], references: [id])
-    productEntity ProductEntity @relation(fields: [product_entity_id], references: [id])
-    agent         User          @relation(fields: [agent_id], references: [id])
+    @@index([customer_id, product_entity_id, agent_id, folio_number, investment_type])
+    @@map("tbl_product_mutual_fund")
 }
 
-model ProductFdTable {
-    id                Int @id @default(autoincrement())
-    customer_id       Int
-    product_entity_id Int
-    agent_id          Int
+model ProductFd {
+    id                BigInt        @id @default(autoincrement())
+    customer_id       BigInt
+    customer          Customer      @relation(fields: [customer_id], references: [id])
+    product_entity_id BigInt
+    productEntity     ProductEntity @relation(fields: [product_entity_id], references: [id])
+    agent_id          BigInt
+    agent             User          @relation(fields: [agent_id], references: [id])
+    fd_number         String?
+    amount            Float?
+    interest_rate     Float?
+    tenure_months     Int?
+    start_date        DateTime?
+    maturity_date     DateTime?
+    maturity_amount   Float?
+    payout_frequency  String?
+    nominee_name      String?
+    notes             String?
+    created_at        DateTime      @default(now())
+    updated_at        DateTime      @updatedAt
 
-    fd_number        String?
-    amount           Float?
-    interest_rate    Float?
-    tenure_months    Int?
-    start_date       DateTime?
-    maturity_date    DateTime?
-    maturity_amount  Float?
-    payout_frequency String?
-    nominee_name     String?
-    notes            String?
-    created_at       DateTime  @default(now())
-
-    customer      Customer      @relation(fields: [customer_id], references: [id])
-    productEntity ProductEntity @relation(fields: [product_entity_id], references: [id])
-    agent         User          @relation(fields: [agent_id], references: [id])
+    @@index([customer_id, product_entity_id, agent_id, fd_number, payout_frequency])
+    @@map("tbl_product_fd")
 }
 
-model ProductInsuranceTable {
-    id                Int @id @default(autoincrement())
-    customer_id       Int
-    product_entity_id Int
-    agent_id          Int
-
+model ProductInsurance {
+    id                BigInt        @id @default(autoincrement())
+    customer_id       BigInt
+    customer          Customer      @relation(fields: [customer_id], references: [id])
+    product_entity_id BigInt
+    productEntity     ProductEntity @relation(fields: [product_entity_id], references: [id])
+    agent_id          BigInt
+    agent             User          @relation(fields: [agent_id], references: [id])
     policy_number     String?
     policy_type       String?
     sum_assured       Float?
@@ -402,13 +473,13 @@ model ProductInsuranceTable {
     start_date        DateTime?
     end_date          DateTime?
     nominee_name      String?
-    status            String    @default("active")
+    status            Status        @default(ACTIVE)
     notes             String?
-    created_at        DateTime  @default(now())
+    created_at        DateTime      @default(now())
+    updated_at        DateTime      @updatedAt
 
-    customer      Customer      @relation(fields: [customer_id], references: [id])
-    productEntity ProductEntity @relation(fields: [product_entity_id], references: [id])
-    agent         User          @relation(fields: [agent_id], references: [id])
+    @@index([customer_id, product_entity_id, agent_id, policy_number, policy_type, status])
+    @@map("tbl_product_insurance")
 }
 
 /**
@@ -418,39 +489,48 @@ model ProductInsuranceTable {
  */
 
 model RazorpayOrder {
-    id         Int           @id @default(autoincrement())
-    org_id     Int
-    order_id   String        @unique
-    amount     Float
-    currency   String        @default("INR")
-    status     PaymentStatus @default(created)
-    receipt    String?
-    created_at DateTime      @default(now())
-
+    id           BigInt            @id @default(autoincrement())
+    org_id       BigInt
     organization Organization      @relation(fields: [org_id], references: [id])
+    order_id     String            @unique
+    amount       Float
+    currency     String            @default("INR")
+    status       PaymentStatus     @default(created)
+    receipt      String?
+    created_at   DateTime          @default(now())
+    updated_at   DateTime          @updatedAt
     payments     RazorpayPayment[]
+
+    @@index([org_id, order_id, status])
+    @@map("tbl_razorpay_order")
 }
 
 model RazorpayPayment {
-    id                  Int      @id @default(autoincrement())
-    order_id            Int
-    razorpay_payment_id String   @unique
+    id                  BigInt        @id @default(autoincrement())
+    order_id            BigInt
+    order               RazorpayOrder @relation(fields: [order_id], references: [id])
+    razorpay_payment_id String        @unique
     amount              Float?
-    status              String?
+    status              PaymentStatus @default(created)
     method              String?
     email               String?
     contact             String?
-    created_at          DateTime @default(now())
+    created_at          DateTime      @default(now())
+    updated_at          DateTime      @updatedAt
 
-    order RazorpayOrder @relation(fields: [order_id], references: [id])
+    @@index([order_id, razorpay_payment_id, status, method])
+    @@map("tbl_razorpay_payment")
 }
 
 model RazorpaySubscriptionEvent {
-    id                       Int                           @id @default(autoincrement())
+    id                       BigInt                        @id @default(autoincrement())
     razorpay_subscription_id String?
+    subscription             Subscription?                 @relation(fields: [razorpay_subscription_id], references: [razorpaySubscriptionId])
     event_type               RazorpaySubscriptionEventType
-    payload                  Json
+    payload                  Json?
     created_at               DateTime                      @default(now())
+    updated_at               DateTime                      @updatedAt
 
-    subscription Subscription? @relation(fields: [razorpay_subscription_id], references: [razorpaySubscriptionId])
+    @@index([razorpay_subscription_id, event_type])
+    @@map("tbl_razorpay_subscription_event")
 }
