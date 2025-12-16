@@ -1,14 +1,11 @@
 -- CreateEnum
+CREATE TYPE "AuthType" AS ENUM ('GOOGLE', 'APPLE', 'EMAIL_OTP', 'PHONE_OTP', 'EMAIL_PW');
+
+-- CreateEnum
 CREATE TYPE "RoleName" AS ENUM ('OWNER', 'ADMIN', 'AGENT');
 
 -- CreateEnum
 CREATE TYPE "Status" AS ENUM ('ACTIVE', 'INACTIVE');
-
--- CreateEnum
-CREATE TYPE "OtpChannel" AS ENUM ('sms', 'whatsapp', 'email');
-
--- CreateEnum
-CREATE TYPE "OtpPurpose" AS ENUM ('login', 'signup', 'verification');
 
 -- CreateEnum
 CREATE TYPE "SubscriptionStatus" AS ENUM ('active', 'paused', 'cancelled');
@@ -41,23 +38,6 @@ CREATE TABLE "tbl_user_session" (
 );
 
 -- CreateTable
-CREATE TABLE "tbl_otp" (
-    "id" BIGSERIAL NOT NULL,
-    "delivery_id" TEXT NOT NULL,
-    "destination" TEXT NOT NULL,
-    "channel" "OtpChannel" NOT NULL,
-    "purpose" "OtpPurpose" NOT NULL,
-    "otp_hash" TEXT NOT NULL,
-    "attempts" INTEGER NOT NULL DEFAULT 0,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "expires_at" TIMESTAMP(3) NOT NULL,
-    "used" BOOLEAN NOT NULL DEFAULT false,
-    "meta" JSONB,
-
-    CONSTRAINT "tbl_otp_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "tbl_role" (
     "id" BIGSERIAL NOT NULL,
     "name" "RoleName" NOT NULL,
@@ -68,19 +48,64 @@ CREATE TABLE "tbl_role" (
 );
 
 -- CreateTable
+CREATE TABLE "tbl_admin_settings" (
+    "id" BIGSERIAL NOT NULL,
+    "title" TEXT NOT NULL,
+    "metadata" JSONB NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "tbl_admin_settings_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "tbl_user" (
     "id" BIGSERIAL NOT NULL,
     "first_name" TEXT,
     "last_name" TEXT,
     "email" TEXT,
-    "phone" TEXT,
+    "password" TEXT,
+    "role_id" BIGINT NOT NULL,
+    "phone_no" TEXT,
+    "image" TEXT,
+    "provider" "AuthType" NOT NULL,
+    "provider_id" TEXT,
     "pan_number" TEXT,
     "kyc_status" BOOLEAN NOT NULL DEFAULT false,
-    "password" TEXT,
+    "refresh_token" TEXT,
+    "reset_token" TEXT,
+    "reset_token_exp" TIMESTAMP(3),
+    "is_temporary" BOOLEAN NOT NULL DEFAULT false,
+    "is_deleted" BOOLEAN NOT NULL DEFAULT false,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "tbl_user_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "tbl_otp" (
+    "id" TEXT NOT NULL,
+    "credential" TEXT NOT NULL,
+    "otp" TEXT NOT NULL,
+    "limit" INTEGER NOT NULL DEFAULT 0,
+    "is_email" BOOLEAN NOT NULL DEFAULT true,
+    "restrictedTime" TIMESTAMP(3),
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expires_at" TIMESTAMP(3) NOT NULL,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "tbl_otp_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "tbl_invalidated_tokens" (
+    "id" TEXT NOT NULL,
+    "token" TEXT NOT NULL,
+    "expires_at" TIMESTAMP(3) NOT NULL,
+    "user_id" BIGINT NOT NULL,
+
+    CONSTRAINT "tbl_invalidated_tokens_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -151,6 +176,7 @@ CREATE TABLE "tbl_customer" (
     "last_name" TEXT,
     "email" TEXT,
     "phone" TEXT,
+    "image" TEXT,
     "aadhaar_number" TEXT,
     "pan_number" TEXT,
     "address" TEXT,
@@ -354,12 +380,6 @@ CREATE UNIQUE INDEX "tbl_user_session_session_id_key" ON "tbl_user_session"("ses
 CREATE INDEX "tbl_user_session_session_id_user_id_org_id_ip_address_revok_idx" ON "tbl_user_session"("session_id", "user_id", "org_id", "ip_address", "revoked");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "tbl_otp_delivery_id_key" ON "tbl_otp"("delivery_id");
-
--- CreateIndex
-CREATE INDEX "tbl_otp_delivery_id_destination_channel_purpose_used_idx" ON "tbl_otp"("delivery_id", "destination", "channel", "purpose", "used");
-
--- CreateIndex
 CREATE UNIQUE INDEX "tbl_role_name_key" ON "tbl_role"("name");
 
 -- CreateIndex
@@ -369,7 +389,19 @@ CREATE INDEX "tbl_role_name_idx" ON "tbl_role"("name");
 CREATE UNIQUE INDEX "tbl_user_email_key" ON "tbl_user"("email");
 
 -- CreateIndex
-CREATE INDEX "tbl_user_first_name_last_name_email_phone_pan_number_kyc_st_idx" ON "tbl_user"("first_name", "last_name", "email", "phone", "pan_number", "kyc_status");
+CREATE UNIQUE INDEX "tbl_user_reset_token_key" ON "tbl_user"("reset_token");
+
+-- CreateIndex
+CREATE INDEX "tbl_user_first_name_last_name_email_phone_no_provider_pan_n_idx" ON "tbl_user"("first_name", "last_name", "email", "phone_no", "provider", "pan_number", "kyc_status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "tbl_otp_credential_key" ON "tbl_otp"("credential");
+
+-- CreateIndex
+CREATE INDEX "tbl_otp_credential_idx" ON "tbl_otp"("credential");
+
+-- CreateIndex
+CREATE INDEX "tbl_invalidated_tokens_user_id_idx" ON "tbl_invalidated_tokens"("user_id");
 
 -- CreateIndex
 CREATE INDEX "tbl_organization_name_gst_number_pan_number_contact_email_c_idx" ON "tbl_organization"("name", "gst_number", "pan_number", "contact_email", "contact_phone");
@@ -448,6 +480,12 @@ CREATE INDEX "tbl_razorpay_subscription_event_razorpay_subscription_id_ev_idx" O
 
 -- AddForeignKey
 ALTER TABLE "tbl_user_session" ADD CONSTRAINT "tbl_user_session_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "tbl_user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "tbl_user" ADD CONSTRAINT "tbl_user_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "tbl_role"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "tbl_invalidated_tokens" ADD CONSTRAINT "tbl_invalidated_tokens_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "tbl_user"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "tbl_organization" ADD CONSTRAINT "tbl_organization_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "tbl_user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

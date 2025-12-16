@@ -1,19 +1,37 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { CryptoUtil } from 'src/common/utils/crypto.util';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
-    constructor() {
+    constructor(
+        config: ConfigService,
+        private readonly prisma: PrismaService,
+    ) {
         super({
             jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-            secretOrKey: process.env.JWT_SECRET,
-            passReqToCallback: true,
+            secretOrKey: config.get('JWT_SECRET'),
         });
     }
 
-    validate(req: any, payload: any) {
+    async validate(payload: any) {
+        const session = await this.prisma.userSession.findFirst({
+            where: {
+                session_id: payload.sid,
+                user_id: BigInt(payload.sub),
+                revoked: false,
+                expires_at: { gt: new Date() },
+            },
+        });
+
+        if (!session) {
+            throw new UnauthorizedException('Session expired');
+        }
+
         return payload;
     }
+
 }

@@ -21,6 +21,14 @@ datasource db {
  * ==============================================================
  */
 
+enum AuthType {
+    GOOGLE
+    APPLE
+    EMAIL_OTP
+    PHONE_OTP
+    EMAIL_PW
+}
+
 enum RoleName {
     OWNER
     ADMIN
@@ -30,18 +38,6 @@ enum RoleName {
 enum Status {
     ACTIVE
     INACTIVE
-}
-
-enum OtpChannel {
-    sms
-    whatsapp
-    email
-}
-
-enum OtpPurpose {
-    login
-    signup
-    verification
 }
 
 enum SubscriptionStatus {
@@ -95,23 +91,6 @@ model UserSession {
     @@map("tbl_user_session")
 }
 
-model Otp {
-    id          BigInt     @id @default(autoincrement())
-    delivery_id String     @unique
-    destination String
-    channel     OtpChannel
-    purpose     OtpPurpose
-    otp_hash    String
-    attempts    Int        @default(0)
-    created_at  DateTime   @default(now())
-    expires_at  DateTime
-    used        Boolean    @default(false)
-    meta        Json?
-
-    @@index([delivery_id, destination, channel, purpose, used])
-    @@map("tbl_otp")
-}
-
 /**
  * ============================================================
  * ROLE
@@ -124,6 +103,7 @@ model Role {
     description       String?
     created_at        DateTime           @default(now())
     organizationUsers OrganizationUser[]
+    users             User[]
 
     @@index([name])
     @@map("tbl_role")
@@ -135,17 +115,82 @@ model Role {
  * ==============================================================
  */
 
+model AdminSettings {
+    id         BigInt   @id @default(autoincrement()) @db.BigInt
+    title      String
+    metadata   Json
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt()
+
+    @@index([title])
+    @@map("tbl_admin_settings")
+}
+
+model Country {
+    id         BigInt   @id @default(autoincrement())
+    name       String
+    iso_code   String   @unique
+    phone_code String?
+    status     Status   @default(ACTIVE)
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    currencies CountryCurrency[]
+
+    @@index([name, iso_code, phone_code, status])
+    @@map("tbl_country")
+}
+
+model Currency {
+    id            BigInt   @id @default(autoincrement())
+    name          String
+    code          String   @unique
+    symbol        String
+    exchange_rate Decimal? @default(0)
+    status        Status   @default(ACTIVE)
+    created_at    DateTime @default(now())
+    updated_at    DateTime @updatedAt
+
+    countries CountryCurrency[]
+
+    @@index([name, code, symbol, exchange_rate])
+    @@map("tbl_currency")
+}
+
+model CountryCurrency {
+    id          BigInt   @id @default(autoincrement())
+    country_id  BigInt
+    country     Country  @relation(fields: [country_id], references: [id])
+    currency_id BigInt
+    currency    Currency @relation(fields: [currency_id], references: [id])
+    is_default  Boolean  @default(false)
+
+    @@unique([country_id, currency_id])
+    @@map("tbl_country_currency")
+}
+
 model User {
     id                   BigInt               @id @default(autoincrement())
     first_name           String?
     last_name            String?
     email                String?              @unique
-    phone                String?
+    password             String?              @db.Text()
+    role_id              BigInt
+    role                 Role                 @relation(fields: [role_id], references: [id])
+    phone_no             String?
+    image                String?
+    provider             AuthType
+    provider_id          String?
     pan_number           String?
     kyc_status           Boolean              @default(false)
-    password             String?              @db.Text()
+    refresh_token        String?
+    reset_token          String?              @unique
+    reset_token_exp      DateTime?
+    is_temporary         Boolean              @default(false)
+    is_deleted           Boolean              @default(false)
     created_at           DateTime             @default(now())
     updated_at           DateTime             @updatedAt
+    invalidatedTokens    InvalidatedToken[]
     organizations        Organization[]       @relation("OrgCreatedBy")
     orgUsers             OrganizationUser[]
     customers            Customer[]           @relation("CustomerCreatedBy")
@@ -157,8 +202,34 @@ model User {
     agentProductEntities AgentProductEntity[]
     sessions             UserSession[]
 
-    @@index([first_name, last_name, email, phone, pan_number, kyc_status])
+    @@index([first_name, last_name, email, phone_no, provider, pan_number, kyc_status])
     @@map("tbl_user")
+}
+
+model OTP {
+    id             String    @id @default(uuid())
+    credential     String    @unique
+    otp            String
+    limit          Int       @default(0)
+    is_email       Boolean   @default(true)
+    restrictedTime DateTime?
+    created_at     DateTime  @default(now())
+    expires_at     DateTime
+    updated_at     DateTime  @updatedAt()
+
+    @@index([credential])
+    @@map("tbl_otp")
+}
+
+model InvalidatedToken {
+    id         String   @id @default(uuid())
+    token      String
+    expires_at DateTime
+    user_id    BigInt
+    user       User     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+    @@index([user_id])
+    @@map("tbl_invalidated_tokens")
 }
 
 /**
@@ -272,6 +343,7 @@ model Customer {
     last_name        String?
     email            String?
     phone            String?
+    image            String?
     aadhaar_number   String?
     pan_number       String?
     address          String?

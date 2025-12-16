@@ -1,180 +1,317 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { OtpService } from './otp/otp.service';
-import { SessionService } from './sessions/session.service';
-import { JwtUtil } from 'src/common/utils/jwt.util';
 import { CryptoUtil } from 'src/common/utils/crypto.util';
-import { LoginDto } from './dto/login.dto';
+import { OtpService } from 'src/otp/otp.service';
+import { decryptData, encryptData } from 'src/helper/common.helper';
+import { CommonDto } from './dto/common.dto';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
+import { Tokens } from './types/tokens.type';
+import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
+import { Request } from 'express';
 
 @Injectable()
 export class AuthService {
     constructor(
         private prisma: PrismaService,
         private otpService: OtpService,
-        private sessionService: SessionService,
+        private jwtService: JwtService,
+        private config: ConfigService,
+        // private sessionService: SessionService,
     ) { }
 
-    /* ============================================================
-       SEND OTP
-    ============================================================ */
-    async sendOtp(dto: any) {
-        const otp = await this.otpService.generateOtp(dto);
-        return { ok: true, delivery_id: otp.delivery_id };
-    }
+    async auth(commonDto: CommonDto, req: Request): Promise<Tokens> {
+        const payload = decryptData(commonDto.data);
 
-    /* ============================================================
-       LOGIN
-    ============================================================ */
-    async login(dto: LoginDto) {
-        const { auth_type } = dto;
+        const {
+            auth_method,
+            email,
+            phone_no,
+            password,
+            otp,
+            provider_id,
+            first_name,
+            last_name,
+        } = payload;
 
-        let user: any;
-
-        if (auth_type === 'email_pw') {
-            user = await this.loginWithEmailPassword(dto);
-        } else if (auth_type === 'email_otp' || auth_type === 'phone_otp') {
-            user = await this.loginWithOtp(dto);
-        } else if (auth_type === 'google') {
-            user = await this.loginWithGoogle(dto);
-        } else if (auth_type === 'apple') {
-            user = await this.loginWithApple(dto);
-        } else {
-            throw new UnauthorizedException('Invalid auth_type');
+        if (!auth_method) {
+            throw new BadRequestException('Auth method required');
         }
 
-        // Create session + tokens
-        const session = await this.sessionService.createSession(user);
 
-        return {
-            ok: true,
-            user,
-            tokens: session.tokens,
-            session: session.sessionData,
-        };
-    }
+        await this.verifyAuth(payload);
 
-    /* ============================================================
-       EMAIL + PASSWORD
-    ============================================================ */
-    async loginWithEmailPassword(dto: LoginDto) {
-        const user = await this.prisma.user.findUnique({
-            where: { email: dto.email },
-        });
+        const where: any = {};
 
-        if (!user) throw new UnauthorizedException('User not found');
-
-        if (!dto.password) {
-            throw new UnauthorizedException('Password is required for email/password login');
+        if ((auth_method === 'EMAIL_OTP' || auth_method === "EMAIL_PW") && email) {
+            where.email = email.toLowerCase();
         }
 
-        const valid = CryptoUtil.compareHash(dto.password, user.password_hash);
-        if (!valid) throw new UnauthorizedException('Wrong password');
-
-        return user;
-    }
-
-
-    /* ============================================================
-       OTP LOGIN
-    ============================================================ */
-    async loginWithOtp(dto: LoginDto) {
-        console.log(LoginDto, "LoginDto");
-        // -----------------------------
-        // TYPE NARROWING FOR TS STRICT
-        // -----------------------------
-        if (!dto.destination) {
-            throw new UnauthorizedException('Destination is required');
+        if (auth_method === 'PHONE_OTP' && phone_no) {
+            where.phone_no = phone_no;
         }
 
-        if (!dto.delivery_id) {
-            throw new UnauthorizedException('delivery_id is required');
+        if (
+            (auth_method === 'GOOGLE' || auth_method === 'APPLE') &&
+            provider_id
+        ) {
+            where.provider_id = provider_id;
         }
 
-        if (!dto.otp) {
-            throw new UnauthorizedException('OTP is required');
-        }
-
-        // Now TS knows destination, otp, delivery_id are DEFINITELY string
-        // --------------------------------------------------------------
-
-        const otpVerified = await this.otpService.verifyOtp(dto.delivery_id, dto.otp);
-        if (!otpVerified) throw new UnauthorizedException('Invalid OTP');
-
-        // Find user by email or phone
-        let user = await this.prisma.user.findFirst({
-            where: {
-                OR: [
-                    { email: dto.destination.includes('@') ? dto.destination : undefined },
-                    { phone: !dto.destination.includes('@') ? dto.destination : undefined },
-                ],
+        // 4️⃣ Find user
+        let user = await this.prisma.user.findUnique({
+            where,
+            select: {
+                id: true,
+                first_name: true,
+                last_name: true,
+                email: true,
+                phone_no: true,
+                role: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
             },
         });
 
-        // -----------------------------
-        // CREATE USER IF NOT EXISTS
-        // -----------------------------
+        // 5️⃣ Register if not exists
         if (!user) {
             user = await this.prisma.user.create({
                 data: {
-                    full_name: 'New User',
-                    email: dto.destination.includes('@') ? dto.destination : null,
-                    phone: dto.destination.includes('@') ? null : dto.destination,
-                    password_hash: '',
+                    first_name,
+                    last_name,
+                    email: email?.toLowerCase(),
+                    phone_no,
+                    provider: auth_method,
+                    provider_id,
+                    role: {
+                        connect: {
+                            name: "AGENT",
+                        },
+                    },
+                },
+                select: {
+                    id: true,
+                    first_name: true,
+                    last_name: true,
+                    email: true,
+                    phone_no: true,
+                    role: {
+                        select: {
+                            id: true,
+                            name: true,
+                        },
+                    },
                 },
             });
         }
 
-        return user;
+        // 6️⃣ Generate tokens
+        const role = {
+            id: user.role.id.toString(),
+            title: user.role.name,
+        };
+
+        const { session, refreshPlain } = await this.createSession(user, req);
+        const accessToken = this.jwtService.sign(
+            {
+                sub: user.id.toString(),
+                role,
+                sid: session.session_id,
+            },
+            {
+                secret: this.config.get('JWT_SECRET'),
+                expiresIn: this.config.get('JWT_EXPIRATION'),
+            },
+        );
+
+        return {
+            accessToken,
+            refreshToken: encryptData(refreshPlain),
+        };
     }
 
+    private async verifyAuth(payload: any) {
+        const { auth_method, otp, email, phone_no, password, provider_id } = payload;
+        const verifyOtp: any = {
+            otp
+        }
+        try {
+            if (auth_method === 'EMAIL_PW') {
+                const user = await this.prisma.user.findUnique({
+                    where: { email },
+                });
+                if (!user) {
+                    throw new UnauthorizedException('Invalid credentials');
+                }
+                const passwordMatches = await bcrypt.compare(password, user.password);
+                if (!passwordMatches) {
+                    throw new UnauthorizedException('Invalid credentials');
+                }
+                return true;
+            }
 
-    /* ============================================================
-       SOCIAL LOGINS
-    ============================================================ */
-    async loginWithGoogle(dto: LoginDto) {
-        // TODO modify google verification
-        const googleEmail = dto.id_token;
+            if (auth_method === 'EMAIL_OTP') {
+                verifyOtp.credential = email;
+                verifyOtp.is_email = true;
 
-        let user = await this.prisma.user.findUnique({
-            where: { email: googleEmail },
+                if (!email || !otp) throw new Error();
+                await this.otpService.verifyOtp(verifyOtp);
+                return;
+            }
+
+            if (auth_method === 'PHONE_OTP') {
+                verifyOtp.credential = phone_no;
+                verifyOtp.is_email = false
+                if (!phone_no || !otp) throw new Error();
+                await this.otpService.verifyOtp(verifyOtp);
+                return;
+            }
+
+            if (auth_method === 'GOOGLE' || auth_method === 'APPLE') {
+                if (!provider_id) throw new Error();
+                // provider token already verified upstream
+                return;
+            }
+
+            throw new Error();
+        } catch (e) {
+            throw new UnauthorizedException(e.message || 'Invalid credentials');
+        }
+    }
+
+    async createSession(user: any, req?: Request) {
+        const session_id = randomUUID();
+
+        const refreshPlain = randomUUID() + randomUUID();
+        const refreshHash = CryptoUtil.hash(refreshPlain);
+        const refreshEncrypted = encryptData(refreshPlain);
+
+        const session = await this.prisma.userSession.create({
+            data: {
+                session_id,
+                user_id: user.id,
+                ip_address: req?.ip,
+                device_info: req?.headers['user-agent'],
+                refresh_token_hash: refreshHash,
+                refresh_token_encrypted: refreshEncrypted,
+                expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            },
         });
 
-        if (!user) {
-            user = await this.prisma.user.create({
-                data: {
-                    full_name: 'Google User',
-                    email: googleEmail,
-                    password_hash: '',
-                },
-            });
-        }
-        return user;
+        return { session, refreshPlain };
     }
 
-    async loginWithApple(dto: LoginDto) {
-        // TODO Apple token verification
-        const appleEmail = dto.id_token;
+    async refreshTokens(data: string): Promise<Tokens> {
+        const { refreshToken } = decryptData(data);
 
-        let user = await this.prisma.user.findUnique({
-            where: { email: appleEmail },
+        const refreshHash = CryptoUtil.hash(decryptData(refreshToken));
+
+        const session = await this.prisma.userSession.findFirst({
+            where: {
+                refresh_token_hash: refreshHash,
+                revoked: false,
+                expires_at: { gt: new Date() },
+            },
+            include: {
+                user: {
+                    select: {
+                        id: true,
+                        role: {
+                            select: { id: true, name: true },
+                        },
+                    },
+                },
+            },
         });
 
-        if (!user) {
-            user = await this.prisma.user.create({
-                data: {
-                    full_name: 'Apple User',
-                    email: appleEmail,
-                    password_hash: '',
-                },
-            });
+        if (!session) {
+            throw new UnauthorizedException('Invalid credentials');
         }
-        return user;
+
+        // rotate refresh token
+        const newPlain = randomUUID() + randomUUID();
+        const newHash = CryptoUtil.hash(newPlain);
+
+        await this.prisma.userSession.update({
+            where: { id: session.id },
+            data: {
+                refresh_token_hash: newHash,
+                last_used_at: new Date(),
+            },
+        });
+
+        const role = {
+            id: session.user.role.id.toString(),
+            title: session.user.role.name,
+        };
+
+        const accessToken = this.jwtService.sign(
+            {
+                sub: session.user.id.toString(),
+                role,
+                sid: session.session_id,
+            },
+            {
+                secret: this.config.get('JWT_SECRET'),
+                expiresIn: this.config.get('JWT_EXPIRATION'),
+            },
+        );
+
+        return {
+            accessToken,
+            refreshToken: encryptData(newPlain),
+        };
     }
 
-    /* ============================================================
-       REFRESH TOKEN
-    ============================================================ */
-    async refresh(refreshToken: string) {
-        return this.sessionService.refreshToken(refreshToken);
+    async logout(userId: bigint, sid: string) {
+        await this.prisma.userSession.updateMany({
+            where: {
+                user_id: userId,
+                session_id: sid,
+                revoked: false,
+            },
+            data: {
+                revoked: true,
+                last_used_at: new Date(),
+            },
+        });
+        return true;
     }
+
+    async logoutAll(userId: bigint) {
+        await this.prisma.userSession.updateMany({
+            where: {
+                user_id: userId,
+                revoked: false,
+            },
+            data: {
+                revoked: true,
+                last_used_at: new Date(),
+            },
+        });
+        return true;
+    }
+
+
+    async TestEncryption(body: any) {
+        try {
+            return await encryptData(body);
+        } catch (error) {
+            throw error
+        }
+    }
+
+    async TestDecryption(body: any) {
+        try {
+            const data = await decryptData(body.data);
+            return data;
+        } catch (error) {
+            throw error
+        }
+    }
+
 }

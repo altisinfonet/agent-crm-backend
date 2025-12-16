@@ -32,17 +32,17 @@ export class LoginDto {
     @ValidateIf(o => o.auth_type === 'email_otp' || o.auth_type === 'phone_otp')
     @ApiProperty({ example: '9876543210', required: false })
     @IsString()
-    destination?: string;
+    credential?: string;
 
     @ValidateIf(o => o.auth_type === 'email_otp' || o.auth_type === 'phone_otp')
     @ApiProperty({ example: '123456', required: false })
     @IsString()
     otp?: string;
 
-    @ValidateIf(o => o.auth_type === 'email_otp' || o.auth_type === 'phone_otp')
-    @IsString()
-    @ApiProperty({ example: 'uuid-delivery-id', required: false })
-    delivery_id?: string;
+    // @ValidateIf(o => o.auth_type === 'email_otp' || o.auth_type === 'phone_otp')
+    // @IsString()
+    // @ApiProperty({ example: 'uuid-delivery-id', required: false })
+    // delivery_id?: string;
 
     // ------------------------------
     // SOCIAL LOGIN
