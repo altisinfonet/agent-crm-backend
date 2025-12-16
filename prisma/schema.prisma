@@ -169,6 +169,33 @@ model CountryCurrency {
     @@map("tbl_country_currency")
 }
 
+model FAQ {
+    id         BigInt    @id @default(autoincrement()) @db.BigInt
+    question   String
+    answer     String    @db.Text()
+    rank       BigInt    @default(autoincrement()) @db.BigInt
+    module_id  BigInt    @default(1)
+    module     FAQModule @relation(fields: [module_id], references: [id])
+    status     Status    @default(ACTIVE)
+    created_at DateTime  @default(now())
+
+    @@index([id, question, answer, rank, status])
+    @@map("tbl_faqs")
+}
+
+model FAQModule {
+    id         BigInt   @id @default(autoincrement()) @db.BigInt
+    name       String   @db.Text()
+    desc       String?  @db.Text()
+    rank       BigInt   @default(autoincrement()) @db.BigInt
+    status     Status   @default(ACTIVE)
+    created_at DateTime @default(now())
+    FAQ        FAQ[]
+
+    @@index([id, name, rank, status])
+    @@map("tbl_faq_modules")
+}
+
 model User {
     id                   BigInt               @id @default(autoincrement())
     first_name           String?

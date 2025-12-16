@@ -7,6 +7,7 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Role } from 'src/common/enum/role.enum';
 import { Roles } from 'src/common/decorators/roles.decorator';
+import { FaqModule } from './faq/faq.module';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
@@ -25,6 +26,10 @@ import { Roles } from 'src/common/decorators/roles.decorator';
                         module: CurrencyModule,
                     },
                     {
+                        path: 'faq',
+                        module: FaqModule,
+                    },
+                    {
                         path: 'settings',
                         module: AdminSettingsModule,
                     },
@@ -34,6 +39,7 @@ import { Roles } from 'src/common/decorators/roles.decorator';
         AdminSettingsModule,
         CountryModule,
         CurrencyModule,
+        FaqModule,
     ],
 })
 export class AdminModule { }
