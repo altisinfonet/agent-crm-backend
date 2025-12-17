@@ -70,6 +70,7 @@ export class PagesService {
       throw new BadRequestException(error.message || "Failed to create dynamic page");
     }
   };
+
   async getAllDynamicPages(dto: CommonDto) {
     try {
       const payload = decryptData(dto.data);

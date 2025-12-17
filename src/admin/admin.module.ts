@@ -6,6 +6,7 @@ import { CurrencyModule } from './currency/currency.module';
 import { FaqModule } from './faq/faq.module';
 import { PagesModule } from './pages/pages.module';
 import { MenuModule } from './menu/menu.module';
+import { ProductsModule } from './products/products.module';
 
 @Module({
     imports: [
@@ -34,6 +35,10 @@ import { MenuModule } from './menu/menu.module';
                         module: PagesModule,
                     },
                     {
+                        path: 'products',
+                        module: ProductsModule,
+                    },
+                    {
                         path: 'settings',
                         module: AdminSettingsModule,
                     },
@@ -46,7 +51,8 @@ import { MenuModule } from './menu/menu.module';
         CurrencyModule,
         FaqModule,
         PagesModule,
-        MenuModule
+        MenuModule,
+        ProductsModule
     ],
 })
 export class AdminModule { }

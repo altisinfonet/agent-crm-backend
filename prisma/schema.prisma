@@ -450,7 +450,7 @@ model Customer {
  * ==============================================================
  */
 
-model ProductType {
+model Products {
     id         BigInt          @id @default(autoincrement())
     name       String          @unique
     status     Status          @default(ACTIVE)
@@ -459,7 +459,7 @@ model ProductType {
     entities   ProductEntity[]
 
     @@index([name, status])
-    @@map("tbl_product_type")
+    @@map("tbl_products")
 }
 
 /**
@@ -471,8 +471,9 @@ model ProductType {
 model ProductEntity {
     id                   BigInt               @id @default(autoincrement())
     name                 String
-    product_type_id      BigInt
-    productType          ProductType          @relation(fields: [product_type_id], references: [id])
+    slug                 String               @unique
+    product_id           BigInt
+    products             Products             @relation(fields: [product_id], references: [id])
     status               Status               @default(ACTIVE)
     created_at           DateTime             @default(now())
     updated_at           DateTime             @updatedAt
@@ -483,7 +484,7 @@ model ProductEntity {
     fdDetails            ProductFd[]
     insuranceDetails     ProductInsurance[]
 
-    @@index([name, product_type_id, status])
+    @@index([name, slug, product_id, status])
     @@map("tbl_product_entity")
 }
 
