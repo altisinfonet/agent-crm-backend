@@ -196,6 +196,63 @@ model FAQModule {
     @@map("tbl_faq_modules")
 }
 
+model DynamicPage {
+    id          BigInt   @id @default(autoincrement()) @db.BigInt
+    title       String   @db.VarChar(255)
+    slug        String   @unique @db.VarChar(255)
+    description String?  @db.Text
+    isActive    Boolean  @default(true)
+    created_at  DateTime @default(now())
+    updated_at  DateTime @updatedAt()
+
+    @@unique([id])
+    @@map("tbl_dynamic_pages")
+}
+
+model MenuType {
+    id               BigInt     @id @default(autoincrement()) @db.BigInt
+    name             String
+    slug             String     @unique @db.VarChar(255)
+    parent_menu_type BigInt?
+    parent_relation  MenuType?  @relation("parent", fields: [parent_menu_type], references: [id])
+    sub_menu_types   MenuType[] @relation("parent")
+    menu             Menu[]
+    created_at       DateTime   @default(now())
+    updated_at       DateTime   @updatedAt()
+
+    @@index([id])
+    @@map("tbl_menu_types")
+}
+
+model Menu {
+    id             BigInt   @id @default(autoincrement()) @db.BigInt
+    menu_type_id   BigInt
+    menu_type      MenuType @relation(fields: [menu_type_id], references: [id])
+    menu_item_id   BigInt
+    menu_item_type String
+    status         Status   @default(ACTIVE)
+    path           String
+    display_rank   Int?
+    created_at     DateTime @default(now())
+    updated_at     DateTime @updatedAt()
+
+    @@index([id, menu_type_id, menu_item_id, path])
+    @@map("tbl_menu")
+}
+
+model MetaData {
+    id         BigInt   @id @default(autoincrement()) @db.BigInt
+    table_id   BigInt
+    table_name String
+    key        String
+    value      String
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt()
+
+    @@index([id, table_id, table_name, key])
+    @@map("tbl_meta_data")
+}
+
 model User {
     id                   BigInt               @id @default(autoincrement())
     first_name           String?

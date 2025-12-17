@@ -10,6 +10,7 @@ import { CommonDto } from './dto/common.dto';
 import { GetCurrentUserId } from 'src/common/decorators/current-user-id.decorator';
 import { AuthGuard } from '@nestjs/passport';
 import { GetCurrentUser } from 'src/common/decorators/current-user.decorator';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 
 
 @ApiTags('Authentication')
@@ -56,7 +57,7 @@ export class AuthController {
         }
     }
 
-    @UseGuards(AuthGuard('jwt'))
+    @UseGuards(JwtAuthGuard)
     @Post('logout')
     @HttpCode(HttpStatus.OK)
     async logout(
@@ -75,7 +76,7 @@ export class AuthController {
         }
     }
 
-    @UseGuards(AuthGuard('jwt'))
+    @UseGuards(JwtAuthGuard)
     @Post('logout-all')
     @HttpCode(HttpStatus.OK)
     async logoutAll(

@@ -1,11 +1,17 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Res, HttpStatus, BadRequestException, Put } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Res, HttpStatus, BadRequestException, Put, UseGuards } from '@nestjs/common';
 import { CurrencyService } from './currency.service';
 import { CommonDto } from 'src/auth/dto/common.dto';
 import { encryptData } from 'src/helper/common.helper';
 import { ApiResponse } from 'src/helper/response.helper';
 import type { Response } from 'express';
+import { Role } from 'src/common/enum/role.enum';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+import { Roles } from 'src/common/decorators/roles.decorator';
 
 @Controller({ path: '', version: '1' })
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.ADMIN)
 export class CurrencyController {
   constructor(private readonly currencyService: CurrencyService) { }
 

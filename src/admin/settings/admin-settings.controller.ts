@@ -4,7 +4,6 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { Role } from 'src/common/enum/role.enum';
-import { PrismaService } from 'src/prisma/prisma.service';
 import { ApiResponse } from 'src/helper/response.helper';
 import { AdminSettingsService } from './admin-settings.service';
 import { encryptData } from 'src/helper/common.helper';
@@ -13,6 +12,8 @@ import { CommonDto } from 'src/auth/dto/common.dto';
 
 
 @Controller({ path: '', version: '1' })
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.ADMIN)
 export class AdminSettingsController {
 
   constructor(

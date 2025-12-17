@@ -5,10 +5,16 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { ApiResponse } from 'src/helper/response.helper';
 import { CommonDto } from 'src/auth/dto/common.dto';
 import { encryptData } from 'src/helper/common.helper';
+import { Role } from 'src/common/enum/role.enum';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guards/roles.guard';
 
 
 
 @Controller({ path: '', version: '1' })
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.ADMIN)
 export class FaqController {
   constructor(
     private readonly faqService: FaqService,

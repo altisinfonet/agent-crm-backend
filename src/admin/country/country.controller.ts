@@ -1,11 +1,17 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Res, Req, HttpStatus, BadRequestException, Put } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Res, Req, HttpStatus, BadRequestException, Put, UseGuards } from '@nestjs/common';
 import { CountryService } from './country.service';
 import type { Request, Response } from 'express';
 import { encryptData } from 'src/helper/common.helper';
 import { CommonDto } from 'src/auth/dto/common.dto';
 import { ApiResponse } from 'src/helper/response.helper';
+import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { Role } from 'src/common/enum/role.enum';
 
 @Controller({ path: '', version: '1' })
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.ADMIN)
 export class CountryController {
   constructor(private readonly countryService: CountryService) { }
 

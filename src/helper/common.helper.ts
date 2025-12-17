@@ -8,6 +8,38 @@
 
 import CryptoJS from 'crypto-js';
 import * as bcrypt from 'bcrypt';
+import slugify from 'slugify';
+
+import { PrismaService } from 'src/prisma/prisma.service';
+
+const prisma = new PrismaService();
+
+export const generateSlug = async (
+    base: string,
+    model: any,
+    field: string
+): Promise<string> => {
+    if (!base) {
+        throw new Error('Base string for slug generation is empty.');
+    }
+
+    try {
+        let slug = slugify(base, { lower: true, strict: true });
+        let uniqueSlug = slug;
+        let counter = 1;
+
+        while (await model.findFirst({ where: { [field]: uniqueSlug } })) {
+            uniqueSlug = `${slug}-${counter}`;
+            counter++;
+        }
+
+        return uniqueSlug;
+    } catch (error) {
+        console.error('Error generating slug:', error);
+        throw new Error('Failed to generate a unique slug.');
+    }
+};
+
 
 export const generateOTP = () => {
     let otp = '';
@@ -63,3 +95,19 @@ export const encryptData = (data: any) => {
         return null;
     }
 };
+
+export async function createMetaData(
+    table_id: bigint,
+    table_name: string,
+    key: string,
+    value: string,
+) {
+    return await prisma.metaData.create({
+        data: {
+            table_id: table_id,
+            table_name: table_name,
+            key: key,
+            value: value
+        }
+    });
+}
