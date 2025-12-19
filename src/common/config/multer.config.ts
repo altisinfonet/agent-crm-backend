@@ -48,23 +48,47 @@ function checkFileType(file: any, cb: multer.FileFilterCallback) {
 }
 
 const upload = multer({
-    storage: storage,
-    fileFilter: function (req, file, cb) {
+    storage: multer.memoryStorage(),
+    fileFilter: (req, file, cb) => {
         checkFileType(file, cb);
-    }
+    },
+    limits: {
+        fileSize: 5 * 1024 * 1024,
+    },
 });
 
 
-export const isValidImage = async (filePath: string): Promise<boolean> => {
+// const upload = multer({
+//     storage: storage,
+//     fileFilter: function (req, file, cb) {
+//         checkFileType(file, cb);
+//     }
+// });
+
+
+
+
+export async function isValidImageBuffer(buffer: Buffer): Promise<boolean> {
     try {
-        const fileBuffer = fs.readFileSync(filePath);
-        const metadata = await sharp(fileBuffer).metadata();
+        await sharp(buffer).metadata();
         return true;
-    } catch (error) {
-        console.error("Sharp error:", error.message);
+    } catch {
         return false;
     }
 }
+
+
+
+// export const isValidImage = async (filePath: string): Promise<boolean> => {
+//     try {
+//         const fileBuffer = fs.readFileSync(filePath);
+//         const metadata = await sharp(fileBuffer).metadata();
+//         return true;
+//     } catch (error) {
+//         console.error("Sharp error:", error.message);
+//         return false;
+//     }
+// }
 
 
 // function checkExcelFileType(file: any, cb: any) {

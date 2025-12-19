@@ -40,6 +40,12 @@ enum Status {
     INACTIVE
 }
 
+enum ApprovalStatus {
+    PENDING
+    APPROVED
+    REJECTED
+}
+
 enum SubscriptionStatus {
     active
     paused
@@ -55,6 +61,7 @@ enum PaymentStatus {
 enum SubscriptionCycle {
     WEEKLY
     MONTHLY
+    QUARTERLY
     YEARLY
 }
 
@@ -127,15 +134,20 @@ model AdminSettings {
 }
 
 model Country {
-    id         BigInt   @id @default(autoincrement())
-    name       String
-    iso_code   String   @unique
-    phone_code String?
-    status     Status   @default(ACTIVE)
-    created_at DateTime @default(now())
-    updated_at DateTime @updatedAt
+    id             BigInt   @id @default(autoincrement())
+    name           String
+    region         String?
+    iso_code       String   @unique
+    phoneLength    Int
+    phone_code     String?
+    timezone       String
+    utc_offset_min Int
+    status         Status   @default(ACTIVE)
+    image          String?
+    created_at     DateTime @default(now())
+    updated_at     DateTime @updatedAt
 
-    currencies CountryCurrency[]
+    user User[]
 
     @@index([name, iso_code, phone_code, status])
     @@map("tbl_country")
@@ -151,22 +163,10 @@ model Currency {
     created_at    DateTime @default(now())
     updated_at    DateTime @updatedAt
 
-    countries CountryCurrency[]
+    user User[]
 
     @@index([name, code, symbol, exchange_rate])
     @@map("tbl_currency")
-}
-
-model CountryCurrency {
-    id          BigInt   @id @default(autoincrement())
-    country_id  BigInt
-    country     Country  @relation(fields: [country_id], references: [id])
-    currency_id BigInt
-    currency    Currency @relation(fields: [currency_id], references: [id])
-    is_default  Boolean  @default(false)
-
-    @@unique([country_id, currency_id])
-    @@map("tbl_country_currency")
 }
 
 model FAQ {
@@ -265,11 +265,14 @@ model User {
     image                String?
     provider             AuthType
     provider_id          String?
-    pan_number           String?
-    kyc_status           Boolean              @default(false)
+    status               Status               @default(ACTIVE)
     refresh_token        String?
     reset_token          String?              @unique
     reset_token_exp      DateTime?
+    country_id           BigInt
+    country              Country              @relation(fields: [country_id], references: [id])
+    currency_id          BigInt
+    currency             Currency             @relation(fields: [currency_id], references: [id])
     is_temporary         Boolean              @default(false)
     is_deleted           Boolean              @default(false)
     created_at           DateTime             @default(now())
@@ -278,16 +281,35 @@ model User {
     organizations        Organization[]       @relation("OrgCreatedBy")
     orgUsers             OrganizationUser[]
     customers            Customer[]           @relation("CustomerCreatedBy")
-    loanDetails          ProductLoan[]
-    sipDetails           ProductSip[]
-    mfDetails            ProductMutualFund[]
-    fdDetails            ProductFd[]
-    insuranceDetails     ProductInsurance[]
     agentProductEntities AgentProductEntity[]
     sessions             UserSession[]
+    agentKYC             AgentKYC?
+    agentSales           AgentSale[]
 
-    @@index([first_name, last_name, email, phone_no, provider, pan_number, kyc_status])
+    @@index([first_name, last_name, email, phone_no, provider, country_id, currency_id])
     @@map("tbl_user")
+}
+
+model AgentKYC {
+    id             BigInt         @id @default(autoincrement())
+    agent_id       BigInt         @unique
+    agent          User           @relation(fields: [agent_id], references: [id])
+    kyc_status     ApprovalStatus @default(PENDING)
+    pan_number     String
+    pan_image      String
+    aadhar_number  String
+    aadhar_image   String
+    bank_name      String
+    account_number String
+    branch_name    String
+    ifsc_code      String
+    upi_id         String?
+    qr_code        String?
+    created_at     DateTime       @default(now())
+    updated_at     DateTime       @updatedAt
+
+    @@index([pan_number, aadhar_number, bank_name, branch_name, ifsc_code, upi_id])
+    @@map("tbl_agent_kyc")
 }
 
 model OTP {
@@ -334,6 +356,7 @@ model Organization {
     created_at     DateTime           @default(now())
     updated_at     DateTime           @updatedAt
     subscription   Subscription?
+    agentSales     AgentSale[]
     users          OrganizationUser[]
     customers      Customer[]
     razorpayOrders RazorpayOrder[]
@@ -419,26 +442,22 @@ model Subscription {
  */
 
 model Customer {
-    id               BigInt              @id @default(autoincrement())
-    org_id           BigInt
-    created_by       BigInt
-    createdByUser    User                @relation("CustomerCreatedBy", fields: [created_by], references: [id])
-    first_name       String?
-    last_name        String?
-    email            String?
-    phone            String?
-    image            String?
-    aadhaar_number   String?
-    pan_number       String?
-    address          String?
-    created_at       DateTime            @default(now())
-    updated_at       DateTime            @updatedAt
-    organization     Organization        @relation(fields: [org_id], references: [id])
-    loanDetails      ProductLoan[]
-    sipDetails       ProductSip[]
-    mfDetails        ProductMutualFund[]
-    fdDetails        ProductFd[]
-    insuranceDetails ProductInsurance[]
+    id             BigInt       @id @default(autoincrement())
+    org_id         BigInt
+    organization   Organization @relation(fields: [org_id], references: [id])
+    created_by     BigInt
+    createdByUser  User         @relation("CustomerCreatedBy", fields: [created_by], references: [id])
+    first_name     String?
+    last_name      String?
+    email          String?
+    phone          String?
+    image          String?
+    aadhaar_number String?
+    pan_number     String?
+    address        String?
+    created_at     DateTime     @default(now())
+    updated_at     DateTime     @updatedAt
+    agentSales     AgentSale[]
 
     @@index([first_name, last_name, email, phone, aadhaar_number, pan_number])
     @@map("tbl_customer")
@@ -477,12 +496,8 @@ model ProductEntity {
     status               Status               @default(ACTIVE)
     created_at           DateTime             @default(now())
     updated_at           DateTime             @updatedAt
+    agentSales           AgentSale[]
     agentProductEntities AgentProductEntity[]
-    loanDetails          ProductLoan[]
-    sipDetails           ProductSip[]
-    mfDetails            ProductMutualFund[]
-    fdDetails            ProductFd[]
-    insuranceDetails     ProductInsurance[]
 
     @@index([name, slug, product_id, status])
     @@map("tbl_product_entity")
@@ -514,129 +529,122 @@ model AgentProductEntity {
  * ==============================================================
  */
 
-model ProductLoan {
-    id                 BigInt        @id @default(autoincrement())
-    customer_id        BigInt
-    customer           Customer      @relation(fields: [customer_id], references: [id])
-    product_entity_id  BigInt
-    productEntity      ProductEntity @relation(fields: [product_entity_id], references: [id])
-    agent_id           BigInt
-    agent              User          @relation(fields: [agent_id], references: [id])
-    loan_type          String?
-    loan_amount        Float?
-    interest_rate      Float?
-    tenure_months      Int?
-    emi_amount         Float?
-    emi_due_day        Int?
-    start_date         DateTime?
-    end_date           DateTime?
-    collateral_details String?
-    status             Status        @default(ACTIVE)
-    notes              String?
-    created_at         DateTime      @default(now())
-    updated_at         DateTime      @updatedAt
-
-    @@index([customer_id, product_entity_id, agent_id, loan_type, status])
-    @@map("tbl_product_loan")
-}
-
-model ProductSip {
-    id                      BigInt        @id @default(autoincrement())
-    customer_id             BigInt
-    customer                Customer      @relation(fields: [customer_id], references: [id])
-    product_entity_id       BigInt
-    productEntity           ProductEntity @relation(fields: [product_entity_id], references: [id])
-    agent_id                BigInt
-    agent                   User          @relation(fields: [agent_id], references: [id])
-    folio_number            String?
-    scheme_name             String?
-    start_date              DateTime?
-    sip_amount              Float?
-    frequency               String?
-    tenure_months           Int?
-    expected_maturity_value Float?
-    risk_profile            String?
-    notes                   String?
-    created_at              DateTime      @default(now())
-    updated_at              DateTime      @updatedAt
-
-    @@index([customer_id, product_entity_id, agent_id, scheme_name, frequency])
-    @@map("tbl_product_sip")
-}
-
-model ProductMutualFund {
-    id                BigInt        @id @default(autoincrement())
-    customer_id       BigInt
-    customer          Customer      @relation(fields: [customer_id], references: [id])
-    product_entity_id BigInt
-    productEntity     ProductEntity @relation(fields: [product_entity_id], references: [id])
+model AgentSale {
+    id                BigInt                   @id @default(autoincrement())
+    org_id            BigInt?
+    organization      Organization?            @relation(fields: [org_id], references: [id])
     agent_id          BigInt
-    agent             User          @relation(fields: [agent_id], references: [id])
-    folio_number      String?
-    scheme_name       String?
-    nav               Float?
-    units             Float?
-    investment_amount Float?
-    purchase_date     DateTime?
-    investment_type   String?
-    risk_profile      String?
-    notes             String?
-    created_at        DateTime      @default(now())
-    updated_at        DateTime      @updatedAt
+    agent             User                     @relation(fields: [agent_id], references: [id])
+    customer_id       BigInt
+    customer          Customer                 @relation(fields: [customer_id], references: [id])
+    product_entity_id BigInt
+    productEntity     ProductEntity            @relation(fields: [product_entity_id], references: [id])
+    sale_date         DateTime                 @default(now())
+    status            Status                   @default(ACTIVE)
+    created_at        DateTime                 @default(now())
+    updated_at        DateTime                 @updatedAt
+    lifeInsurance     ProductLifeInsurance?
+    medicalInsurance  ProductMedicalInsurance?
+    mutualFund        ProductMutualFund?
+    realEstate        ProductRealEstate?
 
-    @@index([customer_id, product_entity_id, agent_id, folio_number, investment_type])
-    @@map("tbl_product_mutual_fund")
+    @@index([agent_id, customer_id, product_entity_id, sale_date, status])
+    @@map("tbl_agent_sale")
 }
 
-model ProductFd {
-    id                BigInt        @id @default(autoincrement())
-    customer_id       BigInt
-    customer          Customer      @relation(fields: [customer_id], references: [id])
-    product_entity_id BigInt
-    productEntity     ProductEntity @relation(fields: [product_entity_id], references: [id])
-    agent_id          BigInt
-    agent             User          @relation(fields: [agent_id], references: [id])
-    fd_number         String?
-    amount            Float?
-    interest_rate     Float?
-    tenure_months     Int?
-    start_date        DateTime?
-    maturity_date     DateTime?
-    maturity_amount   Float?
-    payout_frequency  String?
-    nominee_name      String?
-    notes             String?
-    created_at        DateTime      @default(now())
-    updated_at        DateTime      @updatedAt
-
-    @@index([customer_id, product_entity_id, agent_id, fd_number, payout_frequency])
-    @@map("tbl_product_fd")
-}
-
-model ProductInsurance {
-    id                BigInt        @id @default(autoincrement())
-    customer_id       BigInt
-    customer          Customer      @relation(fields: [customer_id], references: [id])
-    product_entity_id BigInt
-    productEntity     ProductEntity @relation(fields: [product_entity_id], references: [id])
-    agent_id          BigInt
-    agent             User          @relation(fields: [agent_id], references: [id])
+model ProductLifeInsurance {
+    id                BigInt             @id @default(autoincrement())
+    sale_id           BigInt             @unique
+    sale              AgentSale          @relation(fields: [sale_id], references: [id])
     policy_number     String?
+    plan_name         String?
     policy_type       String?
     sum_assured       Float?
     premium_amount    Float?
-    premium_frequency String?
+    premium_frequency SubscriptionCycle? @default(MONTHLY)
+    policy_term       Int? // years
+    payment_term      Int?
     issue_date        DateTime?
     start_date        DateTime?
     end_date          DateTime?
     nominee_name      String?
-    status            Status        @default(ACTIVE)
+    nominee_relation  String?
+    policy_status     Status             @default(ACTIVE)
     notes             String?
-    created_at        DateTime      @default(now())
-    updated_at        DateTime      @updatedAt
+    created_at        DateTime           @default(now())
+    updated_at        DateTime           @updatedAt
 
-    @@index([customer_id, product_entity_id, agent_id, policy_number, policy_type, status])
-    @@map("tbl_product_insurance")
+    @@index([policy_number, plan_name, policy_type, policy_status])
+    @@map("tbl_product_life_insurance")
+}
+
+model ProductMedicalInsurance {
+    id                   BigInt    @id @default(autoincrement())
+    sale_id              BigInt    @unique
+    sale                 AgentSale @relation(fields: [sale_id], references: [id])
+    policy_number        String?
+    plan_name            String?
+    coverage_amount      Float?
+    premium_amount       Float?
+    policy_type          String? // Individual / Family Floater
+    insured_members      Json? // [{name, age, relation}]
+    pre_existing_disease String?
+    waiting_period       Int? // months
+    issue_date           DateTime?
+    start_date           DateTime?
+    end_date             DateTime?
+    policy_status        Status    @default(ACTIVE)
+    notes                String?
+    created_at           DateTime  @default(now())
+    updated_at           DateTime  @updatedAt
+
+    @@index([policy_number, plan_name, policy_type, policy_status])
+    @@map("tbl_product_medical_insurance")
+}
+
+model ProductMutualFund {
+    id                BigInt    @id @default(autoincrement())
+    sale_id           BigInt    @unique
+    sale              AgentSale @relation(fields: [sale_id], references: [id])
+    folio_number      String?
+    scheme_name       String?
+    fund_house        String?
+    investment_type   String? // SIP / LUMPSUM
+    investment_amount Float?
+    nav               Float?
+    units             Float?
+    sip_start_date    DateTime?
+    sip_end_date      DateTime?
+    risk_profile      String?
+    notes             String?
+    created_at        DateTime  @default(now())
+    updated_at        DateTime  @updatedAt
+
+    @@index([folio_number, scheme_name, investment_type])
+    @@map("tbl_product_mutual_fund")
+}
+
+model ProductRealEstate {
+    id BigInt @id @default(autoincrement())
+
+    sale_id         BigInt    @unique
+    sale            AgentSale @relation(fields: [sale_id], references: [id])
+    property_type   String? // Flat / Land / Commercial
+    property_name   String?
+    location        String?
+    area_sqft       Float?
+    property_value  Float?
+    booking_amount  Float?
+    builder_name    String?
+    agreement_date  DateTime?
+    possession_date DateTime?
+    ownership_type  String?
+    notes           String?
+    created_at      DateTime  @default(now())
+    updated_at      DateTime  @updatedAt
+
+    @@index([property_type, location, property_name, builder_name, ownership_type])
+    @@map("tbl_product_real_estate")
 }
 
 /**

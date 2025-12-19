@@ -8,7 +8,6 @@ import { ApiResponse } from 'src/helper/response.helper';
 import { encryptData } from 'src/helper/common.helper';
 import { CommonDto } from './dto/common.dto';
 import { GetCurrentUserId } from 'src/common/decorators/current-user-id.decorator';
-import { AuthGuard } from '@nestjs/passport';
 import { GetCurrentUser } from 'src/common/decorators/current-user.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 

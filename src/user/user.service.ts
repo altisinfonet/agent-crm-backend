@@ -3,6 +3,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { CommonDto } from 'src/auth/dto/common.dto';
 import { decryptData, hashPassword } from 'src/helper/common.helper';
 import * as bcrypt from 'bcrypt';
+import { R2Service } from 'src/helper/r2.helper';
 
 @Injectable()
 export class UserService {
@@ -28,7 +29,6 @@ export class UserService {
         phone_no: true,
         image: true,
         provider: true,
-        kyc_status: true,
         role: {
           select: {
             id: true,
@@ -42,8 +42,51 @@ export class UserService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException("User not found");
     }
+
+    const isAgent = user.role?.name === "AGENT";
+    if (isAgent) {
+      const agentData = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          country: true,
+          currency: true,
+        },
+      });
+
+      Object.assign(user, agentData);
+    }
+
+    if (user.image) {
+      user.image = await R2Service.getSignedUrl(user.image);
+    }
+
+    return user;
+  }
+
+
+
+  async getUserForUpload(userId: bigint) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        first_name: true,
+        last_name: true,
+        agentKYC: {
+          select: {
+            pan_number: true,
+          }
+        },
+        created_at: true,
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException("User not found");
+    }
+
     return user;
   }
 
@@ -119,15 +162,14 @@ export class UserService {
     }
   }
 
-  async updateProfileImage(userId: bigint, dto: any, file) {
+  async updateProfileImage(userId: bigint, dto: any, file: { key?: string }) {
     try {
-      const imageFileName = file?.filename ?? "";
       let dataToUpdate: any = {};
 
       if (Boolean(dto?.delete)) {
         dataToUpdate.image = null;
-      } else if (imageFileName !== "") {
-        dataToUpdate.image = `${file?.path}`;
+      } else if (file?.key) {
+        dataToUpdate.image = file.key;
       }
 
       const res = await this.prisma.user.update({
@@ -140,7 +182,132 @@ export class UserService {
       const { password, ...user } = res;
       return user;
     } catch (error) {
-      throw error
+      throw error;
+    }
+  }
+
+
+  async saveKyc(userId: bigint, kycData: any, files: any) {
+    try {
+      if (!files?.pan_image) {
+        throw new BadRequestException("PAN card image is required.")
+      }
+      if (!files?.aadhar_image) {
+        throw new BadRequestException("AADHAR card image is required.")
+      }
+      if (!files?.qr_code) {
+        throw new BadRequestException("QR code is required.")
+      }
+
+      const data = {
+        pan_number: kycData?.pan_number,
+        aadhar_number: kycData?.aadhar_number,
+        bank_name: kycData?.bank_name,
+        account_number: kycData?.account_number,
+        branch_name: kycData?.branch_name,
+        ifsc_code: kycData?.ifsc_code,
+        upi_id: kycData?.upi_id,
+      }
+      const entity_ids: bigint[] = kycData?.entity_ids || [];
+
+      return await this.prisma.$transaction(async (tx) => {
+        const kyc = await tx.agentKYC.upsert({
+          where: { agent_id: userId },
+          update: {
+            ...data,
+            ...files,
+          },
+          create: {
+            agent_id: userId,
+            ...data,
+            ...files,
+          },
+        });
+
+        if (entity_ids.length) {
+          await tx.agentProductEntity.createMany({
+            data: entity_ids.map((entityId) => ({
+              agent_id: userId,
+              product_entity_id: BigInt(entityId),
+            })),
+            skipDuplicates: true,
+          });
+        }
+
+        return kyc;
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async getAgentKYCDetails(userId: bigint) {
+    try {
+      const agent = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          first_name: true,
+          last_name: true,
+          email: true,
+          phone_no: true,
+          image: true,
+          country: true,
+          currency: true,
+          created_at: true,
+          agentKYC: {
+            select: {
+              kyc_status: true,
+              pan_number: true,
+              pan_image: true,
+              aadhar_number: true,
+              aadhar_image: true,
+              account_number: true,
+              bank_name: true,
+              branch_name: true,
+              ifsc_code: true,
+              qr_code: true,
+              upi_id: true,
+              created_at: true,
+            },
+          },
+        },
+      });
+
+      if (!agent) return null;
+      const [
+        profileImage,
+        panImage,
+        aadharImage,
+        qrCode,
+      ] = await Promise.all([
+        agent.image
+          ? R2Service.getSignedUrl(agent.image)
+          : null,
+        agent.agentKYC?.pan_image
+          ? R2Service.getSignedUrl(agent.agentKYC.pan_image)
+          : null,
+        agent.agentKYC?.aadhar_image
+          ? R2Service.getSignedUrl(agent.agentKYC.aadhar_image)
+          : null,
+        agent.agentKYC?.qr_code
+          ? R2Service.getSignedUrl(agent.agentKYC.qr_code)
+          : null,
+      ]);
+
+      return {
+        ...agent,
+        image: profileImage,
+        agentKYC: agent.agentKYC
+          ? {
+            ...agent.agentKYC,
+            pan_image: panImage,
+            aadhar_image: aadharImage,
+            qr_code: qrCode,
+          }
+          : null,
+      };
+    } catch (error) {
+      throw error;
     }
   }
 

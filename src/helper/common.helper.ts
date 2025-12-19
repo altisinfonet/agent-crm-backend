@@ -10,7 +10,7 @@ import CryptoJS from 'crypto-js';
 import * as bcrypt from 'bcrypt';
 import slugify from 'slugify';
 
-import { PrismaService } from 'src/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 const prisma = new PrismaService();
 
@@ -39,6 +39,17 @@ export const generateSlug = async (
         throw new Error('Failed to generate a unique slug.');
     }
 };
+
+
+export function buildUserRootFolder(
+    username: string,
+    panNumber: string
+) {
+    const safeName = slugify(username, { lower: true });
+    const safePan = panNumber.toUpperCase().replace(/\s+/g, "");
+
+    return `${process.env.IMAGE_PATH}/${safeName}_${safePan}`;
+}
 
 
 export const generateOTP = () => {

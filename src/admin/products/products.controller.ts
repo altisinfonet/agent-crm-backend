@@ -33,6 +33,23 @@ export class ProductsController {
     }
   };
 
+  @Get("list")
+  async findAllProducts(@Res() res: Response) {
+    try {
+      const entity = await this.productsService.findAllProducts();
+
+      let result = JSON.stringify(entity, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Fetched all products."));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error: any) {
+      console.log('error: ', error);
+      throw new BadRequestException(error.response);
+    }
+  }
+
   @Put(":id/entity/list")
   async findAll(@Res() res: Response, @Param('id') id: string, @Body() findEntityDto: CommonDto) {
     try {

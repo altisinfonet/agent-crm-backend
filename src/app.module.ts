@@ -9,6 +9,7 @@ import { MailService } from './mail/mail.service';
 import { OtpModule } from './otp/otp.module';
 import { UserModule } from './user/user.module';
 import { AdminModule } from './admin/admin.module';
+import { ProductsModule } from './products/products.module';
 
 @Module({
   imports: [
@@ -20,7 +21,8 @@ import { AdminModule } from './admin/admin.module';
     AuthModule,
     AdminModule,
     OtpModule,
-    UserModule
+    UserModule,
+    ProductsModule
   ],
   controllers: [AppController],
   providers: [AppService, MailService],

@@ -4,13 +4,14 @@ import { SendOtpDto } from './dto/send-otp.dto';
 import { verifyOtpDto } from './dto/verify-otp.dto';
 import { ApiResponse } from 'src/helper/response.helper';
 import type { Request, Response } from 'express';
+import { CommonDto } from 'src/auth/dto/common.dto';
 
 @Controller({ path: 'otp', version: '1' })
 export class OtpController {
   constructor(private readonly otpService: OtpService) { }
 
   @Post('send')
-  async sendOtp(@Body() dto: SendOtpDto, @Req() req: Request, @Res() res: Response) {
+  async sendOtp(@Body() dto: CommonDto, @Req() req: Request, @Res() res: Response) {
     try {
       let result = await this.otpService.sendOtp(dto);
       if (result) {

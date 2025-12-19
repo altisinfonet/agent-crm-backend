@@ -10,6 +10,7 @@ import { Tokens } from './types/tokens.type';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import { Request } from 'express';
+import { RoleName } from 'generated/prisma';
 
 @Injectable()
 export class AuthService {
@@ -60,7 +61,7 @@ export class AuthService {
         }
 
         // 4️⃣ Find user
-        let user = await this.prisma.user.findUnique({
+        let user: any = await this.prisma.user.findUnique({
             where,
             select: {
                 id: true,
@@ -74,6 +75,7 @@ export class AuthService {
                         name: true,
                     },
                 },
+
             },
         });
 
@@ -87,11 +89,9 @@ export class AuthService {
                     phone_no,
                     provider: auth_method,
                     provider_id,
-                    role: {
-                        connect: {
-                            name: "AGENT",
-                        },
-                    },
+                    role_id: BigInt(2),
+                    country_id: 1,
+                    currency_id: 1
                 },
                 select: {
                     id: true,
@@ -111,14 +111,14 @@ export class AuthService {
 
         // 6️⃣ Generate tokens
         const role = {
-            id: user.role.id.toString(),
-            title: user.role.name,
+            id: user?.role.id.toString(),
+            title: user?.role.name,
         };
 
         const { session, refreshPlain } = await this.createSession(user, req);
         const accessToken = this.jwtService.sign(
             {
-                sub: user.id.toString(),
+                sub: user?.id.toString(),
                 role,
                 sid: session.session_id,
             },

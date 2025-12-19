@@ -3,7 +3,8 @@ import { SendOtpDto } from './dto/send-otp.dto';
 import { verifyOtpDto } from './dto/verify-otp.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { MailService } from 'src/mail/mail.service';
-import { generateOTP } from 'src/helper/common.helper';
+import { decryptData, generateOTP } from 'src/helper/common.helper';
+import { CommonDto } from 'src/auth/dto/common.dto';
 
 @Injectable()
 export class OtpService {
@@ -12,39 +13,40 @@ export class OtpService {
     private mailService: MailService
   ) { }
 
-  async sendOtp(dto: SendOtpDto): Promise<boolean> {
+  async sendOtp(dto: CommonDto): Promise<boolean> {
     try {
+      const otpData = decryptData(dto.data);
       const expiresAt = new Date(Date.now() + 60 * 1000); // 1 minute
       const otp = generateOTP();
 
       await this.prisma.oTP.upsert({
         where: {
-          credential: dto.credential,
+          credential: otpData.credential,
         },
         update: {
           otp,
           limit: 0,
           restrictedTime: null,
-          is_email: dto.is_email,
+          is_email: otpData.is_email,
           expires_at: expiresAt,
         },
         create: {
-          credential: dto.credential,
+          credential: otpData.credential,
           otp,
           limit: 0,
-          is_email: dto.is_email,
+          is_email: otpData.is_email,
           expires_at: expiresAt,
         },
       });
 
-      if (dto.is_email) {
+      if (otpData.is_email) {
         const subject = 'Email OTP Verification';
 
         setImmediate(async () => {
           try {
             await this.mailService.sendOTPEmail(
               subject,
-              dto.credential,
+              otpData.credential,
               otp,
             );
           } catch (error) {

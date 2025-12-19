@@ -23,7 +23,12 @@ export class CountryService {
         data: {
           name: decryptedPayload.name,
           iso_code: decryptedPayload.iso_code,
-          phone_code: decryptedPayload.phone_code
+          phone_code: decryptedPayload.phone_code,
+          region: decryptedPayload.region,
+          phoneLength: decryptedPayload.phoneLength,
+          timezone: decryptedPayload.timezone,
+          utc_offset_min: decryptedPayload.offset_min,
+          image: decryptedPayload.image
         }
       })
       return setting
