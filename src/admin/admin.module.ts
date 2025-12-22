@@ -8,6 +8,7 @@ import { PagesModule } from './pages/pages.module';
 import { MenuModule } from './menu/menu.module';
 import { ProductsModule } from './products/products.module';
 import { AgentModule } from './agent/agent.module';
+import { SubscriptionModule } from './subscription/subscription.module';
 
 @Module({
     imports: [
@@ -47,6 +48,10 @@ import { AgentModule } from './agent/agent.module';
                         path: 'settings',
                         module: AdminSettingsModule,
                     },
+                    {
+                        path: 'subscription',
+                        module: SubscriptionModule,
+                    },
                 ],
             },
 
@@ -58,7 +63,8 @@ import { AgentModule } from './agent/agent.module';
         PagesModule,
         MenuModule,
         ProductsModule,
-        AgentModule
+        AgentModule,
+        SubscriptionModule
     ],
 })
 export class AdminModule { }

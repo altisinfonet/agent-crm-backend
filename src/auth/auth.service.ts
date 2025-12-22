@@ -87,7 +87,7 @@ export class AuthService {
                     last_name,
                     email: email?.toLowerCase(),
                     phone_no,
-                    provider: auth_method,
+                    auth_method: auth_method,
                     provider_id,
                     role_id: BigInt(2),
                     country_id: 1,

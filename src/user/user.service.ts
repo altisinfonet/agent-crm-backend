@@ -28,7 +28,7 @@ export class UserService {
         email: true,
         phone_no: true,
         image: true,
-        provider: true,
+        auth_method: true,
         role: {
           select: {
             id: true,

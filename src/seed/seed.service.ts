@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { hashPassword } from '../helper/common.helper';
+import { generateSlug, hashPassword } from '../helper/common.helper';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -29,7 +29,7 @@ export class SeedService {
                     name: "India",
                     region: "Asia",
                     iso_code: "IN",
-                    phoneLength: 6,
+                    phoneLength: 10,
                     phone_code: "+91",
                     timezone: "Asia/Kolkata",
                     utc_offset_min: 330,
@@ -54,18 +54,78 @@ export class SeedService {
             data: [
                 {
                     name: "Life Insurance",
+                    slug: "life-insurance"
                 },
                 {
-                    name: "Medical Insurance ",
+                    name: "Medical Insurance",
+                    slug: "medical-insurance"
                 },
                 {
-                    name: "Real - estate ",
+                    name: "Real - estate",
+                    slug: "real-estate"
                 },
                 {
-                    name: "mutual Fund",
+                    name: "Mutual Fund",
+                    slug: "mutual-fund"
                 }
             ]
         })
+
+        await this.prisma.productEntity.createMany({
+            data: [
+                {
+                    product_id: 1,
+                    name: "LIC",
+                    slug: "lic"
+                },
+                {
+                    product_id: 1,
+                    name: "HDFC Life",
+                    slug: "hdfc-life"
+                },
+                {
+                    product_id: 1,
+                    name: "ICICI Prudential Life",
+                    slug: "icici-prudential-life"
+                },
+                {
+                    product_id: 2,
+                    name: "Star Health",
+                    slug: "star-health"
+                },
+                {
+                    product_id: 2,
+                    name: "HDFC ERGO",
+                    slug: "hdfc-ergo"
+                },
+                {
+                    product_id: 2,
+                    name: "ICICI Lombard",
+                    slug: "icici-lombard"
+                },
+                {
+                    product_id: 3,
+                    name: "DLF",
+                    slug: "dlf"
+                },
+                {
+                    product_id: 3,
+                    name: "Lodha Group",
+                    slug: "lodha-group"
+                },
+                {
+                    product_id: 4,
+                    name: "SBI Mutual Fund",
+                    slug: "sbi-mutual-fund"
+                },
+                {
+                    product_id: 4,
+                    name: "HDFC Mutual Fund",
+                    slug: "hdfc-mutual-fund"
+                },
+            ]
+        })
+
 
         await this.prisma.user.createMany({
             data: [
@@ -74,7 +134,7 @@ export class SeedService {
                     last_name: "Admin",
                     email: "admin@gmail.com",
                     password: await hashPassword("l8n4n#On%c@m4JF&17$?"),
-                    provider: "EMAIL_PW",
+                    auth_method: "EMAIL_PW",
                     role_id: 1,
                     currency_id: 1,
                     country_id: 1

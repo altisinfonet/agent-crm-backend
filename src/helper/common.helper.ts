@@ -67,6 +67,19 @@ export const hashPassword = (password: string): Promise<string> => {
     return bcrypt.hash(password, 10);
 }
 
+export const addDays = (days: number): number => {
+    const date = new Date();
+    date.setDate(date.getDate() + days);
+    date.setSeconds(date.getSeconds() + 120);
+    return Math.floor(date.getTime() / 1000);
+}
+
+export const addYearsFrom = (timestamp: number, years: number): number => {
+    const date = new Date(timestamp * 1000);
+    date.setFullYear(date.getFullYear() + years);
+    return Math.floor(date.getTime() / 1000);
+}
+
 
 
 export const decryptData = (data: any) => {

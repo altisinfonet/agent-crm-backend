@@ -11,16 +11,13 @@ CREATE TYPE "Status" AS ENUM ('ACTIVE', 'INACTIVE');
 CREATE TYPE "ApprovalStatus" AS ENUM ('PENDING', 'APPROVED', 'REJECTED');
 
 -- CreateEnum
-CREATE TYPE "SubscriptionStatus" AS ENUM ('active', 'paused', 'cancelled');
+CREATE TYPE "SubscriptionStatus" AS ENUM ('ACTIVE', 'PAUSED', 'CANCELLED', 'EXPIRED');
 
 -- CreateEnum
-CREATE TYPE "PaymentStatus" AS ENUM ('created', 'paid', 'failed');
+CREATE TYPE "RazorpayEntityType" AS ENUM ('SUBSCRIPTION', 'PAYMENT', 'INVOICE');
 
 -- CreateEnum
 CREATE TYPE "SubscriptionCycle" AS ENUM ('WEEKLY', 'MONTHLY', 'QUARTERLY', 'YEARLY');
-
--- CreateEnum
-CREATE TYPE "RazorpaySubscriptionEventType" AS ENUM ('activated', 'charged_at', 'completed', 'halted', 'cancelled');
 
 -- CreateTable
 CREATE TABLE "tbl_user_session" (
@@ -181,7 +178,7 @@ CREATE TABLE "tbl_user" (
     "role_id" BIGINT NOT NULL,
     "phone_no" TEXT,
     "image" TEXT,
-    "provider" "AuthType" NOT NULL,
+    "auth_method" "AuthType" NOT NULL,
     "provider_id" TEXT,
     "status" "Status" NOT NULL DEFAULT 'ACTIVE',
     "refresh_token" TEXT,
@@ -273,36 +270,6 @@ CREATE TABLE "tbl_organization_user" (
 );
 
 -- CreateTable
-CREATE TABLE "tbl_subscription_plan" (
-    "id" BIGSERIAL NOT NULL,
-    "name" TEXT NOT NULL,
-    "max_customers" INTEGER NOT NULL,
-    "price" DOUBLE PRECISION NOT NULL,
-    "billing_cycle" "SubscriptionCycle" NOT NULL DEFAULT 'MONTHLY',
-    "razorpayPlanId" TEXT,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "tbl_subscription_plan_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
-CREATE TABLE "tbl_subscription" (
-    "id" BIGSERIAL NOT NULL,
-    "org_id" BIGINT NOT NULL,
-    "plan_id" BIGINT NOT NULL,
-    "razorpaySubscriptionId" TEXT,
-    "current_status" "SubscriptionStatus" NOT NULL DEFAULT 'active',
-    "start_date" TIMESTAMP(3) NOT NULL,
-    "end_date" TIMESTAMP(3) NOT NULL,
-    "auto_renew" BOOLEAN NOT NULL DEFAULT true,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
-
-    CONSTRAINT "tbl_subscription_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "tbl_customer" (
     "id" BIGSERIAL NOT NULL,
     "org_id" BIGINT NOT NULL,
@@ -325,6 +292,7 @@ CREATE TABLE "tbl_customer" (
 CREATE TABLE "tbl_products" (
     "id" BIGSERIAL NOT NULL,
     "name" TEXT NOT NULL,
+    "slug" TEXT NOT NULL,
     "status" "Status" NOT NULL DEFAULT 'ACTIVE',
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -462,46 +430,87 @@ CREATE TABLE "tbl_product_real_estate" (
 );
 
 -- CreateTable
-CREATE TABLE "tbl_razorpay_order" (
+CREATE TABLE "tbl_subscription_plan" (
+    "id" BIGSERIAL NOT NULL,
+    "code" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
+    "price" INTEGER NOT NULL,
+    "currency_id" BIGINT NOT NULL,
+    "billing_cycle" "SubscriptionCycle" NOT NULL,
+    "max_agents" INTEGER NOT NULL,
+    "rzp_plan_id" TEXT,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "tbl_subscription_plan_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "tbl_org_subscription" (
     "id" BIGSERIAL NOT NULL,
     "org_id" BIGINT NOT NULL,
-    "order_id" TEXT NOT NULL,
-    "amount" DOUBLE PRECISION NOT NULL,
-    "currency" TEXT NOT NULL DEFAULT 'INR',
-    "status" "PaymentStatus" NOT NULL DEFAULT 'created',
-    "receipt" TEXT,
+    "plan_id" BIGINT NOT NULL,
+    "status" "SubscriptionStatus" NOT NULL,
+    "start_at" TIMESTAMP(3) NOT NULL,
+    "end_at" TIMESTAMP(3),
+    "auto_renew" BOOLEAN NOT NULL DEFAULT true,
+    "cancelled_at" TIMESTAMP(3),
+    "rzp_subscription_id" TEXT,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "tbl_razorpay_order_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "tbl_org_subscription_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "tbl_razorpay_payment" (
+CREATE TABLE "tbl_subscription_feature" (
     "id" BIGSERIAL NOT NULL,
-    "order_id" BIGINT NOT NULL,
-    "razorpay_payment_id" TEXT NOT NULL,
-    "amount" DOUBLE PRECISION,
-    "status" "PaymentStatus" NOT NULL DEFAULT 'created',
-    "method" TEXT,
-    "email" TEXT,
-    "contact" TEXT,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMP(3) NOT NULL,
+    "key" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "description" TEXT,
 
-    CONSTRAINT "tbl_razorpay_payment_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "tbl_subscription_feature_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "tbl_razorpay_subscription_event" (
+CREATE TABLE "tbl_subscription_plan_feature" (
     "id" BIGSERIAL NOT NULL,
-    "razorpay_subscription_id" TEXT,
-    "event_type" "RazorpaySubscriptionEventType" NOT NULL,
-    "payload" JSONB,
+    "plan_id" BIGINT NOT NULL,
+    "feature_id" BIGINT NOT NULL,
+
+    CONSTRAINT "tbl_subscription_plan_feature_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "tbl_razorpay_subscription" (
+    "id" BIGSERIAL NOT NULL,
+    "org_subscription_id" BIGINT NOT NULL,
+    "rzp_subscription_id" TEXT NOT NULL,
+    "rzp_plan_id" TEXT NOT NULL,
+    "status" TEXT NOT NULL,
+    "current_cycle" INTEGER,
+    "total_count" INTEGER,
+    "start_at" TIMESTAMP(3),
+    "end_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "tbl_razorpay_subscription_event_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "tbl_razorpay_subscription_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "tbl_razorpay_event" (
+    "id" BIGSERIAL NOT NULL,
+    "razorpay_entity_id" TEXT NOT NULL,
+    "entity_type" "RazorpayEntityType" NOT NULL DEFAULT 'SUBSCRIPTION',
+    "event_type" TEXT NOT NULL,
+    "payload" JSONB NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "subscription_id" BIGINT,
+
+    CONSTRAINT "tbl_razorpay_event_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -562,7 +571,7 @@ CREATE UNIQUE INDEX "tbl_user_email_key" ON "tbl_user"("email");
 CREATE UNIQUE INDEX "tbl_user_reset_token_key" ON "tbl_user"("reset_token");
 
 -- CreateIndex
-CREATE INDEX "tbl_user_first_name_last_name_email_phone_no_provider_count_idx" ON "tbl_user"("first_name", "last_name", "email", "phone_no", "provider", "country_id", "currency_id");
+CREATE INDEX "tbl_user_first_name_last_name_email_phone_no_auth_method_co_idx" ON "tbl_user"("first_name", "last_name", "email", "phone_no", "auth_method", "country_id", "currency_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "tbl_agent_kyc_agent_id_key" ON "tbl_agent_kyc"("agent_id");
@@ -587,24 +596,6 @@ CREATE INDEX "tbl_organization_user_org_id_user_id_role_id_status_idx" ON "tbl_o
 
 -- CreateIndex
 CREATE UNIQUE INDEX "tbl_organization_user_org_id_user_id_key" ON "tbl_organization_user"("org_id", "user_id");
-
--- CreateIndex
-CREATE UNIQUE INDEX "tbl_subscription_plan_name_key" ON "tbl_subscription_plan"("name");
-
--- CreateIndex
-CREATE UNIQUE INDEX "tbl_subscription_plan_razorpayPlanId_key" ON "tbl_subscription_plan"("razorpayPlanId");
-
--- CreateIndex
-CREATE INDEX "tbl_subscription_plan_name_billing_cycle_razorpayPlanId_idx" ON "tbl_subscription_plan"("name", "billing_cycle", "razorpayPlanId");
-
--- CreateIndex
-CREATE UNIQUE INDEX "tbl_subscription_org_id_key" ON "tbl_subscription"("org_id");
-
--- CreateIndex
-CREATE UNIQUE INDEX "tbl_subscription_razorpaySubscriptionId_key" ON "tbl_subscription"("razorpaySubscriptionId");
-
--- CreateIndex
-CREATE INDEX "tbl_subscription_org_id_plan_id_razorpaySubscriptionId_curr_idx" ON "tbl_subscription"("org_id", "plan_id", "razorpaySubscriptionId", "current_status", "auto_renew");
 
 -- CreateIndex
 CREATE INDEX "tbl_customer_first_name_last_name_email_phone_aadhaar_numbe_idx" ON "tbl_customer"("first_name", "last_name", "email", "phone", "aadhaar_number", "pan_number");
@@ -655,19 +646,34 @@ CREATE UNIQUE INDEX "tbl_product_real_estate_sale_id_key" ON "tbl_product_real_e
 CREATE INDEX "tbl_product_real_estate_property_type_location_property_nam_idx" ON "tbl_product_real_estate"("property_type", "location", "property_name", "builder_name", "ownership_type");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "tbl_razorpay_order_order_id_key" ON "tbl_razorpay_order"("order_id");
+CREATE UNIQUE INDEX "tbl_subscription_plan_code_key" ON "tbl_subscription_plan"("code");
 
 -- CreateIndex
-CREATE INDEX "tbl_razorpay_order_org_id_order_id_status_idx" ON "tbl_razorpay_order"("org_id", "order_id", "status");
+CREATE UNIQUE INDEX "tbl_subscription_plan_rzp_plan_id_key" ON "tbl_subscription_plan"("rzp_plan_id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "tbl_razorpay_payment_razorpay_payment_id_key" ON "tbl_razorpay_payment"("razorpay_payment_id");
+CREATE INDEX "tbl_subscription_plan_code_billing_cycle_is_active_idx" ON "tbl_subscription_plan"("code", "billing_cycle", "is_active");
 
 -- CreateIndex
-CREATE INDEX "tbl_razorpay_payment_order_id_razorpay_payment_id_status_me_idx" ON "tbl_razorpay_payment"("order_id", "razorpay_payment_id", "status", "method");
+CREATE UNIQUE INDEX "tbl_org_subscription_org_id_key" ON "tbl_org_subscription"("org_id");
 
 -- CreateIndex
-CREATE INDEX "tbl_razorpay_subscription_event_razorpay_subscription_id_ev_idx" ON "tbl_razorpay_subscription_event"("razorpay_subscription_id", "event_type");
+CREATE UNIQUE INDEX "tbl_org_subscription_rzp_subscription_id_key" ON "tbl_org_subscription"("rzp_subscription_id");
+
+-- CreateIndex
+CREATE INDEX "tbl_org_subscription_org_id_plan_id_status_idx" ON "tbl_org_subscription"("org_id", "plan_id", "status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "tbl_subscription_feature_key_key" ON "tbl_subscription_feature"("key");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "tbl_subscription_plan_feature_plan_id_feature_id_key" ON "tbl_subscription_plan_feature"("plan_id", "feature_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "tbl_razorpay_subscription_rzp_subscription_id_key" ON "tbl_razorpay_subscription"("rzp_subscription_id");
+
+-- CreateIndex
+CREATE INDEX "tbl_razorpay_event_razorpay_entity_id_event_type_entity_typ_idx" ON "tbl_razorpay_event"("razorpay_entity_id", "event_type", "entity_type");
 
 -- AddForeignKey
 ALTER TABLE "tbl_user_session" ADD CONSTRAINT "tbl_user_session_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "tbl_user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -709,12 +715,6 @@ ALTER TABLE "tbl_organization_user" ADD CONSTRAINT "tbl_organization_user_user_i
 ALTER TABLE "tbl_organization_user" ADD CONSTRAINT "tbl_organization_user_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "tbl_role"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "tbl_subscription" ADD CONSTRAINT "tbl_subscription_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "tbl_organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "tbl_subscription" ADD CONSTRAINT "tbl_subscription_plan_id_fkey" FOREIGN KEY ("plan_id") REFERENCES "tbl_subscription_plan"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
 ALTER TABLE "tbl_customer" ADD CONSTRAINT "tbl_customer_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "tbl_organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -754,10 +754,22 @@ ALTER TABLE "tbl_product_mutual_fund" ADD CONSTRAINT "tbl_product_mutual_fund_sa
 ALTER TABLE "tbl_product_real_estate" ADD CONSTRAINT "tbl_product_real_estate_sale_id_fkey" FOREIGN KEY ("sale_id") REFERENCES "tbl_agent_sale"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "tbl_razorpay_order" ADD CONSTRAINT "tbl_razorpay_order_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "tbl_organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "tbl_subscription_plan" ADD CONSTRAINT "tbl_subscription_plan_currency_id_fkey" FOREIGN KEY ("currency_id") REFERENCES "tbl_currency"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "tbl_razorpay_payment" ADD CONSTRAINT "tbl_razorpay_payment_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "tbl_razorpay_order"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "tbl_org_subscription" ADD CONSTRAINT "tbl_org_subscription_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "tbl_organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "tbl_razorpay_subscription_event" ADD CONSTRAINT "tbl_razorpay_subscription_event_razorpay_subscription_id_fkey" FOREIGN KEY ("razorpay_subscription_id") REFERENCES "tbl_subscription"("razorpaySubscriptionId") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "tbl_org_subscription" ADD CONSTRAINT "tbl_org_subscription_plan_id_fkey" FOREIGN KEY ("plan_id") REFERENCES "tbl_subscription_plan"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "tbl_subscription_plan_feature" ADD CONSTRAINT "tbl_subscription_plan_feature_plan_id_fkey" FOREIGN KEY ("plan_id") REFERENCES "tbl_subscription_plan"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "tbl_subscription_plan_feature" ADD CONSTRAINT "tbl_subscription_plan_feature_feature_id_fkey" FOREIGN KEY ("feature_id") REFERENCES "tbl_subscription_feature"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "tbl_razorpay_subscription" ADD CONSTRAINT "tbl_razorpay_subscription_org_subscription_id_fkey" FOREIGN KEY ("org_subscription_id") REFERENCES "tbl_org_subscription"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "tbl_razorpay_event" ADD CONSTRAINT "tbl_razorpay_event_subscription_id_fkey" FOREIGN KEY ("subscription_id") REFERENCES "tbl_razorpay_subscription"("id") ON DELETE SET NULL ON UPDATE CASCADE;

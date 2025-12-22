@@ -7,6 +7,13 @@ import { ExpressAdapter } from '@nestjs/platform-express';
 
 const port = process.env.PORT || 6969
 const expressApp = express();
+
+expressApp.use(
+  '/api/v1/subscription/webhook',
+  express.raw({ type: 'application/json' })
+);
+
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, new ExpressAdapter(expressApp));
 
