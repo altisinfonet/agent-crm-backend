@@ -10,6 +10,24 @@ import { GetCurrentUserId } from 'src/common/decorators/current-user-id.decorato
 @Controller({ path: 'subscription', version: '1' })
 export class SubscriptionController {
   constructor(private readonly subscriptionService: SubscriptionService) { }
+
+  @UseGuards(JwtAuthGuard)
+  @Get("plans")
+  async allPlans(@Res() res: Response) {
+    try {
+      const plans = await this.subscriptionService.allPlans();
+      let result = JSON.stringify(plans, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "All Plans"));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error) {
+      throw new BadRequestException(error.response);
+    }
+  }
+
+
   @UseGuards(JwtAuthGuard)
   @Post("subscribe")
   async create(@Res() res: Response, @Body() subscribeDto: CommonDto, @GetCurrentUserId() userId: bigint,) {
@@ -20,6 +38,23 @@ export class SubscriptionController {
       );
 
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription initiated"));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error) {
+      throw new BadRequestException(error.response);
+    }
+  }
+
+
+  @UseGuards(JwtAuthGuard)
+  @Post("upgrade")
+  async upgradeSubscription(@Res() res: Response, @Body() upgradedDto: CommonDto, @GetCurrentUserId() userId: bigint,) {
+    try {
+      const subscribe = await this.subscriptionService.upgradeSubscription(userId, upgradedDto);
+      let result = JSON.stringify(subscribe, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription upgraded"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error) {
       throw new BadRequestException(error.response);
@@ -44,11 +79,6 @@ export class SubscriptionController {
     }
   }
 
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.subscriptionService.findOne(+id);
-  }
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateSubscriptionDto: CommonDto) {

@@ -4,6 +4,9 @@ import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handleba
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { join } from 'path';
 import { MailService } from './mail.service';
+import { registerHandlebarsHelpers } from '@/helper/handlebars.helper';
+
+registerHandlebarsHelpers();
 
 @Module({
     imports: [
@@ -12,10 +15,10 @@ import { MailService } from './mail.service';
             inject: [ConfigService],
             useFactory: async (config: ConfigService) => ({
                 transport: {
-                    // host: config.get<string>('MAIL_HOST'),
-                    // port: config.get<string>('MAIL_PORT'),
-                    // secure: false, // true for 465, false for 587
-                    service: "gmail",
+                    host: config.get<string>('MAIL_HOST'),
+                    port: config.get<string>('MAIL_PORT'),
+                    secure: false, // true for 465, false for 587
+                    // service: "gmail",
                     auth: {
                         user: config.get<string>('MAIL_USER'),
                         pass: config.get<string>('MAIL_PASS')
@@ -28,13 +31,13 @@ import { MailService } from './mail.service';
                     dir: join(__dirname, 'templates'),
                     adapter: new HandlebarsAdapter(),
                     options: {
-                        strict: true
-                    }
-                }
-            })
-        })
+                        strict: true,
+                    },
+                },
+            }),
+        }),
     ],
     providers: [MailService],
-    exports: [MailService]
+    exports: [MailService],
 })
 export class MailModule { }

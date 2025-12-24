@@ -25,6 +25,64 @@ export class SubscriptionService {
     });
   }
 
+
+  async allPlans() {
+    try {
+      const plans = await this.prisma.subscriptionPlan.findMany({
+        where: {
+          is_active: true
+        },
+        select: {
+          code: true,
+          name: true,
+          description: true,
+          price: true,
+          currency: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+              symbol: true
+            }
+          },
+          billing_cycle: true,
+          rzp_plan_id: true,
+          created_at: true,
+          subscriptionPlanFeatures: {
+            select: {
+              feature: {
+                select: {
+                  id: true,
+                  key: true,
+                  name: true,
+                  description: true
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // 🔥 FORMAT RESPONSE
+      const formattedPlans = plans.map(plan => ({
+        code: plan.code,
+        name: plan.name,
+        description: plan.description,
+        price: plan.price,
+        currency: plan.currency,
+        billing_cycle: plan.billing_cycle,
+        rzp_plan_id: plan.rzp_plan_id,
+        created_at: plan.created_at,
+        features: plan.subscriptionPlanFeatures.map(spf => spf.feature)
+      }));
+
+      return formattedPlans;
+
+    } catch (error) {
+      throw error;
+    }
+  }
+
   async subscribe(user_id: bigint, dto: CommonDto) {
     try {
       const org = await this.prisma.organization.findUnique({
@@ -36,7 +94,7 @@ export class SubscriptionService {
         throw new BadRequestException("User do not have any organization")
       }
       const payload = decryptData(dto.data);
-      console.log("payload", payload);
+
       const { plan_id } = payload;
       const plan = await this.prisma.subscriptionPlan.findFirst({
         where: {
@@ -122,6 +180,105 @@ export class SubscriptionService {
   }
 
 
+  async upgradeSubscription(user_id: bigint, dto: CommonDto) {
+    try {
+      const org = await this.prisma.organization.findUnique({
+        where: {
+          created_by: user_id,
+        }
+      })
+      if (!org) {
+        throw new BadRequestException("User do not have any organization")
+      }
+      const payload = decryptData(dto.data);
+      const { new_plan_id } = payload;
+
+      if (!new_plan_id) {
+        throw new BadRequestException("New plan Id required")
+      }
+      const currentSub =
+        await this.prisma.organizationSubscription.findFirst({
+          where: {
+            org_id: org?.id,
+            status: "ACTIVE"
+          },
+          include: { plan: true }
+        });
+
+      if (!currentSub || !currentSub?.rzp_subscription_id) {
+        throw new BadRequestException("No active subscription found");
+      }
+
+      const newPlan =
+        await this.prisma.subscriptionPlan.findFirst({
+          where: {
+            id: new_plan_id,
+            is_active: true
+          }
+        });
+
+
+      if (!newPlan || !newPlan?.rzp_plan_id) {
+        throw new BadRequestException("Invalid plan");
+      }
+      try {
+        const fetchrzpSub = await this.razorpay.subscriptions.fetch(currentSub.rzp_subscription_id);
+        console.log("fetchrzpSub++++", fetchrzpSub);
+
+        const cancel = await this.razorpay.subscriptions.cancel(
+          currentSub.rzp_subscription_id,
+          false
+          // { cancel_at_cycle_end: 1 }
+        );
+        console.log("cancel++++", cancel);
+
+        const startAt = addDays(0);
+        const endAt = addYearsFrom(startAt, 10);
+
+        const rzpPayload: any = {
+          plan_id: newPlan.rzp_plan_id,
+          start_at: startAt,
+          end_at: endAt,
+          customer_notify: 1,
+          notes: {
+            org_id: org.id.toString(),
+            upgraded_from: currentSub.plan.code,
+            upgraded_to: newPlan.code
+          }
+        };
+
+
+        const rzpSub = await this.razorpay.subscriptions.create(rzpPayload);
+
+        const newOrgSub =
+          await this.prisma.organizationSubscription.create({
+            data: {
+              org_id: org?.id,
+              plan_id: newPlan.id,
+              status: "PENDING",
+              start_at: new Date(),
+              rzp_subscription_id: rzpSub.id
+            }
+          });
+
+        await this.prisma.organizationSubscription.update({
+          where: { id: currentSub.id },
+          data: {
+            status: "UPGRADED"
+          }
+        });
+        return {
+          subscription_id: rzpSub.id
+        };
+      } catch (error: any) {
+        console.error("Razorpay error:", error?.error || error);
+        throw error;
+      }
+    } catch (error) {
+      throw error
+    }
+  }
+
   async razorpayWebhook(body: Buffer, signature: string) {
     try {
       const expected = crypto
@@ -134,13 +291,11 @@ export class SubscriptionService {
       }
 
       const event = JSON.parse(body.toString());
-      console.log("event++++++++", event);
 
       const eventType = event.event;
       const subscription = event.payload.subscription?.entity;
       if (!subscription) return;
       const subId = subscription.id;
-      console.log("subscription++++++++", subscription);
 
       await this.prisma.razorpayEvent.create({
         data: {
@@ -184,25 +339,29 @@ export class SubscriptionService {
 
         case "subscription.cancelled":
         case "subscription.halted":
-          await this.prisma.organizationSubscription.update({
-            where: { rzp_subscription_id: subId },
-            data: {
-              status: "CANCELLED",
-              cancelled_at: new Date(),
-              auto_renew: false
+          {
+            const orgSub =
+              await this.prisma.organizationSubscription.findUnique({
+                where: { rzp_subscription_id: subId }
+              });
+            if (!orgSub || orgSub.status === "UPGRADED") {
+              return;
             }
-          });
-          break;
+            await this.prisma.organizationSubscription.update({
+              where: { rzp_subscription_id: subId },
+              data: {
+                status: "CANCELLED",
+                cancelled_at: new Date(),
+                auto_renew: false
+              }
+            });
+            break;
+          }
       }
 
     } catch (error) {
       throw error;
     }
-  }
-
-
-  findOne(id: number) {
-    return `This action returns a #${id} subscription`;
   }
 
   update(id: number, updateSubscriptionDto: CommonDto) {

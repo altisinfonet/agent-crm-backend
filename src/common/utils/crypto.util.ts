@@ -9,13 +9,6 @@ export class CryptoUtil {
                 'TOKEN_ENCRYPTION_KEY is missing. Please set it in your environment variables.'
             );
         }
-
-        // if (key.length !== 64) {
-        //     throw new Error(
-        //         'TOKEN_ENCRYPTION_KEY must be a 64-char hex string (256-bit AES key).'
-        //     );
-        // }
-
         return Buffer.from(key, 'hex');
     }
 

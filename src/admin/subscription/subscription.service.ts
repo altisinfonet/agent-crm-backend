@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { CommonDto } from 'src/auth/dto/common.dto';
 import { decryptData } from 'src/helper/common.helper';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -94,12 +94,13 @@ export class SubscriptionService {
           description: true,
           price: true,
           billing_cycle: true,
-          max_agents: true,
           is_active: true,
           rzp_plan_id: true,
+          created_at: true,
           currency: {
             select: {
               id: true,
+              name: true,
               code: true,
               symbol: true
             }
@@ -109,25 +110,101 @@ export class SubscriptionService {
               feature: {
                 select: {
                   id: true,
-                  name: true,
                   key: true,
-                  description: true,
+                  name: true,
+                  description: true
                 }
               }
             }
-          },
-          created_at: true,
-          updated_at: true
+          }
         }
       });
-      return plans;
+
+      const formattedPlans = plans.map(plan => ({
+        code: plan.code,
+        name: plan.name,
+        description: plan.description,
+        price: plan.price,
+        currency: plan.currency,
+        billing_cycle: plan.billing_cycle,
+        rzp_plan_id: plan.rzp_plan_id,
+        created_at: plan.created_at,
+        features: plan.subscriptionPlanFeatures.map(spf => spf.feature)
+      }));
+
+      return formattedPlans;
     } catch (error) {
       throw error;
     }
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} subscription`;
+  async adminGrantSubscription(dto: CommonDto) {
+    try {
+      const payload = decryptData(dto.data);
+      const { orgId, planId, durationDays } = payload;
+
+      if (!orgId || !planId) {
+        throw new BadRequestException("organization Id and plan Id are required.");
+      }
+
+      const plan = await this.prisma.subscriptionPlan.findUnique({
+        where: { id: planId }
+      });
+
+      if (!plan) {
+        throw new BadRequestException("Invalid plan");
+      }
+
+      await this.prisma.$transaction(async (tx) => {
+        const activeSub = await tx.organizationSubscription.findFirst({
+          where: {
+            org_id: orgId,
+            status: "ACTIVE"
+          }
+        });
+
+        if (activeSub && activeSub.source === "ADMIN") {
+          await tx.organizationSubscription.update({
+            where: { id: activeSub.id },
+            data: {
+              plan_id: planId,
+              start_at: new Date(),
+              end_at: durationDays
+                ? new Date(Date.now() + durationDays * 86400000)
+                : null
+            }
+          });
+          return;
+        }
+
+        if (activeSub && activeSub.source === "RAZORPAY") {
+          await tx.organizationSubscription.update({
+            where: { id: activeSub.id },
+            data: {
+              status: "UPGRADED"
+            }
+          });
+        }
+
+        await tx.organizationSubscription.create({
+          data: {
+            org_id: orgId,
+            plan_id: planId,
+            status: "ACTIVE",
+            source: "ADMIN",
+            start_at: new Date(),
+            end_at: durationDays
+              ? new Date(Date.now() + durationDays * 86400000)
+              : null,
+            auto_renew: false
+          }
+        });
+      });
+
+      return true;
+    } catch (error) {
+      throw error;
+    }
   }
 
   async updatePlan(plan_id: bigint, dto: CommonDto) {

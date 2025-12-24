@@ -135,3 +135,23 @@ export async function createMetaData(
         }
     });
 }
+
+export async function createNotification(
+    userId: bigint,
+    type: string,
+    title: string,
+    desc: string,
+    metadata: any = {},
+    image?: string
+) {
+    return await prisma.inAppNotifications.create({
+        data: {
+            user_id: userId,
+            type,
+            title,
+            desc,
+            metadata,
+            image,
+        },
+    });
+}

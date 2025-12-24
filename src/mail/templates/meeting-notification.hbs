@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meeting {{capitalize status}}</title>
+</head>
+
+<body style="margin:0;padding:0;background-color:#f3f4f6;font-family:Arial,Helvetica,sans-serif;">
+
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f3f4f6;padding:20px 0;">
+        <tr>
+            <td align="center">
+
+                <!-- MAIN CONTAINER -->
+                <table width="600" cellpadding="0" cellspacing="0"
+                    style="background:#ffffff;border-radius:10px;overflow:hidden;">
+
+                    <!-- HEADER -->
+                    <tr>
+                        <td style="background:#4f46e5;color:#ffffff;padding:24px;text-align:center;">
+                            <h1 style="margin:0;font-size:22px;font-weight:bold;">
+                                {{#if (eq status "CANCELLED")}}Meeting Cancelled
+                                {{else if (eq status "COMPLETED")}}Meeting Completed
+                                {{else if (eq status "POSTPONED")}}Meeting Rescheduled
+                                {{else}}Meeting Reminder{{/if}}
+                            </h1>
+                        </td>
+                    </tr>
+
+                    <!-- CONTENT -->
+                    <tr>
+                        <td style="padding:24px;color:#1f2937;font-size:15px;line-height:1.6;">
+
+                            <p style="margin:0 0 16px 0;font-size:16px;">
+                                Hi <strong>{{agent.name}}</strong>,
+                            </p>
+
+                            {{#if (eq status "CANCELLED")}}
+                            <p>This meeting has been cancelled.</p>
+                            {{else if (eq status "COMPLETED")}}
+                            <p>This meeting has been completed. Here's a quick recap:</p>
+                            {{else if (eq status "POSTPONED")}}
+                            <p>This meeting has been rescheduled. Here are the updated details:</p>
+                            {{else}}
+                            <p>You have a meeting coming up soon. Here are the details:</p>
+                            {{/if}}
+
+                            <!-- MEETING CARD -->
+                            <table width="100%" cellpadding="0" cellspacing="0"
+                                style="border:1px solid #e5e7eb;border-radius:8px;margin-top:16px;">
+                                <tr>
+                                    <td style="padding:16px;background:#eef2ff;">
+                                        <strong style="font-size:16px;color:#4f46e5;">{{title}}</strong>
+                                        <span style="margin-left:8px;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:bold;
+                                        {{#if (eq status " COMPLETED")}}background:#dcfce7;color:#166534; {{else if (eq
+                                            status "CANCELLED" )}}background:#fee2e2;color:#991b1b; {{else if (eq
+                                            status "POSTPONED" )}}background:#fef3c7;color:#92400e;
+                                            {{else}}background:#dbeafe;color:#1e40af;{{/if}}">
+                                            {{status}}
+                                        </span>
+                                    </td>
+                                </tr>
+
+                                <tr>
+                                    <td style="padding:16px;">
+
+                                        {{#if description}}
+                                        <p><strong>Description:</strong><br>{{description}}</p>
+                                        {{/if}}
+
+                                        <p><strong>Meeting Type:</strong> {{meeting_type}}</p>
+
+                                        {{#if customer}}
+                                        <p><strong>With:</strong> {{customer.name}}</p>
+                                        {{/if}}
+
+                                        <p><strong>Date:</strong>
+                                            {{formatDate start_time "dddd, MMMM D, YYYY"}}
+                                        </p>
+
+                                        <p><strong>Time:</strong>
+                                            {{formatDate start_time "h:mm A"}}{{#if end_time}} - {{formatDate end_time
+                                            "h:mm A"}}{{/if}}
+                                        </p>
+
+                                        {{#if reminder_before}}
+                                        <p><strong>Reminder:</strong> {{reminder_before}} minutes before</p>
+                                        {{/if}}
+
+                                        {{#if mom}}
+                                        <p><strong>Notes:</strong><br>{{mom}}</p>
+                                        {{/if}}
+
+                                    </td>
+                                </tr>
+                            </table>
+
+                            {{#if (eq status "SCHEDULED")}}
+                            <!-- BUTTON -->
+                            <div style="text-align:center;margin:24px 0;">
+                                <a href="{{meetingUrl}}" style="background:#4f46e5;color:#ffffff;text-decoration:none;padding:14px 22px;
+                                    border-radius:6px;font-size:15px;font-weight:bold;display:inline-block;">
+                                    View Meeting Details →
+                                </a>
+                            </div>
+                            {{/if}}
+
+                            <p style="font-size:13px;color:#6b7280;text-align:center;margin-top:20px;">
+                                Need to make changes? You can update this meeting from your dashboard.
+                            </p>
+
+                        </td>
+                    </tr>
+
+                    <!-- FOOTER -->
+                    <tr>
+                        <td style="background:#f9fafb;padding:16px;text-align:center;font-size:12px;color:#6b7280;">
+                            <p style="margin:0;">This is an automated notification. Please do not reply.</p>
+                            <p style="margin:4px 0 0;">© {{currentYear}} Your Company. All rights reserved.</p>
+                        </td>
+                    </tr>
+
+                </table>
+
+            </td>
+        </tr>
+    </table>
+
+</body>
+
+</html>

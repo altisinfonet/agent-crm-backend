@@ -46,9 +46,19 @@ export class SubscriptionController {
     }
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.subscriptionService.findOne(+id);
+  @Post('grant')
+  async findOne(@Res() res: Response, @Body() grantDto: CommonDto) {
+    try {
+      const plans = await this.subscriptionService.adminGrantSubscription(grantDto);
+      let result = JSON.stringify(plans, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Admin subscription grant."));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error: any) {
+      throw new BadRequestException(error.response);
+    }
   }
 
   @Patch(':id')

@@ -10,13 +10,17 @@ import { CommonDto } from './dto/common.dto';
 import { GetCurrentUserId } from 'src/common/decorators/current-user-id.decorator';
 import { GetCurrentUser } from 'src/common/decorators/current-user.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { ConfigService } from '@nestjs/config';
+import { OtpService } from 'src/otp/otp.service';
 
 
 @ApiTags('Authentication')
 @Controller({ path: 'auth', version: '1' })
 export class AuthController {
-    constructor(private authService: AuthService) { }
-
+    constructor(
+        private readonly authService: AuthService,
+        private config: ConfigService,
+    ) { }
     @ApiOperation({ summary: 'Login using password, OTP, Google, or Apple' })
     @Post('login')
     @HttpCode(HttpStatus.OK)

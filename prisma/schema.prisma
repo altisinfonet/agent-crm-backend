@@ -47,10 +47,18 @@ enum ApprovalStatus {
 }
 
 enum SubscriptionStatus {
+    PENDING
     ACTIVE
     PAUSED
+    UPGRADED
     CANCELLED
     EXPIRED
+    HALTED
+}
+
+enum SubscriptionSource {
+    RAZORPAY
+    ADMIN
 }
 
 enum RazorpayEntityType {
@@ -64,6 +72,20 @@ enum SubscriptionCycle {
     MONTHLY
     QUARTERLY
     YEARLY
+}
+
+enum MeetingStatus {
+    SCHEDULED
+    POSTPONED
+    COMPLETED
+    CANCELLED
+}
+
+enum MeetingType {
+    REMINDER
+    FOLLOW_UP
+    CALL
+    VISIT
 }
 
 /**
@@ -272,6 +294,7 @@ model User {
     created_at           DateTime             @default(now())
     updated_at           DateTime             @updatedAt
     invalidatedTokens    InvalidatedToken[]
+    userFCMTokens        UserFCMToken[]
     organizations        Organization[]       @relation("OrgCreatedBy")
     orgUsers             OrganizationUser[]
     customers            Customer[]           @relation("CustomerCreatedBy")
@@ -279,6 +302,8 @@ model User {
     sessions             UserSession[]
     agentKYC             AgentKYC?
     agentSales           AgentSale[]
+    meetings             Meeting[]
+    inAppNotifications   InAppNotifications[]
 
     @@index([first_name, last_name, email, phone_no, auth_method, country_id, currency_id])
     @@map("tbl_user")
@@ -330,6 +355,47 @@ model InvalidatedToken {
 
     @@index([user_id])
     @@map("tbl_invalidated_tokens")
+}
+
+model UserFCMToken {
+    id         BigInt   @id @default(autoincrement()) @db.BigInt
+    user_id    BigInt
+    user       User     @relation(fields: [user_id], references: [id])
+    token      String
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    @@map("tbl_user_fcm_tokens")
+}
+
+model InAppNotifications {
+    id         BigInt   @id @default(autoincrement()) @db.BigInt
+    user_id    BigInt
+    user       User     @relation(fields: [user_id], references: [id])
+    type       String
+    title      String
+    desc       String
+    image      String?
+    is_read    Boolean  @default(false)
+    metadata   Json?
+    created_at DateTime @default(now())
+
+    @@index([user_id, type, title, desc, is_read])
+    @@map("tbl_in_app_notifications")
+}
+
+model PushNotification {
+    id         BigInt   @id @default(autoincrement()) @db.BigInt
+    title      String
+    body       String
+    url        String?
+    type       String?
+    images     String?
+    created_at DateTime @default(now())
+    updated_at DateTime @updatedAt
+
+    @@index([id])
+    @@map("tbl_push_notifications")
 }
 
 /**
@@ -406,6 +472,7 @@ model Customer {
     created_at     DateTime     @default(now())
     updated_at     DateTime     @updatedAt
     agentSales     AgentSale[]
+    meetings       Meeting[]
 
     @@index([first_name, last_name, email, phone, aadhaar_number, pan_number])
     @@map("tbl_customer")
@@ -629,6 +696,7 @@ model OrganizationSubscription {
     plan_id                 BigInt
     plan                    SubscriptionPlan       @relation(fields: [plan_id], references: [id])
     status                  SubscriptionStatus
+    source                  SubscriptionSource     @default(RAZORPAY)
     start_at                DateTime
     end_at                  DateTime?
     auto_renew              Boolean                @default(true)
@@ -696,4 +764,28 @@ model RazorpayEvent {
 
     @@index([razorpay_entity_id, event_type, entity_type])
     @@map("tbl_razorpay_event")
+}
+
+model Meeting {
+    id              BigInt        @id @default(autoincrement())
+    agent_id        BigInt
+    agent           User          @relation(fields: [agent_id], references: [id])
+    customer_id     BigInt?
+    customer        Customer?     @relation(fields: [customer_id], references: [id])
+    title           String
+    description     String?
+    meeting_type    MeetingType   @default(REMINDER)
+    start_time      DateTime
+    end_time        DateTime?
+    status          MeetingStatus @default(SCHEDULED)
+    is_completed    Boolean       @default(false)
+    completed_at    DateTime?
+    mom             String?
+    reminder_before Int?
+    reminder_sent   Boolean       @default(false)
+    created_at      DateTime      @default(now())
+    updated_at      DateTime      @updatedAt
+
+    @@index([agent_id, start_time, status, reminder_sent])
+    @@map("tbl_meetings")
 }

@@ -14,6 +14,8 @@ import { SettingsModule } from './settings/settings.module';
 import { SubscriptionModule } from './subscription/subscription.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { TaskModule } from './task/task.module';
+import { MeetingModule } from './meeting/meeting.module';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
   imports: [
@@ -30,7 +32,9 @@ import { TaskModule } from './task/task.module';
     UserModule,
     ProductsModule,
     SettingsModule,
-    SubscriptionModule
+    SubscriptionModule,
+    MeetingModule,
+    NotificationModule
   ],
   controllers: [AppController],
   providers: [AppService, MailService],

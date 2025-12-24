@@ -25,14 +25,14 @@ export class TaskService {
         });
     }
 
-    @Cron(CronExpression.EVERY_30_MINUTES)
+    @Cron(CronExpression.EVERY_10_MINUTES)
     async reconcileSubscriptions() {
         this.logger.log("Starting subscription reconciliation");
         const MAX_ATTEMPTS = 3;
         const pendingSubs =
             await this.prisma.organizationSubscription.findMany({
                 where: {
-                    status: "PAUSED",
+                    status: "PENDING",
                     reconciliation_attempts: {
                         lt: MAX_ATTEMPTS
                     },

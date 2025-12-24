@@ -10,13 +10,12 @@ import { Tokens } from './types/tokens.type';
 import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import { Request } from 'express';
-import { RoleName } from 'generated/prisma';
+import { verifyOtpDto } from 'src/otp/dto/verify-otp.dto';
 
 @Injectable()
 export class AuthService {
     constructor(
         private prisma: PrismaService,
-        private otpService: OtpService,
         private jwtService: JwtService,
         private config: ConfigService,
         // private sessionService: SessionService,
@@ -75,7 +74,7 @@ export class AuthService {
                         name: true,
                     },
                 },
-
+                status: true,
             },
         });
 
@@ -105,6 +104,7 @@ export class AuthService {
                             name: true,
                         },
                     },
+                    status: true
                 },
             });
         }
@@ -121,6 +121,7 @@ export class AuthService {
                 sub: user?.id.toString(),
                 role,
                 sid: session.session_id,
+                status: user?.status
             },
             {
                 secret: this.config.get('JWT_SECRET'),
@@ -159,7 +160,7 @@ export class AuthService {
                 verifyOtp.is_email = true;
 
                 if (!email || !otp) throw new Error();
-                await this.otpService.verifyOtp(verifyOtp);
+                await this.verifyOtp(verifyOtp);
                 return;
             }
 
@@ -167,7 +168,7 @@ export class AuthService {
                 verifyOtp.credential = phone_no;
                 verifyOtp.is_email = false
                 if (!phone_no || !otp) throw new Error();
-                await this.otpService.verifyOtp(verifyOtp);
+                await this.verifyOtp(verifyOtp);
                 return;
             }
 
@@ -180,6 +181,55 @@ export class AuthService {
             throw new Error();
         } catch (e) {
             throw new UnauthorizedException(e.message || 'Invalid credentials');
+        }
+    }
+
+    async verifyOtp(dto: verifyOtpDto) {
+        try {
+            const otpRecord = await this.prisma.oTP.findFirst({
+                where: {
+                    credential: dto.credential,
+                },
+                select: {
+                    id: true,
+                    otp: true,
+                    limit: true,
+                    expires_at: true,
+                    updated_at: true
+                }
+            });
+
+            if (!otpRecord) {
+                throw new BadRequestException('OTP not found for this credential.');
+            }
+
+            if (otpRecord?.limit >= 3) {
+                throw new BadRequestException('You tried too many attempts. Try again later.');
+            }
+
+            const now = new Date();
+            if (otpRecord.expires_at < now) {
+                throw new BadRequestException('OTP has expired.');
+            }
+
+            if (otpRecord.otp !== dto.otp) {
+                await this.prisma.oTP.update({
+                    where: { id: otpRecord.id },
+                    data: {
+                        limit: { increment: 1 },
+                        updated_at: new Date()
+                    }
+                });
+                throw new BadRequestException('Invalid OTP.');
+            }
+
+            await this.prisma.oTP.delete({
+                where: { id: otpRecord.id }
+            });
+
+            return true;
+        } catch (error) {
+            throw error;
         }
     }
 
@@ -223,6 +273,7 @@ export class AuthService {
                         role: {
                             select: { id: true, name: true },
                         },
+                        status: true,
                     },
                 },
             },
@@ -254,6 +305,7 @@ export class AuthService {
                 sub: session.user.id.toString(),
                 role,
                 sid: session.session_id,
+                status: session.user.status
             },
             {
                 secret: this.config.get('JWT_SECRET'),
