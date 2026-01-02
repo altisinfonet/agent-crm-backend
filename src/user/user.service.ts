@@ -99,8 +99,11 @@ export class UserService {
         phone_no,
         first_name,
         last_name,
+        dob,
         old_password,
         new_password,
+        country_id,
+        currency_id
       } = payload;
 
       const findUser = await this.prisma.user.findUnique({
@@ -117,6 +120,9 @@ export class UserService {
       if (phone_no) updateData.phone_no = phone_no;
       if (first_name) updateData.first_name = first_name;
       if (last_name) updateData.last_name = last_name;
+      if (dob) updateData.dob = dob;
+      if (country_id) updateData.country_id = country_id;
+      if (currency_id) updateData.currency_id = currency_id;
 
       const hasOld = !!old_password;
       const hasNew = !!new_password;
@@ -158,6 +164,7 @@ export class UserService {
       });
       return this.getCurrentUser(userId);
     } catch (error) {
+      console.log("error", error);
       throw error
     }
   }
@@ -251,6 +258,7 @@ export class UserService {
           email: true,
           phone_no: true,
           image: true,
+          dob: true,
           country: true,
           currency: true,
           created_at: true,

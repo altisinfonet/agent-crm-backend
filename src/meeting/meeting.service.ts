@@ -77,7 +77,7 @@ export class MeetingService {
             }
           );
         } catch (error) {
-          console.error("Error sending reject email", error);
+          console.error("Error sending metting email", error);
         }
       });
       return createdMeeting;
@@ -316,7 +316,6 @@ export class MeetingService {
         try {
           await this.mailService.sendMeetingEmail(updatedMeeting, 'updated');
           const notification: any = await this.getMeetingNotificationPayload(updatedMeeting, 'updated');
-          console.log("notification", notification);
 
           await createNotification(
             agent_id,
@@ -330,7 +329,7 @@ export class MeetingService {
             }
           );
         } catch (error) {
-          console.error("Error sending reject email", error);
+          console.error("Error sending metting email", error);
         }
       });
       return updatedMeeting;
@@ -365,5 +364,81 @@ export class MeetingService {
       throw error;
     }
   }
+
+  async sendReminder() {
+    try {
+      const now = new Date();
+      const DEFAULT_REMINDER_MINUTES = 15;
+
+      const meetings = await this.prisma.meeting.findMany({
+        where: {
+          status: {
+            in: ["SCHEDULED", "POSTPONED"],
+          },
+          reminder_sent: false,
+          start_time: {
+            gte: now,
+          },
+        },
+        include: {
+          agent: {
+            select: {
+              id: true,
+              email: true,
+              first_name: true,
+              last_name: true,
+            },
+          },
+          customer: {
+            select: {
+              first_name: true,
+              last_name: true,
+            },
+          },
+        },
+      });
+
+      for (const meeting of meetings) {
+        const reminderMinutes =
+          meeting.reminder_before !== null
+            ? meeting.reminder_before
+            : DEFAULT_REMINDER_MINUTES;
+
+        const reminderTime = new Date(
+          meeting.start_time.getTime() - reminderMinutes * 60 * 1000
+        );
+
+        if (now >= reminderTime) {
+          const context = {
+            email: meeting.agent.email,
+            name: `${meeting.agent.first_name} ${meeting.agent.last_name}`,
+            meetingTitle: meeting.title,
+            meetingDesc: meeting.description,
+            meeting_type: meeting.meeting_type,
+            start_time: meeting.start_time,
+            end_time: meeting.end_time,
+            customerName: meeting.customer
+              ? `${meeting.customer.first_name} ${meeting.customer.last_name}`
+              : null,
+          };
+
+          await this.mailService.sendMeetingReminderEmail(context);
+
+          await this.prisma.meeting.update({
+            where: { id: meeting.id },
+            data: {
+              reminder_sent: true,
+            },
+          });
+        }
+      }
+
+      return true;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+
 
 }

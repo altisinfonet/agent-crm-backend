@@ -1,10 +1,9 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Req, Res, BadRequestException, HttpStatus } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Req, Res, BadRequestException, HttpStatus, UseGuards } from '@nestjs/common';
 import { OtpService } from './otp.service';
-import { SendOtpDto } from './dto/send-otp.dto';
-import { verifyOtpDto } from './dto/verify-otp.dto';
 import { ApiResponse } from 'src/helper/response.helper';
 import type { Request, Response } from 'express';
 import { CommonDto } from 'src/auth/dto/common.dto';
+import { verifyOtpDto } from './dto/verify-otp.dto';
 
 @Controller({ path: 'otp', version: '1' })
 export class OtpController {
@@ -34,9 +33,8 @@ export class OtpController {
       } else {
         throw new BadRequestException(new ApiResponse(null, 'Invalid Credential.', false));
       }
-    } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
+    } catch (error) {
+      throw error;
     }
   }
 

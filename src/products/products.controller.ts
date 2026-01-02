@@ -1,9 +1,11 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Res, HttpStatus, BadRequestException, Put } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Res, HttpStatus, BadRequestException, Put, UseGuards } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { CommonDto } from 'src/auth/dto/common.dto';
 import type { Response } from 'express';
 import { encryptData } from 'src/helper/common.helper';
 import { ApiResponse } from 'src/helper/response.helper';
+import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
+import { GetCurrentUserId } from '@/common/decorators/current-user-id.decorator';
 
 
 @Controller({ path: 'products', version: '1' })
@@ -34,6 +36,24 @@ export class ProductsController {
       );
 
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Product enetity list"));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error: any) {
+      console.log('error: ', error);
+      throw new BadRequestException(error.response);
+    }
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post("agent/entity/:id")
+  async create(@Res() res: Response, @GetCurrentUserId() userId: bigint, @Param('id') id: string,) {
+    try {
+      const entity = await this.productsService.create(userId, BigInt(id));
+
+      let result = JSON.stringify(entity, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Agent product enetity created successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
       console.log('error: ', error);

@@ -105,6 +105,39 @@ export class SubscriptionService {
               symbol: true
             }
           },
+        }
+      });
+
+      return plans;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async findOne(plan_id: bigint) {
+    try {
+      const plan = await this.prisma.subscriptionPlan.findUnique({
+        where: {
+          id: plan_id,
+        },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          description: true,
+          price: true,
+          billing_cycle: true,
+          is_active: true,
+          rzp_plan_id: true,
+          created_at: true,
+          currency: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
+              symbol: true
+            }
+          },
           subscriptionPlanFeatures: {
             select: {
               feature: {
@@ -120,19 +153,19 @@ export class SubscriptionService {
         }
       });
 
-      const formattedPlans = plans.map(plan => ({
-        code: plan.code,
-        name: plan.name,
-        description: plan.description,
-        price: plan.price,
-        currency: plan.currency,
-        billing_cycle: plan.billing_cycle,
-        rzp_plan_id: plan.rzp_plan_id,
-        created_at: plan.created_at,
-        features: plan.subscriptionPlanFeatures.map(spf => spf.feature)
-      }));
+      const formattedPlan = {
+        code: plan?.code,
+        name: plan?.name,
+        description: plan?.description,
+        price: plan?.price,
+        currency: plan?.currency,
+        billing_cycle: plan?.billing_cycle,
+        rzp_plan_id: plan?.rzp_plan_id,
+        created_at: plan?.created_at,
+        features: plan?.subscriptionPlanFeatures.map(spf => spf.feature)
+      };
 
-      return formattedPlans;
+      return formattedPlan;
     } catch (error) {
       throw error;
     }
@@ -212,6 +245,19 @@ export class SubscriptionService {
       const payload = decryptData(dto.data);
       const { max_agents, is_active, code } = payload;
 
+      const duplicatePlan = await this.prisma.subscriptionPlan.findFirst({
+        where: {
+          code,
+          id: {
+            not: plan_id
+          }
+        },
+      });
+
+      if (duplicatePlan) {
+        throw new BadRequestException("Duplicate plan code.");
+      }
+
       const update = await this.prisma.subscriptionPlan.update({
         where: { id: plan_id },
         data: {
@@ -220,9 +266,159 @@ export class SubscriptionService {
           code
         }
       });
+
       return update;
     } catch (error) {
-      throw error
+      throw error;
+    }
+  }
+
+  async subscribers(subscribersDto: CommonDto) {
+    try {
+      const payload = decryptData(subscribersDto.data);
+
+      const page = payload?.page ? Number(payload.page) : 1;
+      const limit = payload?.limit ? Number(payload.limit) : 10;
+      const search = payload?.search?.trim();
+      const status = payload?.status;
+      const plan_id = payload?.plan_id;
+      const auto_renew = payload?.auto_renew;
+      const source = payload?.source;
+
+      const sortBy = payload?.sortBy || "created_at";
+      const sortOrder = payload?.sortOrder === "asc" ? "asc" : "desc";
+
+      const skip = (page - 1) * limit;
+      const where: any = {
+        ...(status && { status }),
+        ...(plan_id && { plan_id }),
+        ...(auto_renew !== undefined && { auto_renew }),
+        ...(source && { source }),
+
+        ...(search && {
+          OR: [
+            {
+              organization: {
+                name: {
+                  contains: search,
+                  mode: "insensitive",
+                },
+              },
+            },
+            {
+              plan: {
+                name: {
+                  contains: search,
+                  mode: "insensitive",
+                },
+              },
+            },
+            {
+              plan: {
+                code: {
+                  contains: search,
+                  mode: "insensitive",
+                },
+              },
+            },
+          ],
+        }),
+      };
+
+      /* ------------------------------------
+         SORTING LOGIC
+      ------------------------------------ */
+      let orderBy: any = { created_at: sortOrder };
+
+      if (sortBy === "start_at") {
+        orderBy = { start_at: sortOrder };
+      }
+
+      if (sortBy === "end_at") {
+        orderBy = { end_at: sortOrder };
+      }
+
+      if (sortBy === "plan_price") {
+        orderBy = {
+          plan: {
+            price: sortOrder,
+          },
+        };
+      }
+
+      if (sortBy === "organization_name") {
+        orderBy = {
+          organization: {
+            name: sortOrder,
+          },
+        };
+      }
+
+      /* ------------------------------------
+         QUERY
+      ------------------------------------ */
+      const [data, total] = await this.prisma.$transaction([
+        this.prisma.organizationSubscription.findMany({
+          where,
+          skip,
+          take: limit,
+          orderBy,
+          select: {
+            id: true,
+            start_at: true,
+            end_at: true,
+            auto_renew: true,
+            source: true,
+            status: true,
+            created_at: true,
+
+            organization: {
+              select: {
+                id: true,
+                name: true,
+                contact_email: true,
+                createdByUser: {
+                  select: {
+                    first_name: true,
+                    last_name: true,
+                    email: true,
+                    phone_no: true,
+                    status: true,
+                  },
+                },
+              },
+            },
+
+            plan: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+                description: true,
+                price: true,
+                is_active: true,
+                rzp_plan_id: true,
+                currency: {
+                  select: {
+                    name: true,
+                    code: true,
+                    symbol: true,
+                  },
+                },
+              },
+            },
+          },
+        }),
+
+        this.prisma.organizationSubscription.count({ where }),
+      ]);
+
+      return {
+        Subscribers: data,
+        Total: total,
+      };
+    } catch (error) {
+      throw error;
     }
   }
 

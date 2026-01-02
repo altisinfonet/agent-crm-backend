@@ -5,17 +5,16 @@ import { OtpService } from 'src/otp/otp.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtModule, JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { MailService } from 'src/mail/mail.service';
-import { MailerService } from '@nestjs-modules/mailer';
+import { OtpModule } from '@/otp/otp.module';
+import { MailModule } from '@/mail/mail.module';
 
 @Module({
-    imports: [JwtModule.register({})],
+    imports: [OtpModule, MailModule, JwtModule.register({})],
     controllers: [AuthController],
     providers: [
         AuthService,
         JwtStrategy,
         JwtService,
-        MailService,
         ConfigService,
     ],
 })

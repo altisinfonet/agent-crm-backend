@@ -16,6 +16,9 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { TaskModule } from './task/task.module';
 import { MeetingModule } from './meeting/meeting.module';
 import { NotificationModule } from './notification/notification.module';
+import { CustomerModule } from './customer/customer.module';
+import { TodoModule } from './todo/todo.module';
+import { WhatsappModule } from './whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -34,7 +37,10 @@ import { NotificationModule } from './notification/notification.module';
     SettingsModule,
     SubscriptionModule,
     MeetingModule,
-    NotificationModule
+    NotificationModule,
+    CustomerModule,
+    TodoModule,
+    WhatsappModule
   ],
   controllers: [AppController],
   providers: [AppService, MailService],

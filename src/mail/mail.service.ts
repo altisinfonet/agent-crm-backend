@@ -27,6 +27,25 @@ export class MailService {
         }
     }
 
+    async sendResetPasswordEmail(email: string, resetLink: string, token: string = '', expiry_minutes: number) {
+        console.log("resetLink", resetLink);
+
+        const mailOptions = {
+            to: email,
+            subject: 'Reset your password',
+            template: './forgot-password',
+            context: {
+                code: token,
+                expiry_minutes: expiry_minutes,
+                currentYear: new Date().getFullYear(),
+                reset_link: resetLink,
+            }
+        };
+
+        await this.mailer.sendMail(mailOptions);
+    }
+
+
     async sendMeetingEmail(meeting: any, action: 'created' | 'updated') {
         try {
             const agent = await this.prisma.user.findUnique({
@@ -38,18 +57,17 @@ export class MailService {
                 return;
             }
 
-            const formatDate = (date: Date) => {
-                return new Date(date).toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    year: 'numeric',
-                    month: 'long',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-            };
+            // const formatDate = (date: Date) => {
+            //     return new Date(date).toLocaleDateString('en-US', {
+            //         weekday: 'long',
+            //         year: 'numeric',
+            //         month: 'long',
+            //         day: 'numeric',
+            //         hour: '2-digit',
+            //         minute: '2-digit'
+            //     });
+            // };
 
-            // Get customer details if exists
             let customer: any = null;
             if (meeting.customer_id) {
                 customer = await this.prisma.customer.findUnique({
@@ -84,9 +102,9 @@ export class MailService {
                 template: './meeting-notification',
                 context: meetingData
             };
-            console.log("mailOptions++++", mailOptions);
             try {
                 const send = await this.mailer.sendMail(mailOptions);
+                return true;
             } catch (error) {
                 console.warn('Error sending meeting email.', error);
             }
@@ -98,7 +116,56 @@ export class MailService {
                 });
             }
         } catch (error) {
-            console.error('Error sending meeting email====', error);
+            console.error('Error sending meeting email', error);
+        }
+    }
+
+    async sendMeetingReminderEmail(context: any) {
+        try {
+            const subject = `Meeting Reminder: ${context?.meetingTitle}`
+            const mailOptions = {
+                to: context.email,
+                subject: subject,
+                template: './meeting-notification',
+                context: {
+                    name: context?.name,
+                    meetingTitle: context?.meetingTitle,
+                    meetingDesc: context?.meetingDesc,
+                    meetingType: context?.meeting_type,
+                    meetingTime: context?.start_time,
+                    meetingEnd: context?.end_time,
+                    customerName: context.customerName,
+                    currentYear: new Date().getFullYear()
+                }
+            };
+            try {
+                const send = await this.mailer.sendMail(mailOptions);
+                return true;
+            } catch (error) {
+                console.warn('Error sending reminder email.', error);
+            }
+        } catch (error) {
+            console.error('Error sending reminder email', error);
+        }
+    }
+
+
+    async sendHBDEmail(email: string, name: string) {
+        try {
+            const mailOptions = {
+                to: email,
+                subject: `Happy Birthday, ${name} 🎉`,
+                template: './birthday-wish',
+                context: {
+                    name: name,
+                    currentYear: new Date().getFullYear()
+                }
+            };
+            const send = await this.mailer.sendMail(mailOptions);
+            return true;
+
+        } catch (error) {
+            console.error('Error sending meeting email', error);
         }
     }
 }

@@ -88,6 +88,12 @@ enum MeetingType {
     VISIT
 }
 
+enum Priority {
+    LOW
+    MEDIUM
+    HIGH
+}
+
 /**
  * ============================================================
  * AUTH MODELS (ADDED)
@@ -279,6 +285,7 @@ model User {
     role                 Role                 @relation(fields: [role_id], references: [id])
     phone_no             String?
     image                String?
+    dob                  DateTime?
     auth_method          AuthType
     provider_id          String?
     status               Status               @default(ACTIVE)
@@ -304,6 +311,7 @@ model User {
     agentSales           AgentSale[]
     meetings             Meeting[]
     inAppNotifications   InAppNotifications[]
+    toDos                ToDo[]
 
     @@index([first_name, last_name, email, phone_no, auth_method, country_id, currency_id])
     @@map("tbl_user")
@@ -420,6 +428,7 @@ model Organization {
     agentSales    AgentSale[]
     users         OrganizationUser[]
     customers     Customer[]
+    toDos         ToDo[]
 
     @@index([name, gst_number, pan_number, contact_email, contact_phone])
     @@map("tbl_organization")
@@ -677,7 +686,7 @@ model SubscriptionPlan {
     currency_id              BigInt
     currency                 Currency                   @relation(fields: [currency_id], references: [id])
     billing_cycle            SubscriptionCycle
-    max_agents               Int
+    max_agents               Int?
     rzp_plan_id              String?                    @unique
     is_active                Boolean                    @default(true)
     created_at               DateTime                   @default(now())
@@ -788,4 +797,23 @@ model Meeting {
 
     @@index([agent_id, start_time, status, reminder_sent])
     @@map("tbl_meetings")
+}
+
+model ToDo {
+    id           BigInt        @id @default(autoincrement())
+    org_id       BigInt?
+    organization Organization? @relation(fields: [org_id], references: [id])
+    agent_id     BigInt
+    agent        User          @relation(fields: [agent_id], references: [id])
+    title        String
+    description  String?
+    due_date     DateTime?
+    priority     Priority      @default(MEDIUM)
+    is_completed Boolean       @default(false)
+    completed_at DateTime?
+    created_at   DateTime      @default(now())
+    updated_at   DateTime      @updatedAt
+
+    @@index([org_id, agent_id, is_completed, due_date])
+    @@map("tbl_todo")
 }

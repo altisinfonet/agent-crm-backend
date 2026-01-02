@@ -4,13 +4,15 @@ import { verifyOtpDto } from './dto/verify-otp.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { MailService } from 'src/mail/mail.service';
 import { decryptData, generateOTP } from 'src/helper/common.helper';
-import { CommonDto } from 'src/auth/dto/common.dto';
+import { WhatsappService } from '@/whatsapp/whatsapp.service';
+import { CommonDto } from '@/auth/dto/common.dto';
 
 @Injectable()
 export class OtpService {
   constructor(
     private prisma: PrismaService,
-    private mailService: MailService
+    private mailService: MailService,
+    private whatsappService: WhatsappService
   ) { }
 
   async sendOtp(dto: CommonDto): Promise<boolean> {
@@ -39,27 +41,25 @@ export class OtpService {
         },
       });
 
-      if (otpData.is_email) {
-        const subject = 'Email OTP Verification';
-
-        setImmediate(async () => {
-          try {
+      setImmediate(async () => {
+        try {
+          if (otpData.is_email) {
+            const subject = 'Email OTP Verification';
             await this.mailService.sendOTPEmail(
               subject,
               otpData.credential,
               otp,
             );
-          } catch (error) {
-            console.error('Error sending OTP email:', error);
-          }
-        });
-      } else {
-        // TODO: Send OTP via SMS
-      }
+          } else {
 
+          }
+        } catch (error) {
+          console.error('Error sending OTP', error);
+        }
+      });
       return true;
     } catch (error) {
-      console.error('Send OTP failed:', error);
+      console.error('Error sending OTP', error);
       throw error;
     }
   }
@@ -80,11 +80,7 @@ export class OtpService {
       });
 
       if (!otpRecord) {
-        throw new BadRequestException('OTP not found for this credential.');
-      }
-
-      if (otpRecord?.limit >= 3) {
-        throw new BadRequestException('You tried too many attempts. Try again later.');
+        throw new BadRequestException('Invalid credential.');
       }
 
       const now = new Date();

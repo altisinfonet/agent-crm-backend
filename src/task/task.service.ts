@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from 'src/prisma/prisma.service';
 import Razorpay = require("razorpay");
 import { SettingsService } from 'src/settings/settings.service';
+import { NotificationService } from '@/notification/notification.service';
 
 
 @Injectable()
@@ -11,7 +12,8 @@ export class TaskService {
     private readonly logger = new Logger(TaskService.name);
     constructor(
         private readonly prisma: PrismaService,
-        private settingsService: SettingsService
+        private readonly settingsService: SettingsService,
+        private readonly notificationService: NotificationService,
     ) { }
     async onModuleInit() {
         await this.initRazorpay();
@@ -94,5 +96,11 @@ export class TaskService {
                 });
             }
         }
+    }
+
+    @Cron(CronExpression.EVERY_DAY_AT_10AM)
+    async sendBirthdayNotifications() {
+        this.logger.log('Running birthday notification job');
+        await this.notificationService.sendHBDNotifications();
     }
 }

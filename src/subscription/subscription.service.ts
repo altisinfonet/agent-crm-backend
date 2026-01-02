@@ -33,6 +33,7 @@ export class SubscriptionService {
           is_active: true
         },
         select: {
+          id: true,
           code: true,
           name: true,
           description: true,
@@ -65,6 +66,7 @@ export class SubscriptionService {
 
       // 🔥 FORMAT RESPONSE
       const formattedPlans = plans.map(plan => ({
+        id: plan.id,
         code: plan.code,
         name: plan.name,
         description: plan.description,
@@ -83,7 +85,7 @@ export class SubscriptionService {
     }
   }
 
-  async subscribe(user_id: bigint, dto: CommonDto) {
+  async subscribe(user_id: bigint, plan_id: bigint) {
     try {
       const org = await this.prisma.organization.findUnique({
         where: {
@@ -93,9 +95,6 @@ export class SubscriptionService {
       if (!org) {
         throw new BadRequestException("User do not have any organization")
       }
-      const payload = decryptData(dto.data);
-
-      const { plan_id } = payload;
       const plan = await this.prisma.subscriptionPlan.findFirst({
         where: {
           id: plan_id,
@@ -119,7 +118,7 @@ export class SubscriptionService {
       const TRIAL_DAYS = 0;
       const TEN_YEARS = 10;
 
-      const startAt = addDays(TRIAL_DAYS);
+      const startAt = addDays(TRIAL_DAYS, 5);
       const endAt = addYearsFrom(startAt, TEN_YEARS);
 
       const rzpPayload: any = {
@@ -143,7 +142,7 @@ export class SubscriptionService {
             data: {
               org_id: org?.id,
               plan_id: plan.id,
-              status: "PAUSED",
+              status: "PENDING",
               start_at: new Date(),
               auto_renew: true,
               rzp_subscription_id: rzpSub?.id
@@ -232,7 +231,7 @@ export class SubscriptionService {
         );
         console.log("cancel++++", cancel);
 
-        const startAt = addDays(0);
+        const startAt = addDays(0, 2);
         const endAt = addYearsFrom(startAt, 10);
 
         const rzpPayload: any = {

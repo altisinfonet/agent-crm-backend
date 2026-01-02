@@ -9,6 +9,7 @@ import { MenuModule } from './menu/menu.module';
 import { ProductsModule } from './products/products.module';
 import { AgentModule } from './agent/agent.module';
 import { SubscriptionModule } from './subscription/subscription.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
     imports: [
@@ -27,6 +28,10 @@ import { SubscriptionModule } from './subscription/subscription.module';
                     {
                         path: 'currency',
                         module: CurrencyModule,
+                    },
+                    {
+                        path: 'dashboard',
+                        module: DashboardModule,
                     },
                     {
                         path: 'faq',
@@ -64,7 +69,8 @@ import { SubscriptionModule } from './subscription/subscription.module';
         MenuModule,
         ProductsModule,
         AgentModule,
-        SubscriptionModule
+        SubscriptionModule,
+        DashboardModule
     ],
 })
 export class AdminModule { }

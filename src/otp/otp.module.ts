@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
 import { OtpService } from './otp.service';
 import { OtpController } from './otp.controller';
-import { MailService } from '@/mail/mail.service';
 import { MailModule } from '@/mail/mail.module';
+import { WhatsappModule } from '@/whatsapp/whatsapp.module';
 
 @Module({
-  imports: [MailModule],
+  imports: [MailModule, WhatsappModule],
   controllers: [OtpController],
   providers: [OtpService],
+  exports: [OtpService],
 })
 export class OtpModule { }

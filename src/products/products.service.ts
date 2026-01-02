@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { CommonDto } from 'src/auth/dto/common.dto';
 import { decryptData } from 'src/helper/common.helper';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -95,6 +95,36 @@ export class ProductsService {
     }
   }
 
+  async create(agent_id: bigint, entity_id: bigint) {
+    try {
+      const findEntity = await this.prisma.productEntity.count({
+        where: {
+          id: entity_id
+        }
+      })
+      if (!findEntity) {
+        throw new BadRequestException("Product entity not found")
+      }
+      const findAgentEntity = await this.prisma.agentProductEntity.count({
+        where: {
+          agent_id,
+          product_entity_id: entity_id
+        }
+      })
+      if (findAgentEntity) {
+        throw new BadRequestException("Duplicate entity not allowed")
+      }
+      const agentEntity = await this.prisma.agentProductEntity.create({
+        data: {
+          agent_id,
+          product_entity_id: entity_id
+        }
+      })
+      return agentEntity;
+    } catch (error) {
+      throw error;
+    }
+  }
 
   update(id: number, updateProductDto: CommonDto) {
     return `This action updates a #${id} product`;

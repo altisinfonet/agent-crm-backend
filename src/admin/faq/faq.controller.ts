@@ -1,7 +1,6 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, HttpStatus, BadRequestException, Res, Req, Put, UseGuards } from '@nestjs/common';
 import { FaqService } from './faq.service';
 import type { Request, Response } from 'express';
-import { PrismaService } from 'src/prisma/prisma.service';
 import { ApiResponse } from 'src/helper/response.helper';
 import { CommonDto } from 'src/auth/dto/common.dto';
 import { encryptData } from 'src/helper/common.helper';
@@ -18,7 +17,6 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
 export class FaqController {
   constructor(
     private readonly faqService: FaqService,
-    private prisma: PrismaService
   ) { }
 
   //////////////// Client side FAQs //////////////////

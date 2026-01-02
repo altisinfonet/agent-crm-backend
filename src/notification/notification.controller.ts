@@ -75,10 +75,19 @@ export class NotificationController {
     }
   }
 
+  @Post('hbd')
+  async sendHBDNotifications(@Res() res: Response) {
+    try {
+      const notification = await this.notificationService.sendHBDNotifications();
+      let result = JSON.stringify(notification, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.notificationService.findOne(+id);
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Birthday notification sended to agents."));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error) {
+      throw new BadRequestException(error.response);
+    }
   }
 
   @Delete(':id')

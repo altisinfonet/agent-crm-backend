@@ -67,10 +67,11 @@ export const hashPassword = (password: string): Promise<string> => {
     return bcrypt.hash(password, 10);
 }
 
-export const addDays = (days: number): number => {
+export const addDays = (days: number, mins: number): number => {
     const date = new Date();
+    const minutes = mins * 60
     date.setDate(date.getDate() + days);
-    date.setSeconds(date.getSeconds() + 120);
+    date.setSeconds(date.getSeconds() + minutes);
     return Math.floor(date.getTime() / 1000);
 }
 
@@ -80,7 +81,14 @@ export const addYearsFrom = (timestamp: number, years: number): number => {
     return Math.floor(date.getTime() / 1000);
 }
 
-
+export async function generateRandomID(length = 12) {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%!&';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+}
 
 export const decryptData = (data: any) => {
     const secretKey = process.env.PUBLIC_ENCRYPTION_KEY;

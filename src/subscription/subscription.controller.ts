@@ -29,10 +29,10 @@ export class SubscriptionController {
 
 
   @UseGuards(JwtAuthGuard)
-  @Post("subscribe")
-  async create(@Res() res: Response, @Body() subscribeDto: CommonDto, @GetCurrentUserId() userId: bigint,) {
+  @Post("subscribe/:id")
+  async create(@Res() res: Response, @Param('id') id: string, @GetCurrentUserId() userId: bigint,) {
     try {
-      const subscribe = await this.subscriptionService.subscribe(userId, subscribeDto);
+      const subscribe = await this.subscriptionService.subscribe(userId, BigInt(id));
       let result = JSON.stringify(subscribe, (key, value) =>
         typeof value === 'bigint' ? value.toString() : value,
       );

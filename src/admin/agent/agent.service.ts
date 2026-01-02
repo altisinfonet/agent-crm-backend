@@ -125,6 +125,57 @@ export class AgentService {
               created_at: true,
             },
           },
+          organizations: {
+            select: {
+              id: true,
+              name: true,
+              contact_email: true,
+              contact_phone: true,
+              gst_number: true,
+              pan_number: true,
+              status: true,
+              createdByUser: {
+                select: {
+                  id: true,
+                  first_name: true,
+                  last_name: true,
+                  email: true,
+                  phone_no: true,
+                  image: true,
+                }
+              },
+              created_at: true,
+              subscription: {
+                select: {
+                  id: true,
+                  start_at: true,
+                  end_at: true,
+                  auto_renew: true,
+                  source: true,
+                  status: true,
+                  created_at: true,
+                  plan: {
+                    select: {
+                      id: true,
+                      name: true,
+                      code: true,
+                      description: true,
+                      price: true,
+                      is_active: true,
+                      rzp_plan_id: true,
+                      currency: {
+                        select: {
+                          name: true,
+                          code: true,
+                          symbol: true,
+                        },
+                      },
+                    },
+                  },
+                }
+              }
+            }
+          },
           agentProductEntities: {
             select: {
               productEntity: {

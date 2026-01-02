@@ -2,12 +2,14 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { CommonDto } from '@/auth/dto/common.dto';
 import { PrismaService } from '@/prisma/prisma.service';
 import { FirebaseAdminService } from '@/utils/firebase.utils';
-import { decryptData } from '@/helper/common.helper';
+import { createNotification, decryptData } from '@/helper/common.helper';
+import { MailService } from '@/mail/mail.service';
 
 @Injectable()
 export class NotificationService {
   constructor(
     private prisma: PrismaService,
+    private mailService: MailService,
     private FirebaseAdmin: FirebaseAdminService,
   ) { }
 
@@ -214,10 +216,6 @@ export class NotificationService {
     }
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} notification`;
-  }
-
   async readNotifications(agent_id: bigint) {
     try {
       const readNotifications = await this.prisma.inAppNotifications.updateMany({
@@ -233,6 +231,81 @@ export class NotificationService {
       throw error
     }
   }
+
+  async sendHBDNotifications() {
+    try {
+      const now = new Date();
+      const todayDay = now.getDate();
+      const todayMonth = now.getMonth() + 1;
+      const currentYear = now.getFullYear();
+
+      const users = await this.prisma.user.findMany({
+        where: {
+          dob: { not: null },
+        },
+        select: {
+          id: true,
+          first_name: true,
+          last_name: true,
+          email: true,
+          phone_no: true,
+          dob: true,
+        },
+      });
+
+      for (const user of users) {
+        if (!user.dob) {
+          continue;
+        }
+        const dob = new Date(user.dob);
+
+        if (
+          dob.getDate() !== todayDay ||
+          dob.getMonth() + 1 !== todayMonth
+        ) {
+          continue;
+        }
+
+        const alreadySent = await this.prisma.inAppNotifications.findFirst({
+          where: {
+            user_id: user.id,
+            type: 'HBD',
+            created_at: {
+              gte: new Date(`${currentYear}-01-01`),
+              lte: new Date(`${currentYear}-12-31`),
+            },
+          },
+        });
+
+        if (alreadySent) continue;
+        const user_name = `${user.first_name} ${user.last_name}`
+        setImmediate(async () => {
+          try {
+            //Send HBD notification
+            if (user.email) {
+              const send = await this.mailService.sendHBDEmail(user.email, user_name);
+            }
+            await createNotification(
+              user.id,
+              'HBD',
+              'Happy Birthday 🎉',
+              `Happy Birthday ${user_name}! 🎂
+               Wishing you a great year ahead.`,
+              {
+                action: 'birthday',
+                year: currentYear,
+              }
+            );
+          } catch (error) {
+            console.error("Error sending metting email", error);
+          }
+        });
+      }
+    } catch (error) {
+      throw error;
+    }
+  }
+
 
   remove(id: number) {
     return `This action removes a #${id} notification`;

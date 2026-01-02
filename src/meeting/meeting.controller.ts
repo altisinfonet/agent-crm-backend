@@ -34,7 +34,7 @@ export class MeetingController {
       let result = JSON.stringify(meeting, (key, value) =>
         typeof value === 'bigint' ? value.toString() : value,
       );
-      const resData = encryptData(new ApiResponse((JSON.parse(result)), "All meetings."));
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "All meeting lists."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
       throw new BadRequestException(error.response);

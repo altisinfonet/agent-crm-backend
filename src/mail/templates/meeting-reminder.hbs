@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Meeting Reminder</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+</head>
+
+<body style="margin:0; padding:0; background-color:#f4f6f8; font-family:Arial, Helvetica, sans-serif;">
+
+
+    <!-- Wrapper -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f8; padding:20px 0;">
+        <tr>
+            <td align="center">
+
+                <!-- Card -->
+                <table width="100%" cellpadding="0" cellspacing="0"
+                    style="max-width:420px; background-color:#ffffff; border-radius:10px; padding:24px; box-shadow:0 4px 12px rgba(0,0,0,0.05);">
+
+                    <!-- App Name -->
+                    <tr>
+                        <td align="center" style="padding-bottom:16px;">
+                            <div style="font-size:20px; font-weight:700; color:#2563eb;">
+                                Agent CRM
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Greeting -->
+                    <tr>
+                        <td style="padding-bottom:12px;">
+                            <div style="font-size:14px; color:#111827;">
+                                Hi <strong>{{name}}</strong>,
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Message -->
+                    <tr>
+                        <td style="padding-bottom:20px;">
+                            <div style="font-size:14px; line-height:1.6; color:#374151;">
+                                This is a friendly reminder about your upcoming scheduled meeting.
+                                Please find the details below.
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Meeting Details Box -->
+                    <tr>
+                        <td style="padding-bottom:20px;">
+                            <div
+                                style="background-color:#f9fafb; border:1px solid #e5e7eb; border-radius:8px; padding:16px;">
+
+                                <div style="font-size:15px; font-weight:600; color:#111827; margin-bottom:10px;">
+                                    {{meetingTitle}}
+                                </div>
+
+                                {{#if meetingDesc}}
+                                <div style="font-size:13px; color:#4b5563; margin-bottom:12px; line-height:1.5;">
+                                    {{meetingDesc}}
+                                </div>
+                                {{/if}}
+
+                                <div style="font-size:13px; color:#374151; margin-bottom:6px;">
+                                    <strong>Meeting Type:</strong> {{meetingType}}
+                                </div>
+
+                                {{#if customerName}}
+                                <div style="font-size:13px; color:#374151; margin-bottom:6px;">
+                                    <strong>Customer:</strong> {{customerName}}
+                                </div>
+                                {{/if}}
+
+                                <div style="font-size:13px; color:#374151; margin-bottom:6px;">
+                                    <strong>Start Time:</strong> {{meetingTime}}
+                                </div>
+
+                                {{#if meetingEnd}}
+                                <div style="font-size:13px; color:#374151;">
+                                    <strong>End Time:</strong> {{meetingEnd}}
+                                </div>
+                                {{/if}}
+
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Note -->
+                    <tr>
+                        <td style="padding-bottom:16px;">
+                            <div style="font-size:13px; color:#6b7280; line-height:1.5;">
+                                Please make sure you are prepared and available at the scheduled time.
+                            </div>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td align="center" style="padding-top:10px; border-top:1px solid #e5e7eb;">
+                            <p style="font-size: 12px; color: #94a3b8; margin: 0; line-height: 1.4;">© {{currentYear}}
+                                Altis Infonet
+                                Pvt. Ltd. All
+                                rights reserved.</p>
+                        </td>
+                    </tr>
+
+                </table>
+                <!-- End Card -->
+
+            </td>
+        </tr>
+    </table>
+
+</body>
+
+</html>

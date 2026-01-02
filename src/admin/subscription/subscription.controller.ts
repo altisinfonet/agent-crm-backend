@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Res, Req, HttpStatus, BadRequestException } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Res, Req, HttpStatus, BadRequestException, Put } from '@nestjs/common';
 import { SubscriptionService } from './subscription.service';
 import { CommonDto } from 'src/auth/dto/common.dto';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
@@ -10,13 +10,13 @@ import { ApiResponse } from 'src/helper/response.helper';
 import { encryptData } from 'src/helper/common.helper';
 
 
-@Controller({ path: 'plan', version: '1' })
+@Controller({ path: '', version: '1' })
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
 export class SubscriptionController {
   constructor(private readonly subscriptionService: SubscriptionService) { }
 
-  @Post("sync")
+  @Post("sync/plan")
   async create(@Res() res: Response) {
     try {
       const plans = await this.subscriptionService.syncPlan();
@@ -31,7 +31,7 @@ export class SubscriptionController {
     }
   }
 
-  @Get()
+  @Get("plan/list")
   async findAll(@Res() res: Response) {
     try {
       const plans = await this.subscriptionService.findAllPlans();
@@ -46,8 +46,23 @@ export class SubscriptionController {
     }
   }
 
+  @Get("plan/:id")
+  async findOne(@Res() res: Response, @Param('id') id: string) {
+    try {
+      const plans = await this.subscriptionService.findOne(BigInt(id));
+      let result = JSON.stringify(plans, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "All subscription plans."));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error: any) {
+      throw new BadRequestException(error.response);
+    }
+  }
+
   @Post('grant')
-  async findOne(@Res() res: Response, @Body() grantDto: CommonDto) {
+  async adminGrantSubscription(@Res() res: Response, @Body() grantDto: CommonDto) {
     try {
       const plans = await this.subscriptionService.adminGrantSubscription(grantDto);
       let result = JSON.stringify(plans, (key, value) =>
@@ -61,7 +76,7 @@ export class SubscriptionController {
     }
   }
 
-  @Patch(':id')
+  @Patch('plan/:id')
   async update(@Param('id') id: string, @Res() res: Response, @Body() updateSubscriptionDto: CommonDto) {
     try {
       const plans = await this.subscriptionService.updatePlan(BigInt(id), updateSubscriptionDto);
@@ -70,6 +85,21 @@ export class SubscriptionController {
       );
 
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription plan updated successfully."));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error: any) {
+      throw new BadRequestException(error.response);
+    }
+  }
+
+  @Put('subscribers')
+  async subscribers(@Res() res: Response, @Body() subscribersDto: CommonDto) {
+    try {
+      const plans = await this.subscriptionService.subscribers(subscribersDto);
+      let result = JSON.stringify(plans, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "All subscribers list."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
       throw new BadRequestException(error.response);

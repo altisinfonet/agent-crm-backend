@@ -1,8 +1,7 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CryptoUtil } from 'src/common/utils/crypto.util';
-import { OtpService } from 'src/otp/otp.service';
-import { decryptData, encryptData } from 'src/helper/common.helper';
+import { decryptData, encryptData, generateRandomID } from 'src/helper/common.helper';
 import { CommonDto } from './dto/common.dto';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -11,6 +10,9 @@ import * as bcrypt from 'bcrypt';
 import { randomUUID } from 'crypto';
 import { Request } from 'express';
 import { verifyOtpDto } from 'src/otp/dto/verify-otp.dto';
+import { MailService } from '@/mail/mail.service';
+import { OtpService } from '@/otp/otp.service';
+import { handleAuthFailure, resetAuthLimits } from '@/helper/rate-limit.helper';
 
 @Injectable()
 export class AuthService {
@@ -18,11 +20,14 @@ export class AuthService {
         private prisma: PrismaService,
         private jwtService: JwtService,
         private config: ConfigService,
-        // private sessionService: SessionService,
+        private mailService: MailService,
+        private otpService: OtpService
     ) { }
 
     async auth(commonDto: CommonDto, req: Request): Promise<Tokens> {
+        console.log("commonDto", commonDto);
         const payload = decryptData(commonDto.data);
+        console.log("payload", payload);
 
         const {
             auth_method,
@@ -40,7 +45,7 @@ export class AuthService {
         }
 
 
-        await this.verifyAuth(payload);
+        await this.verifyAuth(payload, req.ip as string);
 
         const where: any = {};
 
@@ -135,101 +140,137 @@ export class AuthService {
         };
     }
 
-    private async verifyAuth(payload: any) {
+    // private async verifyAuth(payload: any) {
+    //     const { auth_method, otp, email, phone_no, password, provider_id } = payload;
+    //     const verifyOtp: any = {
+    //         otp
+    //     }
+    //     try {
+    //         if (auth_method === 'EMAIL_PW') {
+    //             const user = await this.prisma.user.findUnique({
+    //                 where: { email },
+    //             });
+    //             if (!user) {
+    //                 throw new UnauthorizedException('Invalid credentials');
+    //             }
+    //             const passwordMatches = await bcrypt.compare(password, user.password);
+    //             if (!passwordMatches) {
+    //                 throw new UnauthorizedException('Invalid credentials');
+    //             }
+    //             return true;
+    //         }
+
+    //         if (auth_method === 'EMAIL_OTP') {
+    //             if (!email || !otp) {
+    //                 throw new BadRequestException('Email and OTP are required.');
+    //             }
+
+    //             verifyOtp.credential = email;
+    //             verifyOtp.is_email = true;
+    //             await this.otpService.verifyOtp(verifyOtp);
+    //             return;
+    //         }
+
+    //         if (auth_method === 'PHONE_OTP') {
+    //             if (!phone_no || !otp) {
+    //                 throw new BadRequestException('Phone number and OTP are required.');
+    //             }
+
+    //             verifyOtp.credential = phone_no;
+    //             verifyOtp.is_email = false;
+    //             await this.otpService.verifyOtp(verifyOtp);
+    //             return;
+    //         }
+
+    //         if (auth_method === 'GOOGLE' || auth_method === 'APPLE') {
+    //             if (!provider_id) {
+    //                 throw new BadRequestException('Provider ID is required.');
+    //             }
+    //             // Provider token already verified upstream
+    //             return;
+    //         }
+
+    //         throw new BadRequestException('Invalid authentication method.');
+    //     } catch (e) {
+    //         throw new UnauthorizedException(e.message || 'Invalid credentials');
+    //     }
+    // }
+
+    private async verifyAuth(payload: any, ip: string) {
         const { auth_method, otp, email, phone_no, password, provider_id } = payload;
-        const verifyOtp: any = {
-            otp
-        }
+
+        const identifier =
+            auth_method === 'EMAIL_PW' || auth_method === 'EMAIL_OTP'
+                ? email
+                : phone_no;
+
+        const verifyOtp: any = { otp };
+
         try {
+            // ========== EMAIL PASSWORD ==========
             if (auth_method === 'EMAIL_PW') {
-                const user = await this.prisma.user.findUnique({
-                    where: { email },
-                });
+                const user = await this.prisma.user.findUnique({ where: { email } });
+
                 if (!user) {
+                    await handleAuthFailure(identifier, ip);
                     throw new UnauthorizedException('Invalid credentials');
                 }
-                const passwordMatches = await bcrypt.compare(password, user.password);
-                if (!passwordMatches) {
+
+                const ok = await bcrypt.compare(password, user.password);
+                if (!ok) {
+                    await handleAuthFailure(identifier, ip);
                     throw new UnauthorizedException('Invalid credentials');
                 }
+                await resetAuthLimits(identifier, ip);
                 return true;
             }
 
+            // ========== EMAIL OTP ==========
             if (auth_method === 'EMAIL_OTP') {
+                if (!email || !otp) {
+                    throw new BadRequestException('Email and OTP are required');
+                }
+
                 verifyOtp.credential = email;
                 verifyOtp.is_email = true;
 
-                if (!email || !otp) throw new Error();
-                await this.verifyOtp(verifyOtp);
-                return;
+                await this.otpService.verifyOtp(verifyOtp);
+
+                await resetAuthLimits(identifier, ip);
+                return true;
             }
 
+            // ========== PHONE OTP ==========
             if (auth_method === 'PHONE_OTP') {
-                verifyOtp.credential = phone_no;
-                verifyOtp.is_email = false
-                if (!phone_no || !otp) throw new Error();
-                await this.verifyOtp(verifyOtp);
-                return;
-            }
-
-            if (auth_method === 'GOOGLE' || auth_method === 'APPLE') {
-                if (!provider_id) throw new Error();
-                // provider token already verified upstream
-                return;
-            }
-
-            throw new Error();
-        } catch (e) {
-            throw new UnauthorizedException(e.message || 'Invalid credentials');
-        }
-    }
-
-    async verifyOtp(dto: verifyOtpDto) {
-        try {
-            const otpRecord = await this.prisma.oTP.findFirst({
-                where: {
-                    credential: dto.credential,
-                },
-                select: {
-                    id: true,
-                    otp: true,
-                    limit: true,
-                    expires_at: true,
-                    updated_at: true
+                if (!phone_no || !otp) {
+                    throw new BadRequestException('Phone number and OTP are required');
                 }
-            });
 
-            if (!otpRecord) {
-                throw new BadRequestException('OTP not found for this credential.');
+                verifyOtp.credential = phone_no;
+                verifyOtp.is_email = false;
+
+                await this.otpService.verifyOtp(verifyOtp);
+
+                await resetAuthLimits(identifier, ip);
+                return true;
             }
 
-            if (otpRecord?.limit >= 3) {
-                throw new BadRequestException('You tried too many attempts. Try again later.');
+            // ========== SOCIAL LOGIN ==========
+            if (auth_method === 'GOOGLE' || auth_method === 'APPLE') {
+                if (!provider_id) {
+                    throw new BadRequestException('Provider ID is required');
+                }
+
+                await resetAuthLimits(identifier, ip);
+                return true;
             }
 
-            const now = new Date();
-            if (otpRecord.expires_at < now) {
-                throw new BadRequestException('OTP has expired.');
+            throw new BadRequestException('Invalid authentication method');
+        } catch (err) {
+            if (identifier) {
+                await handleAuthFailure(identifier, ip);
             }
-
-            if (otpRecord.otp !== dto.otp) {
-                await this.prisma.oTP.update({
-                    where: { id: otpRecord.id },
-                    data: {
-                        limit: { increment: 1 },
-                        updated_at: new Date()
-                    }
-                });
-                throw new BadRequestException('Invalid OTP.');
-            }
-
-            await this.prisma.oTP.delete({
-                where: { id: otpRecord.id }
-            });
-
-            return true;
-        } catch (error) {
-            throw error;
+            throw err;
         }
     }
 
@@ -345,6 +386,79 @@ export class AuthService {
                 last_used_at: new Date(),
             },
         });
+        return true;
+    }
+
+
+    async forgotPassword(dto: CommonDto) {
+        const paylaod = decryptData(dto?.data)
+        const user = await this.prisma.user.findUnique({
+            where: {
+                email: paylaod.email.toLowerCase(),
+            },
+        });
+        if (!user?.email) {
+            throw new BadRequestException(`Email address not found.`)
+        }
+        else {
+            if (user?.auth_method !== 'EMAIL_OTP' && user?.auth_method !== 'EMAIL_PW') {
+                if (user?.auth_method === "APPLE") {
+                    throw new BadRequestException(`Account created with 'Continue with Apple'`)
+                } else if (user?.auth_method === "GOOGLE") {
+                    throw new BadRequestException(`Account created with 'Continue with Google'`)
+                }
+            }
+
+            const token = await generateRandomID(12);
+            const expiry_minutes = 5;
+            const expiry = new Date(Date.now() + expiry_minutes * 60 * 1000);
+            await this.prisma.user.update({
+                where: {
+                    id: user?.id,
+                },
+                data: { reset_token: token, reset_token_exp: expiry },
+            });
+
+            const resetLink = `${this.config.get('WEB_BASE_PATH')}/admin/forgot-password?token=${token}`;
+            setImmediate(async () => {
+                try {
+                    if (!user?.email) {
+                        throw new BadRequestException(`Email address not found.`)
+                    }
+                    await this.mailService.sendResetPasswordEmail(user?.email, resetLink, token, expiry_minutes);
+                } catch (error) {
+                    console.error("Error sending email", error);
+                }
+            });
+            return true;
+        }
+    }
+
+
+    async resetPassword(dto: CommonDto) {
+        const paylaod = decryptData(dto?.data)
+        const user = await this.prisma.user.findFirst({
+            where: {
+                reset_token: paylaod.token,
+                reset_token_exp: { gt: new Date() },
+            }
+        });
+
+        if (!user) {
+            return false;
+        }
+
+        const hashed = await bcrypt.hash(paylaod.new_password, 10);
+
+        await this.prisma.user.update({
+            where: { id: user.id },
+            data: {
+                password: hashed,
+                reset_token: null,
+                reset_token_exp: null,
+            },
+        });
+
         return true;
     }
 

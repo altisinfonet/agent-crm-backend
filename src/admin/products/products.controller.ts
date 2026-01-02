@@ -16,23 +16,6 @@ import { encryptData } from 'src/helper/common.helper';
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) { }
 
-  @Post(":id/entity")
-  async create(@Res() res: Response, @Param('id') id: string, @Body() createEntityDto: CommonDto) {
-    try {
-      const entity = await this.productsService.create(BigInt(id), createEntityDto);
-
-      let result = JSON.stringify(entity, (key, value) =>
-        typeof value === 'bigint' ? value.toString() : value,
-      );
-
-      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Product enetity added successfully"));
-      return res.status(HttpStatus.OK).json({ data: resData });
-    } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
-    }
-  };
-
   @Get("list")
   async findAllProducts(@Res() res: Response) {
     try {
@@ -49,6 +32,24 @@ export class ProductsController {
       throw new BadRequestException(error.response);
     }
   }
+
+
+  @Post(":id/entity")
+  async create(@Res() res: Response, @Param('id') id: string, @Body() createEntityDto: CommonDto) {
+    try {
+      const entity = await this.productsService.create(BigInt(id), createEntityDto);
+
+      let result = JSON.stringify(entity, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Product enetity added successfully"));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error: any) {
+      console.log('error: ', error);
+      throw new BadRequestException(error.response);
+    }
+  };
 
   @Put(":id/entity/list")
   async findAll(@Res() res: Response, @Param('id') id: string, @Body() findEntityDto: CommonDto) {

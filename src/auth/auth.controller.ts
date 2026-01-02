@@ -11,7 +11,7 @@ import { GetCurrentUserId } from 'src/common/decorators/current-user-id.decorato
 import { GetCurrentUser } from 'src/common/decorators/current-user.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { ConfigService } from '@nestjs/config';
-import { OtpService } from 'src/otp/otp.service';
+import { AuthRateLimitGuard } from '@/common/guards/auth-rate-limit.guard';
 
 
 @ApiTags('Authentication')
@@ -22,6 +22,7 @@ export class AuthController {
         private config: ConfigService,
     ) { }
     @ApiOperation({ summary: 'Login using password, OTP, Google, or Apple' })
+    @UseGuards(AuthRateLimitGuard)
     @Post('login')
     @HttpCode(HttpStatus.OK)
     async login(
@@ -97,6 +98,35 @@ export class AuthController {
         }
     }
 
+    @Post('forgot-password')
+    async forgotPassword(@Body() dto: CommonDto, @Req() req: Request, @Res() res: Response) {
+        try {
+            let result = await this.authService.forgotPassword(dto);
+            if (result) {
+                return res.status(HttpStatus.OK).json(new ApiResponse(null, "Password reset request accepted. Email will be sent if the user exists."));
+            } else {
+                throw new BadRequestException(new ApiResponse(null, 'User not found.', false));
+            }
+        } catch (error: any) {
+            console.log('error: ', error);
+            throw new BadRequestException(error.response);
+        }
+    }
+
+    @Post('reset-password')
+    async resetPassword(@Body() dto: CommonDto, @Req() req: Request, @Res() res: Response) {
+        try {
+            let result = await this.authService.resetPassword(dto);
+            if (result) {
+                return res.status(HttpStatus.OK).json(new ApiResponse(null, "Your password has been reset successfully."));
+            } else {
+                throw new BadRequestException(new ApiResponse(null, 'Invalid or expired token', false));
+            }
+        } catch (error: any) {
+            console.log('error: ', error);
+            throw new BadRequestException(error.response);
+        }
+    }
 
     @HttpCode(HttpStatus.CREATED)
     @Post('test-encryption')
