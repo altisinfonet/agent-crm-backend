@@ -6,13 +6,26 @@ import { ApiResponse } from 'src/helper/response.helper';
 import type { Request, Response } from 'express';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { GetCurrentUserId } from 'src/common/decorators/current-user-id.decorator';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiBody,
+  ApiExcludeEndpoint,
+  ApiResponse as SwaggerApiResponse,
+} from '@nestjs/swagger';
 
+@ApiTags('Agent - Subscriptions')
+@ApiBearerAuth('access-token')
 @Controller({ path: 'subscription', version: '1' })
 export class SubscriptionController {
   constructor(private readonly subscriptionService: SubscriptionService) { }
 
   @UseGuards(JwtAuthGuard)
-  @Get("plans")
+  @Get('plans')
+  @ApiOperation({ summary: 'Get all available subscription plans' })
+  @SwaggerApiResponse({ status: 200, description: 'Subscription plans fetched successfully' })
   async allPlans(@Res() res: Response) {
     try {
       const plans = await this.subscriptionService.allPlans();
@@ -27,9 +40,11 @@ export class SubscriptionController {
     }
   }
 
-
   @UseGuards(JwtAuthGuard)
-  @Post("subscribe/:id")
+  @Post('subscribe/:id')
+  @ApiOperation({ summary: 'Subscribe to a plan' })
+  @ApiParam({ name: 'id', description: 'Subscription plan ID', example: 1 })
+  @SwaggerApiResponse({ status: 200, description: 'Subscription initiated successfully' })
   async create(@Res() res: Response, @Param('id') id: string, @GetCurrentUserId() userId: bigint,) {
     try {
       const subscribe = await this.subscriptionService.subscribe(userId, BigInt(id));
@@ -44,25 +59,8 @@ export class SubscriptionController {
     }
   }
 
-
-  @UseGuards(JwtAuthGuard)
-  @Post("upgrade")
-  async upgradeSubscription(@Res() res: Response, @Body() upgradedDto: CommonDto, @GetCurrentUserId() userId: bigint,) {
-    try {
-      const subscribe = await this.subscriptionService.upgradeSubscription(userId, upgradedDto);
-      let result = JSON.stringify(subscribe, (key, value) =>
-        typeof value === 'bigint' ? value.toString() : value,
-      );
-
-      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription upgraded"));
-      return res.status(HttpStatus.OK).json({ data: resData });
-    } catch (error) {
-      throw new BadRequestException(error.response);
-    }
-  }
-
-
   @Post("webhook")
+  @ApiExcludeEndpoint()
   async razorpayWebhook(
     @Req() req: Request,
     @Res() res: Response,
@@ -80,12 +78,53 @@ export class SubscriptionController {
   }
 
 
+  @UseGuards(JwtAuthGuard)
+  @Post('upgrade')
+  @ApiOperation({ summary: 'Upgrade current subscription plan' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Subscription upgraded successfully' })
+  async upgradeSubscription(@Res() res: Response, @Body() upgradedDto: CommonDto, @GetCurrentUserId() userId: bigint,) {
+    try {
+      const subscribe = await this.subscriptionService.upgradeSubscription(userId, upgradedDto);
+      let result = JSON.stringify(subscribe, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription upgraded"));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error) {
+      throw new BadRequestException(error.response);
+    }
+  }
+
+
+  @UseGuards(JwtAuthGuard)
+  @Post('cancel')
+  @ApiOperation({ summary: 'Cancel active subscription (at cycle end)' })
+  @SwaggerApiResponse({ status: 200, description: 'Subscription cancellation requested' })
+  async cancelSubscription(@Res() res: Response, @GetCurrentUserId() userId: bigint,) {
+    try {
+      const subscribe = await this.subscriptionService.cancelSubscription(userId);
+      let result = JSON.stringify(subscribe, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription cancelled"));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error) {
+      throw new BadRequestException(error.response);
+    }
+  }
+
+
   @Patch(':id')
+  @ApiExcludeEndpoint()
   update(@Param('id') id: string, @Body() updateSubscriptionDto: CommonDto) {
     return this.subscriptionService.update(+id, updateSubscriptionDto);
   }
 
   @Delete(':id')
+  @ApiExcludeEndpoint()
   remove(@Param('id') id: string) {
     return this.subscriptionService.remove(+id);
   }

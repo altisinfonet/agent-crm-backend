@@ -8,7 +8,17 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { Role } from 'src/common/enum/role.enum';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiBody,
+  ApiResponse as SwaggerApiResponse,
+} from '@nestjs/swagger';
 
+@ApiTags('Admin - Countries')
+@ApiBearerAuth('access-token')
 @Controller({ path: '', version: '1' })
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
@@ -17,8 +27,14 @@ export class CountryController {
 
 
   @Post()
-  async create(@Res() res: Response, @Body() createCountryDto: CommonDto,
-    @Req() req: Request) {
+  @ApiOperation({ summary: 'Create country (Admin)' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Country created successfully' })
+  async create(
+    @Res() res: Response,
+    @Body() createCountryDto: CommonDto,
+    @Req() req: Request,
+  ) {
     try {
       const settings = await this.countryService.create(createCountryDto);
       let result = JSON.stringify(settings, (key, value) =>
@@ -32,8 +48,14 @@ export class CountryController {
     }
   }
 
-  @Put("list")
-  async findAll(@Res() res: Response, @Body() commonDto: CommonDto,) {
+  @Put('list')
+  @ApiOperation({ summary: 'Get list of countries (Admin)' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Countries fetched successfully' })
+  async findAll(
+    @Res() res: Response,
+    @Body() commonDto: CommonDto,
+  ) {
     try {
       const data = await this.countryService.findAll(commonDto);
 
@@ -52,7 +74,13 @@ export class CountryController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: string, @Res() res: Response) {
+  @ApiOperation({ summary: 'Get country by ID (Admin)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @SwaggerApiResponse({ status: 200, description: 'Country fetched successfully' })
+  async findOne(
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
     try {
       const data = await this.countryService.findOne(BigInt(id));
 
@@ -71,6 +99,10 @@ export class CountryController {
   }
 
   @Patch(':id')
+  @ApiOperation({ summary: 'Update country (Admin)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Country updated successfully' })
   async update(
     @Param('id') id: string,
     @Body() updateCountryDto: CommonDto,
@@ -97,7 +129,13 @@ export class CountryController {
   }
 
   @Delete(':id')
-  async delete(@Param('id') id: string, @Res() res: Response) {
+  @ApiOperation({ summary: 'Delete country (Admin)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @SwaggerApiResponse({ status: 200, description: 'Country deleted successfully' })
+  async delete(
+    @Param('id') id: string,
+    @Res() res: Response,
+  ) {
     try {
       await this.countryService.remove(BigInt(id));
 

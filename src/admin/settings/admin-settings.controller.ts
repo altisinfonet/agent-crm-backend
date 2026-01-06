@@ -8,9 +8,17 @@ import { ApiResponse } from 'src/helper/response.helper';
 import { AdminSettingsService } from './admin-settings.service';
 import { encryptData } from 'src/helper/common.helper';
 import { CommonDto } from 'src/auth/dto/common.dto';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiBody,
+  ApiResponse as SwaggerApiResponse,
+} from '@nestjs/swagger';
 
-
-
+@ApiTags('Admin - Settings')
+@ApiBearerAuth('access-token')
 @Controller({ path: '', version: '1' })
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
@@ -21,8 +29,14 @@ export class AdminSettingsController {
   ) { }
 
   @Post()
-  async create(@Res() res: Response, @Body() createAdminSettingDto: CommonDto,
-    @Req() req: Request) {
+  @ApiOperation({ summary: 'Create admin settings (Admin)' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Settings created successfully' })
+  async create(
+    @Res() res: Response,
+    @Body() createAdminSettingDto: CommonDto,
+    @Req() req: Request,
+  ) {
     try {
       const settings = await this.adminSettingsService.create(createAdminSettingDto);
       let result = JSON.stringify(settings, (key, value) =>
@@ -37,6 +51,8 @@ export class AdminSettingsController {
   }
 
   @Put()
+  @ApiOperation({ summary: 'Get all admin settings (Admin)' })
+  @SwaggerApiResponse({ status: 200, description: 'Settings fetched successfully' })
   async findAll(@Res() res: Response) {
     try {
       const settings = await this.adminSettingsService.findAll();
@@ -52,14 +68,25 @@ export class AdminSettingsController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get admin settings by ID (Admin)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @SwaggerApiResponse({ status: 200, description: 'Settings fetched successfully' })
   findOne(@Param('id') id: string) {
     return this.adminSettingsService.findOne(+id);
   }
 
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() updateAdminSettingDto: CommonDto,
-    @Req() req: Request, @Res() res: Response) {
+  @ApiOperation({ summary: 'Update admin settings (Admin)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Settings updated successfully' })
+  async update(
+    @Param('id') id: string,
+    @Body() updateAdminSettingDto: CommonDto,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
     try {
       const settings = await this.adminSettingsService.update(BigInt(id), updateAdminSettingDto);
       let result = JSON.stringify(settings, (key, value) =>
@@ -73,9 +100,10 @@ export class AdminSettingsController {
     }
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete admin settings (Admin)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @SwaggerApiResponse({ status: 200, description: 'Settings deleted successfully' })
   remove(@Param('id') id: string) {
     return this.adminSettingsService.remove(+id);
   }

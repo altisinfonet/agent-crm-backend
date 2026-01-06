@@ -699,23 +699,24 @@ model SubscriptionPlan {
 }
 
 model OrganizationSubscription {
-    id                      BigInt                 @id @unique @default(autoincrement())
-    org_id                  BigInt
-    organization            Organization           @relation(fields: [org_id], references: [id])
-    plan_id                 BigInt
-    plan                    SubscriptionPlan       @relation(fields: [plan_id], references: [id])
-    status                  SubscriptionStatus
-    source                  SubscriptionSource     @default(RAZORPAY)
-    start_at                DateTime
-    end_at                  DateTime?
-    auto_renew              Boolean                @default(true)
-    cancelled_at            DateTime?
-    rzp_subscription_id     String?                @unique
-    reconciliation_attempts Int                    @default(0)
-    last_reconciled_at      DateTime?
-    created_at              DateTime               @default(now())
-    updated_at              DateTime               @updatedAt
-    razorpaySubscriptions   RazorpaySubscription[]
+    id                        BigInt                 @id @unique @default(autoincrement())
+    org_id                    BigInt
+    organization              Organization           @relation(fields: [org_id], references: [id])
+    plan_id                   BigInt
+    plan                      SubscriptionPlan       @relation(fields: [plan_id], references: [id])
+    status                    SubscriptionStatus
+    source                    SubscriptionSource     @default(RAZORPAY)
+    start_at                  DateTime
+    end_at                    DateTime?
+    auto_renew                Boolean                @default(true)
+    cancelled_at              DateTime?
+    rzp_subscription_id       String?                @unique
+    reconciliation_attempts   Int                    @default(0)
+    last_reconciled_at        DateTime?
+    expiry_reminder_days_sent Int[]                  @default([])
+    created_at                DateTime               @default(now())
+    updated_at                DateTime               @updatedAt
+    razorpaySubscriptions     RazorpaySubscription[]
 
     @@unique([org_id, rzp_subscription_id])
     @@index([org_id, plan_id, status])

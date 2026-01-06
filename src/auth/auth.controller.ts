@@ -2,7 +2,6 @@ import { BadRequestException, Body, Controller, Get, HttpCode, HttpStatus, Post,
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RefreshTokenDto } from './dto/refresh-token.dto';
-import { ApiTags, ApiOperation, ApiBody } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { ApiResponse } from 'src/helper/response.helper';
 import { encryptData } from 'src/helper/common.helper';
@@ -12,6 +11,13 @@ import { GetCurrentUser } from 'src/common/decorators/current-user.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { ConfigService } from '@nestjs/config';
 import { AuthRateLimitGuard } from '@/common/guards/auth-rate-limit.guard';
+import {
+    ApiTags,
+    ApiOperation,
+    ApiBody,
+    ApiBearerAuth,
+    ApiResponse as SwaggerApiResponse,
+} from '@nestjs/swagger';
 
 
 @ApiTags('Authentication')
@@ -22,6 +28,8 @@ export class AuthController {
         private config: ConfigService,
     ) { }
     @ApiOperation({ summary: 'Login using password, OTP, Google, or Apple' })
+    @ApiBody({ type: CommonDto })
+    @SwaggerApiResponse({ status: 200, description: 'Login successful' })
     @UseGuards(AuthRateLimitGuard)
     @Post('login')
     @HttpCode(HttpStatus.OK)
@@ -45,6 +53,9 @@ export class AuthController {
         }
     }
 
+    @ApiOperation({ summary: 'Refresh access and refresh tokens' })
+    @ApiBody({ type: CommonDto })
+    @SwaggerApiResponse({ status: 200, description: 'Tokens refreshed successfully' })
     @Post('refresh')
     @HttpCode(HttpStatus.OK)
     async refreshTokens(@Body() dto: CommonDto, @Res({ passthrough: true }) res: Response) {
@@ -61,6 +72,9 @@ export class AuthController {
         }
     }
 
+    @ApiOperation({ summary: 'Logout from current session' })
+    @ApiBearerAuth('access-token')
+    @SwaggerApiResponse({ status: 200, description: 'Logout successful' })
     @UseGuards(JwtAuthGuard)
     @Post('logout')
     @HttpCode(HttpStatus.OK)
@@ -80,6 +94,9 @@ export class AuthController {
         }
     }
 
+    @ApiOperation({ summary: 'Logout from all active sessions' })
+    @ApiBearerAuth('access-token')
+    @SwaggerApiResponse({ status: 200, description: 'Logged out from all devices' })
     @UseGuards(JwtAuthGuard)
     @Post('logout-all')
     @HttpCode(HttpStatus.OK)
@@ -98,7 +115,11 @@ export class AuthController {
         }
     }
 
+    @ApiOperation({ summary: 'Request password reset via email' })
+    @ApiBody({ type: CommonDto })
+    @SwaggerApiResponse({ status: 200, description: 'Password reset request accepted' })
     @Post('forgot-password')
+    @HttpCode(HttpStatus.OK)
     async forgotPassword(@Body() dto: CommonDto, @Req() req: Request, @Res() res: Response) {
         try {
             let result = await this.authService.forgotPassword(dto);
@@ -113,7 +134,11 @@ export class AuthController {
         }
     }
 
+    @ApiOperation({ summary: 'Reset password using reset token' })
+    @ApiBody({ type: CommonDto })
+    @SwaggerApiResponse({ status: 200, description: 'Password reset successful' })
     @Post('reset-password')
+    @HttpCode(HttpStatus.OK)
     async resetPassword(@Body() dto: CommonDto, @Req() req: Request, @Res() res: Response) {
         try {
             let result = await this.authService.resetPassword(dto);

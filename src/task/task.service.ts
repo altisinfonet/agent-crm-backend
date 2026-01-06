@@ -4,6 +4,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import Razorpay = require("razorpay");
 import { SettingsService } from 'src/settings/settings.service';
 import { NotificationService } from '@/notification/notification.service';
+import { MailService } from '@/mail/mail.service';
 
 
 @Injectable()
@@ -14,6 +15,7 @@ export class TaskService {
         private readonly prisma: PrismaService,
         private readonly settingsService: SettingsService,
         private readonly notificationService: NotificationService,
+        private readonly mailService: MailService,
     ) { }
     async onModuleInit() {
         await this.initRazorpay();
@@ -97,6 +99,81 @@ export class TaskService {
             }
         }
     }
+
+    @Cron(CronExpression.EVERY_DAY_AT_9AM)
+    async sendSubscriptionExpiryReminders() {
+        try {
+            const REMINDER_DAYS = [7, 3, 0];
+            const today = new Date();
+
+            const subscriptions =
+                await this.prisma.organizationSubscription.findMany({
+                    where: {
+                        status: "ACTIVE",
+                        end_at: {
+                            gte: today,
+                        },
+                    },
+                    include: {
+                        organization: {
+                            include: {
+                                createdByUser: {
+                                    select: {
+                                        email: true,
+                                        first_name: true,
+                                        last_name: true,
+                                    },
+                                },
+                            },
+                        },
+                        plan: {
+                            select: {
+                                name: true,
+                            },
+                        },
+                    },
+                });
+
+            for (const sub of subscriptions) {
+                if (!sub.end_at) continue;
+
+                const daysLeft = Math.ceil(
+                    (sub.end_at.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+                );
+
+                if (!REMINDER_DAYS.includes(daysLeft)) continue;
+
+                const sentDays = sub.expiry_reminder_days_sent ?? [];
+                if (sentDays.includes(daysLeft)) continue;
+
+                const user = sub.organization.createdByUser;
+                if (!user?.email) continue;
+
+                const userName = `${user.first_name} ${user.last_name}`.trim();
+                const renewalLink = `${process.env.WEB_BASE_PATH}`
+                await this.mailService.sendSubscriptionExpiryReminder({
+                    to: user.email,
+                    name: userName,
+                    planName: sub.plan.name,
+                    expiryDate: sub.end_at,
+                    daysLeft,
+                    renewalLink: renewalLink
+                });
+                await this.prisma.organizationSubscription.update({
+                    where: { id: sub.id },
+                    data: {
+                        expiry_reminder_days_sent: {
+                            push: daysLeft,
+                        },
+                    },
+                });
+            }
+        } catch (error) {
+            console.error("Subscription reminder error:", error);
+        }
+    }
+
+
 
     @Cron(CronExpression.EVERY_DAY_AT_10AM)
     async sendBirthdayNotifications() {

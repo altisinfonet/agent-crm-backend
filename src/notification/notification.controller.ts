@@ -6,14 +6,27 @@ import type { Response } from 'express';
 import { ApiResponse } from '@/helper/response.helper';
 import { GetCurrentUserId } from '@/common/decorators/current-user-id.decorator';
 import { encryptData } from '@/helper/common.helper';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiBody,
+  ApiResponse as SwaggerApiResponse,
+} from '@nestjs/swagger';
 
 
+@ApiTags('Agent - Notifications')
+@ApiBearerAuth('access-token')
 @Controller({ path: 'notification', version: '1' })
 @UseGuards(JwtAuthGuard)
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) { }
 
-  @Post('fcm-tokens')
+  @Post('fcm-token')
+  @ApiOperation({ summary: 'Add or update FCM token for push notifications' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'FCM token added successfully' })
   async AddFCMToken(@Res() res: Response, @GetCurrentUserId() userId: bigint, @Body() dto: CommonDto) {
     try {
       const notification = await this.notificationService.AddFCMToken(userId, dto);
@@ -29,6 +42,9 @@ export class NotificationController {
   }
 
   @Post('send')
+  @ApiOperation({ summary: 'Send push notification to users' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Notification sent successfully' })
   async sendNotification(@Res() res: Response, @Body() sendNotificationDto: CommonDto,
   ) {
     try {
@@ -44,7 +60,10 @@ export class NotificationController {
     }
   }
 
-  @Put("in-app/list")
+  @Put('in-app/list')
+  @ApiOperation({ summary: 'Get in-app notifications for logged-in user' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'In-app notification list fetched successfully' })
   async findAll(@Res() res: Response, @GetCurrentUserId() userId: bigint, @Body() inAppNotificationDto: CommonDto,) {
     try {
       const preference = await this.notificationService.findAll(userId, inAppNotificationDto);
@@ -61,6 +80,8 @@ export class NotificationController {
   }
 
   @Post('read')
+  @ApiOperation({ summary: 'Mark all notifications as read' })
+  @SwaggerApiResponse({ status: 200, description: 'Notifications marked as read' })
   async readNotifications(@Res() res: Response, @GetCurrentUserId() userId: bigint,) {
     try {
       const notification = await this.notificationService.readNotifications(userId);
@@ -76,6 +97,8 @@ export class NotificationController {
   }
 
   @Post('hbd')
+  @ApiOperation({ summary: 'Send birthday notifications to agents' })
+  @SwaggerApiResponse({ status: 200, description: 'Birthday notifications sent successfully' })
   async sendHBDNotifications(@Res() res: Response) {
     try {
       const notification = await this.notificationService.sendHBDNotifications();
@@ -90,8 +113,4 @@ export class NotificationController {
     }
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.notificationService.remove(+id);
-  }
 }

@@ -120,6 +120,46 @@ export class MailService {
         }
     }
 
+    async sendSubscriptionExpiryReminder(data: {
+        to: string;
+        name: string;
+        planName: string;
+        expiryDate: Date;
+        daysLeft: number;
+        renewalLink: string;
+    }) {
+        try {
+            const subject =
+                data.daysLeft === 0
+                    ? "Your subscription expires today"
+                    : data.daysLeft <= 3
+                        ? "Your subscription is expiring soon"
+                        : "Your subscription is expiring soon";
+
+            const mailOptions = {
+                to: data?.to,
+                subject: subject,
+                template: './subscription-expiry',
+                context: {
+                    agentName: data.name,
+                    subscriptionPlan: data.planName,
+                    expiryDate: data.expiryDate.toDateString(),
+                    daysUntilExpiry: data.daysLeft,
+                    renewalLink: data.renewalLink,
+                    currentYear: new Date().getFullYear(),
+                },
+            };
+            try {
+                const send = await this.mailer.sendMail(mailOptions);
+                return true;
+            } catch (error) {
+                console.warn('Error sending reminder email.', error);
+            }
+        } catch (error) {
+            console.error('Error sending meeting email', error);
+        }
+    }
+
     async sendMeetingReminderEmail(context: any) {
         try {
             const subject = `Meeting Reminder: ${context?.meetingTitle}`

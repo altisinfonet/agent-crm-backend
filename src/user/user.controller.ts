@@ -9,8 +9,6 @@ import { CommonDto } from 'src/auth/dto/common.dto';
 import { isValidImageBuffer, upload } from 'src/common/config/multer.config';
 import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { File as MulterFile } from 'multer';
-import * as path from 'path';
-import * as fs from 'fs';
 import { R2Service } from 'src/helper/r2.helper';
 
 @Controller({ path: 'user', version: '1' })
@@ -200,6 +198,22 @@ export class UserController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Fetched agent KYC details."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
+      throw new BadRequestException(error.response);
+    }
+  }
+
+
+  @Get('faq/list')
+  async clientFaq(@Res() res: Response) {
+    try {
+      const faq = await this.userService.clientFaq();
+      let result = JSON.stringify(faq, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Faqs."));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error: any) {
+      console.log('error: ', error);
       throw new BadRequestException(error.response);
     }
   }

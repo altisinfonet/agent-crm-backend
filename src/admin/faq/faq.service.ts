@@ -478,48 +478,5 @@ export class FaqService {
     }
   }
 
-  async clientFaq() {
-    try {
-      const allFaqs = await this.prisma.fAQModule.findMany({
-        where: {
-          status: "ACTIVE",
-        },
-        orderBy: {
-          rank: 'asc'
-        },
-        select: {
-          id: true,
-          name: true,
-          desc: true,
-          rank: true,
-          status: true,
-          _count: {
-            select: {
-              FAQ: true,
-            }
-          },
-          FAQ: {
-            where: {
-              status: "ACTIVE",
-            },
-            orderBy: {
-              rank: 'asc'
-            },
-            select: {
-              id: true,
-              question: true,
-              answer: true,
-              rank: true,
-              status: true,
-            }
-          }
-        }
-      })
-      return allFaqs;
-    } catch (error) {
-      throw error
-    }
-  }
-
 }
 

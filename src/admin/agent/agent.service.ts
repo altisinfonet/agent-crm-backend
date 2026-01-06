@@ -216,6 +216,31 @@ export class AgentService {
           : null,
       ]);
 
+      const groupedProductEntities = Object.values(
+        (agent.agentProductEntities || []).reduce((acc: any, item: any) => {
+          const product = item.productEntity.products;
+
+          if (!acc[product.id]) {
+            acc[product.id] = {
+              product: {
+                id: product.id,
+                name: product.name,
+              },
+              entities: [],
+            };
+          }
+
+          acc[product.id].entities.push({
+            id: item.productEntity.id,
+            name: item.productEntity.name,
+            slug: item.productEntity.slug,
+          });
+
+          return acc;
+        }, {})
+      );
+
+
       return {
         ...agent,
         image: profileImage,
@@ -227,6 +252,7 @@ export class AgentService {
             qr_code: qrCode,
           }
           : null,
+        agentProductEntities: groupedProductEntities,
       };
     } catch (error) {
       throw error;

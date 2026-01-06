@@ -6,13 +6,26 @@ import { GetCurrentUserId } from '@/common/decorators/current-user-id.decorator'
 import { ApiResponse } from '@/helper/response.helper';
 import { encryptData } from '@/helper/common.helper';
 import type { Response } from 'express';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiBody,
+  ApiResponse as SwaggerApiResponse,
+} from '@nestjs/swagger';
 
+@ApiTags('Agent - Todos')
+@ApiBearerAuth('access-token')
 @UseGuards(JwtAuthGuard)
 @Controller({ path: 'todo', version: '1' })
 export class TodoController {
   constructor(private readonly todoService: TodoService) { }
 
   @Post()
+  @ApiOperation({ summary: 'Create a new todo' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Todo created successfully' })
   async create(@Res() res: Response, @GetCurrentUserId() userId: bigint, @Body() createTodoDto: CommonDto) {
     try {
       const todo = await this.todoService.create(userId, createTodoDto);
@@ -27,7 +40,10 @@ export class TodoController {
     }
   }
 
-  @Put("list")
+  @Put('list')
+  @ApiOperation({ summary: 'Get todo list for logged-in user' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Todo list fetched successfully' })
   async findAll(@Res() res: Response, @GetCurrentUserId() userId: bigint, @Body() fetchTodoDto: CommonDto) {
     try {
       const todo = await this.todoService.findAll(userId, fetchTodoDto);
@@ -43,6 +59,9 @@ export class TodoController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get todo details by ID' })
+  @ApiParam({ name: 'id', example: 1 })
+  @SwaggerApiResponse({ status: 200, description: 'Todo fetched successfully' })
   async findOne(@Res() res: Response, @GetCurrentUserId() userId: bigint, @Param('id') id: string) {
     try {
       const todo = await this.todoService.findOne(userId, BigInt(id));
@@ -58,6 +77,10 @@ export class TodoController {
   }
 
   @Patch(':id')
+  @ApiOperation({ summary: 'Update todo (including mark as complete)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Todo updated successfully' })
   async update(@Res() res: Response, @GetCurrentUserId() userId: bigint, @Param('id') id: string, @Body() updateTodoDto: CommonDto) {
     try {
       const todo = await this.todoService.update(userId, BigInt(id), updateTodoDto);
@@ -73,6 +96,9 @@ export class TodoController {
   }
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete todo by ID' })
+  @ApiParam({ name: 'id', example: 1 })
+  @SwaggerApiResponse({ status: 200, description: 'Todo deleted successfully' })
   async remove(@Res() res: Response, @GetCurrentUserId() userId: bigint, @Param('id') id: string) {
     try {
       const todo = await this.todoService.remove(userId, BigInt(id));

@@ -171,7 +171,40 @@ export class SubscriptionService {
     }
   }
 
-  async adminGrantSubscription(dto: CommonDto) {
+  async updatePlan(plan_id: bigint, dto: CommonDto) {
+    try {
+      const payload = decryptData(dto.data);
+      const { max_agents, is_active, code } = payload;
+
+      const duplicatePlan = await this.prisma.subscriptionPlan.findFirst({
+        where: {
+          code,
+          id: {
+            not: plan_id
+          }
+        },
+      });
+
+      if (duplicatePlan) {
+        throw new BadRequestException("Duplicate plan code.");
+      }
+
+      const update = await this.prisma.subscriptionPlan.update({
+        where: { id: plan_id },
+        data: {
+          max_agents,
+          is_active,
+          code
+        }
+      });
+
+      return update;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async adminUpgradeSubscription(dto: CommonDto) {
     try {
       const payload = decryptData(dto.data);
       const { orgId, planId, durationDays } = payload;
@@ -240,34 +273,49 @@ export class SubscriptionService {
     }
   }
 
-  async updatePlan(plan_id: bigint, dto: CommonDto) {
+  async adminAssignSubscriptionToAgent(dto: CommonDto) {
     try {
       const payload = decryptData(dto.data);
-      const { max_agents, is_active, code } = payload;
+      const { orgId, planId, durationDays } = payload;
+      if (!orgId || !planId) {
+        throw new BadRequestException("organization Id and plan Id are required.");
+      }
 
-      const duplicatePlan = await this.prisma.subscriptionPlan.findFirst({
+      const plan = await this.prisma.subscriptionPlan.findUnique({
+        where: { id: planId }
+      });
+
+      if (!plan) {
+        throw new BadRequestException("Invalid plan");
+      }
+
+      await this.prisma.organizationSubscription.updateMany({
         where: {
-          code,
-          id: {
-            not: plan_id
-          }
+          org_id: orgId,
+          status: "ACTIVE",
+        },
+        data: {
+          status: "EXPIRED",
+          auto_renew: false,
+          end_at: new Date(),
         },
       });
 
-      if (duplicatePlan) {
-        throw new BadRequestException("Duplicate plan code.");
-      }
-
-      const update = await this.prisma.subscriptionPlan.update({
-        where: { id: plan_id },
+      await this.prisma.organizationSubscription.create({
         data: {
-          max_agents,
-          is_active,
-          code
-        }
+          org_id: orgId,
+          plan_id: plan.id,
+          status: "ACTIVE",
+          source: "ADMIN",
+          start_at: new Date(),
+          end_at: durationDays
+            ? new Date(Date.now() + durationDays * 86400000)
+            : null,
+          auto_renew: false,
+        },
       });
 
-      return update;
+      return true;
     } catch (error) {
       throw error;
     }
@@ -325,9 +373,6 @@ export class SubscriptionService {
         }),
       };
 
-      /* ------------------------------------
-         SORTING LOGIC
-      ------------------------------------ */
       let orderBy: any = { created_at: sortOrder };
 
       if (sortBy === "start_at") {
@@ -354,9 +399,6 @@ export class SubscriptionService {
         };
       }
 
-      /* ------------------------------------
-         QUERY
-      ------------------------------------ */
       const [data, total] = await this.prisma.$transaction([
         this.prisma.organizationSubscription.findMany({
           where,

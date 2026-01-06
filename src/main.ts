@@ -15,11 +15,14 @@ expressApp.use(
 
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, new ExpressAdapter(expressApp));
+  const app = await NestFactory.create(
+    AppModule,
+    new ExpressAdapter(expressApp),
+  );
 
   app.setGlobalPrefix('api');
   app.enableVersioning({
-    type: VersioningType.URI, // adds `/v1`
+    type: VersioningType.URI,
   });
 
   app.useGlobalPipes(
@@ -42,25 +45,35 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    // origin: true,
     origin: process.env.FRONTEND_URL || 'http://192.168.1.101:3030',
     methods: 'GET,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
 
-  // Swagger config
+  // Swagger
   const config = new DocumentBuilder()
-    .setTitle('Agent CRM Authentication API')
-    .setDescription('API documentation for SaaS CRM Auth module')
+    .setTitle('Agent CRM API')
+    .setDescription('API documentation for Agent CRM backend')
     .setVersion('1.0.0')
-    .addBearerAuth()
+    .addBearerAuth(
+      {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+      },
+      'access-token',
+    )
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api/docs', app, document);
+
+  if (process.env.NODE_ENV !== 'production') {
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   await app.listen(port, () => {
     console.log(`Server running on -> http://192.168.1.101:${port}`);
+    console.log(`Swagger -> http://192.168.1.101:${port}/api/docs`);
   });
 }
 bootstrap();

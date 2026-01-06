@@ -8,8 +8,18 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Role } from 'src/common/enum/role.enum';
 import { Roles } from 'src/common/decorators/roles.decorator';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiBody,
+  ApiResponse as SwaggerApiResponse,
+} from '@nestjs/swagger';
 
 
+@ApiTags('Admin - Pages')
+@ApiBearerAuth('access-token')
 @Controller({ path: '', version: '1' })
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
@@ -18,7 +28,14 @@ export class PagesController {
 
 
   @Post()
-  async create(@Res() res: Response, @Req() req: Request, @Body() createDynamicPageDto: CommonDto) {
+  @ApiOperation({ summary: 'Create a dynamic page (Admin)' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Page added successfully' })
+  async create(
+    @Res() res: Response,
+    @Req() req: Request,
+    @Body() createDynamicPageDto: CommonDto,
+  ) {
     try {
       const page = await this.dynamicPagesService.create(createDynamicPageDto);
 
@@ -35,8 +52,14 @@ export class PagesController {
   };
 
 
-  @Put("list")
-  async getAllDynamicPages(@Res() res: Response, @Body() dto: CommonDto) {
+  @Put('list')
+  @ApiOperation({ summary: 'Get list of dynamic pages (Admin)' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'All pages fetched successfully' })
+  async getAllDynamicPages(
+    @Res() res: Response,
+    @Body() dto: CommonDto,
+  ) {
     try {
       const dynamicPages = await this.dynamicPagesService.getAllDynamicPages(dto);
 
@@ -54,7 +77,13 @@ export class PagesController {
 
 
   @Get(':slug')
-  async getDynamicPage(@Res() res: Response, @Param('slug') id: string) {
+  @ApiOperation({ summary: 'Get page by slug (Admin)' })
+  @ApiParam({ name: 'slug', example: 'privacy-policy' })
+  @SwaggerApiResponse({ status: 200, description: 'Page fetched successfully' })
+  async getDynamicPage(
+    @Res() res: Response,
+    @Param('slug') id: string,
+  ) {
     try {
       const dynamicPage = await this.dynamicPagesService.getDynamicPage(id);
 
@@ -71,7 +100,15 @@ export class PagesController {
   };
 
   @Patch(':id')
-  async updateDynamicPage(@Res() res: Response, @Param('id') id: string, @Body() updateDynamicPageDto: CommonDto) {
+  @ApiOperation({ summary: 'Update dynamic page (Admin)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Page updated successfully' })
+  async updateDynamicPage(
+    @Res() res: Response,
+    @Param('id') id: string,
+    @Body() updateDynamicPageDto: CommonDto,
+  ) {
     try {
       const dynamicPage = await this.dynamicPagesService.updateDynamicPage(BigInt(id), updateDynamicPageDto);
 
@@ -89,7 +126,13 @@ export class PagesController {
 
 
   @Delete(':id')
-  async removeDynamicPage(@Res() res: Response, @Param('id') id: string) {
+  @ApiOperation({ summary: 'Delete dynamic page (Admin)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @SwaggerApiResponse({ status: 200, description: 'Page deleted successfully' })
+  async removeDynamicPage(
+    @Res() res: Response,
+    @Param('id') id: string,
+  ) {
     try {
       const dynamicPage = await this.dynamicPagesService.removeDynamicPage(BigInt(id));
 

@@ -8,7 +8,17 @@ import { Roles } from 'src/common/decorators/roles.decorator';
 import type { Request, Response } from 'express';
 import { ApiResponse } from 'src/helper/response.helper';
 import { encryptData } from 'src/helper/common.helper';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiBody,
+  ApiResponse as SwaggerApiResponse,
+} from '@nestjs/swagger';
 
+@ApiTags('Admin - Agents')
+@ApiBearerAuth('access-token')
 @Controller({ path: '', version: '1' })
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
@@ -16,6 +26,9 @@ export class AgentController {
   constructor(private readonly agentService: AgentService) { }
 
   @Put("list")
+  @ApiOperation({ summary: 'Get list of agents (Admin)' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Agents fetched successfully' })
   async findAll(@Res() res: Response, @Body() getAgentDto: CommonDto) {
     try {
       const agent = await this.agentService.findAll(getAgentDto);
@@ -31,6 +44,9 @@ export class AgentController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get agent details by ID (Admin)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @SwaggerApiResponse({ status: 200, description: 'Agent details fetched successfully' })
   async findOne(@Res() res: Response, @Param('id') id: string) {
     try {
       const agent = await this.agentService.findOne(BigInt(id));
@@ -46,7 +62,15 @@ export class AgentController {
   }
 
   @Patch(':id')
-  async update(@Res() res: Response, @Param('id') id: string, @Body() updateAgentDto: CommonDto) {
+  @ApiOperation({ summary: 'Update agent details (Admin)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Agent details updated successfully' })
+  async update(
+    @Res() res: Response,
+    @Param('id') id: string,
+    @Body() updateAgentDto: CommonDto,
+  ) {
     try {
       const agent = await this.agentService.update(BigInt(id), updateAgentDto);
       let result = JSON.stringify(agent, (key, value) =>
@@ -61,6 +85,9 @@ export class AgentController {
   }
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete agent (Admin)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @SwaggerApiResponse({ status: 200, description: 'Agent deleted successfully' })
   async remove(@Res() res: Response, @Param('id') id: string) {
     try {
       const agent = await this.agentService.remove(BigInt(id));

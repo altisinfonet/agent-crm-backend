@@ -6,13 +6,24 @@ import { encryptData } from 'src/helper/common.helper';
 import { ApiResponse } from 'src/helper/response.helper';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { GetCurrentUserId } from '@/common/decorators/current-user-id.decorator';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiBody,
+  ApiResponse as SwaggerApiResponse,
+} from '@nestjs/swagger';
 
 
+@ApiTags('Agent - Products')
 @Controller({ path: 'products', version: '1' })
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) { }
 
-  @Get("list")
+  @Get('list')
+  @ApiOperation({ summary: 'Get all available products (Public)' })
+  @SwaggerApiResponse({ status: 200, description: 'All products fetched successfully' })
   async findAll(@Res() res: Response) {
     try {
       const products = await this.productsService.findAll();
@@ -26,7 +37,11 @@ export class ProductsController {
     }
   }
 
-  @Put(":id/entity/list")
+  @Put(':id/entity/list')
+  @ApiOperation({ summary: 'Get product entities by product ID (Public)' })
+  @ApiParam({ name: 'id', description: 'Product ID', example: 1 })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Product entity list fetched successfully' })
   async findOne(@Res() res: Response, @Param('id') id: string, @Body() findEntityDto: CommonDto) {
     try {
       const entity = await this.productsService.findOne(BigInt(id), findEntityDto);
@@ -44,7 +59,11 @@ export class ProductsController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Post("agent/entity/:id")
+  @Post('agent/entity/:id')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Create agent product entity (Agent only)' })
+  @ApiParam({ name: 'id', description: 'Product ID', example: 1 })
+  @SwaggerApiResponse({ status: 200, description: 'Agent product entity created successfully' })
   async create(@Res() res: Response, @GetCurrentUserId() userId: bigint, @Param('id') id: string,) {
     try {
       const entity = await this.productsService.create(userId, BigInt(id));

@@ -19,21 +19,6 @@ export class FaqController {
     private readonly faqService: FaqService,
   ) { }
 
-  //////////////// Client side FAQs //////////////////
-  @Get('client')
-  async clientFaq(@Res() res: Response) {
-    try {
-      const faq = await this.faqService.clientFaq();
-      let result = JSON.stringify(faq, (key, value) =>
-        typeof value === 'bigint' ? value.toString() : value,
-      );
-      return res.status(HttpStatus.OK).json(new ApiResponse(JSON.parse(result), "Faqs."));
-    } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
-    }
-  }
-
   /////////////////FAQ Module////////////////////
   @Post("module")
   async createModule(@Res() res: Response, @Body() createFaqModuleDto: CommonDto,

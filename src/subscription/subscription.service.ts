@@ -307,15 +307,25 @@ export class SubscriptionService {
 
       switch (eventType) {
         case "subscription.authenticated":
-        case "subscription.activated":
+        case "subscription.activated": {
+          const startAt = subscription.start_at
+            ? new Date(subscription.start_at * 1000)
+            : new Date();
+
+          const endAt = subscription.end_at
+            ? new Date(subscription.end_at * 1000)
+            : null;
+
           await this.prisma.organizationSubscription.update({
             where: { rzp_subscription_id: subId },
             data: {
               status: "ACTIVE",
-              start_at: new Date()
-            }
+              start_at: startAt,
+              end_at: endAt,
+            },
           });
           break;
+        }
 
         case "subscription.charged":
           await this.prisma.razorpaySubscription.update({
@@ -331,7 +341,7 @@ export class SubscriptionService {
             where: { rzp_subscription_id: subId },
             data: {
               status: "EXPIRED",
-              end_at: new Date()
+              cancelled_at: new Date()
             }
           });
           break;
@@ -362,6 +372,59 @@ export class SubscriptionService {
       throw error;
     }
   }
+
+
+  async cancelSubscription(user_id: bigint) {
+    try {
+      const org = await this.prisma.organization.findUnique({
+        where: { created_by: user_id },
+        select: { id: true },
+      });
+
+      if (!org) {
+        throw new BadRequestException("User does not own any organization");
+      }
+
+      const orgSubscription =
+        await this.prisma.organizationSubscription.findFirst({
+          orderBy: {
+            created_at: "desc"
+          },
+          where: {
+            org_id: org.id,
+            status: "ACTIVE",
+          },
+        });
+
+      if (!orgSubscription || !orgSubscription.rzp_subscription_id) {
+        throw new BadRequestException("No active subscription found");
+      }
+
+      try {
+        this.razorpay.subscriptions.cancel(
+          orgSubscription.rzp_subscription_id,
+          true
+        );
+      } catch (error: any) {
+        console.error("Razorpay cancel error:", error?.error || error);
+        throw new BadRequestException("Failed to cancel subscription on Razorpay");
+      }
+
+      await this.prisma.organizationSubscription.update({
+        where: {
+          id: orgSubscription.id,
+        },
+        data: {
+          auto_renew: false,
+        },
+      });
+
+      return true;
+    } catch (error) {
+      throw error;
+    }
+  }
+
 
   update(id: number, updateSubscriptionDto: CommonDto) {
     return `This action updates a #${id} subscription`;

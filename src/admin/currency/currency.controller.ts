@@ -8,7 +8,18 @@ import { Role } from 'src/common/enum/role.enum';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiBody,
+  ApiResponse as SwaggerApiResponse,
+} from '@nestjs/swagger';
 
+
+@ApiTags('Admin - Currencies')
+@ApiBearerAuth('access-token')
 @Controller({ path: '', version: '1' })
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
@@ -16,6 +27,9 @@ export class CurrencyController {
   constructor(private readonly currencyService: CurrencyService) { }
 
   @Post()
+  @ApiOperation({ summary: 'Create currency (Admin)' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Currency created successfully' })
   async create(
     @Res() res: Response,
     @Body() dto: CommonDto,
@@ -38,6 +52,9 @@ export class CurrencyController {
   }
 
   @Put('list')
+  @ApiOperation({ summary: 'Get list of currencies (Admin)' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Currency list fetched successfully' })
   async findAll(
     @Res() res: Response,
     @Body() dto: CommonDto,
@@ -60,6 +77,9 @@ export class CurrencyController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get currency by ID (Admin)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @SwaggerApiResponse({ status: 200, description: 'Currency fetched successfully' })
   async findOne(
     @Res() res: Response,
     @Param('id') id: string,
@@ -82,6 +102,10 @@ export class CurrencyController {
   }
 
   @Patch(':id')
+  @ApiOperation({ summary: 'Update currency (Admin)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Currency updated successfully' })
   async update(
     @Res() res: Response,
     @Param('id') id: string,
@@ -107,6 +131,9 @@ export class CurrencyController {
 
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete currency (Admin)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @SwaggerApiResponse({ status: 200, description: 'Currency deleted successfully' })
   async remove(
     @Res() res: Response,
     @Param('id') id: string,

@@ -4,6 +4,7 @@ import { CommonDto } from 'src/auth/dto/common.dto';
 import type { Response } from 'express';
 import { ApiResponse } from 'src/helper/response.helper';
 import { encryptData } from 'src/helper/common.helper';
+import { ApiExcludeEndpoint } from '@nestjs/swagger';
 
 
 @Controller({ path: 'settings', version: '1' })
@@ -16,6 +17,7 @@ export class SettingsController {
   }
 
   @Get('payment')
+  @ApiExcludeEndpoint()
   async paymentSettings(@Res() res: Response) {
     try {
       const settings = await this.settingsService.paymentSettings();

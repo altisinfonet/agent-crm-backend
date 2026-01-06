@@ -8,15 +8,26 @@ import { Roles } from 'src/common/decorators/roles.decorator';
 import type { Request, Response } from 'express';
 import { ApiResponse } from 'src/helper/response.helper';
 import { encryptData } from 'src/helper/common.helper';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiBody,
+  ApiResponse as SwaggerApiResponse,
+} from '@nestjs/swagger';
 
-
+@ApiTags('Admin - Products')
+@ApiBearerAuth('access-token')
 @Controller({ path: '', version: '1' })
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) { }
 
-  @Get("list")
+  @Get('list')
+  @ApiOperation({ summary: 'Get all products (Admin)' })
+  @SwaggerApiResponse({ status: 200, description: 'Fetched all products' })
   async findAllProducts(@Res() res: Response) {
     try {
       const entity = await this.productsService.findAllProducts();
@@ -34,8 +45,16 @@ export class ProductsController {
   }
 
 
-  @Post(":id/entity")
-  async create(@Res() res: Response, @Param('id') id: string, @Body() createEntityDto: CommonDto) {
+  @Post(':id/entity')
+  @ApiOperation({ summary: 'Create product entity (Admin)' })
+  @ApiParam({ name: 'id', example: 1, description: 'Product ID' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Product entity created successfully' })
+  async create(
+    @Res() res: Response,
+    @Param('id') id: string,
+    @Body() createEntityDto: CommonDto,
+  ) {
     try {
       const entity = await this.productsService.create(BigInt(id), createEntityDto);
 
@@ -51,8 +70,16 @@ export class ProductsController {
     }
   };
 
-  @Put(":id/entity/list")
-  async findAll(@Res() res: Response, @Param('id') id: string, @Body() findEntityDto: CommonDto) {
+  @Put(':id/entity/list')
+  @ApiOperation({ summary: 'Get product entity list (Admin)' })
+  @ApiParam({ name: 'id', example: 1, description: 'Product ID' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Product entity list fetched' })
+  async findAll(
+    @Res() res: Response,
+    @Param('id') id: string,
+    @Body() findEntityDto: CommonDto,
+  ) {
     try {
       const entity = await this.productsService.findAll(BigInt(id), findEntityDto);
 
@@ -69,7 +96,15 @@ export class ProductsController {
   }
 
   @Patch('entity/:id')
-  async update(@Res() res: Response, @Param('id') id: string, @Body() updateEntityDto: CommonDto) {
+  @ApiOperation({ summary: 'Update product entity (Admin)' })
+  @ApiParam({ name: 'id', example: 10, description: 'Product entity ID' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Product entity updated successfully' })
+  async update(
+    @Res() res: Response,
+    @Param('id') id: string,
+    @Body() updateEntityDto: CommonDto,
+  ) {
     try {
       const entity = await this.productsService.update(BigInt(id), updateEntityDto);
 
@@ -86,7 +121,13 @@ export class ProductsController {
   }
 
   @Delete('entity/:id')
-  async remove(@Res() res: Response, @Param('id') id: string) {
+  @ApiOperation({ summary: 'Delete product entity (Admin)' })
+  @ApiParam({ name: 'id', example: 10, description: 'Product entity ID' })
+  @SwaggerApiResponse({ status: 200, description: 'Product entity deleted successfully' })
+  async remove(
+    @Res() res: Response,
+    @Param('id') id: string,
+  ) {
     try {
       const entity = await this.productsService.remove(BigInt(id));
 

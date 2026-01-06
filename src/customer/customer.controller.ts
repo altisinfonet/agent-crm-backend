@@ -6,13 +6,26 @@ import { ApiResponse } from '@/helper/response.helper';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { GetCurrentUserId } from '@/common/decorators/current-user-id.decorator';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiBody,
+  ApiResponse as SwaggerApiResponse,
+} from '@nestjs/swagger';
 
+@ApiTags('Agent - Customers')
+@ApiBearerAuth('access-token')
 @UseGuards(JwtAuthGuard)
 @Controller({ path: 'customer', version: '1' })
 export class CustomerController {
   constructor(private readonly customerService: CustomerService) { }
 
   @Post()
+  @ApiOperation({ summary: 'Create a new customer' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Customer created successfully' })
   async create(@Res() res: Response, @GetCurrentUserId() userId: bigint, @Body() createCustomerDto: CommonDto) {
     try {
       const customer = await this.customerService.create(userId, createCustomerDto);
@@ -27,7 +40,11 @@ export class CustomerController {
     }
   }
 
-  @Post("sale/:id")
+  @Post('sale/:id')
+  @ApiOperation({ summary: 'Sell product to a customer' })
+  @ApiParam({ name: 'id', description: 'Customer ID', example: 1 })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Product sold successfully' })
   async sellProduct(@Res() res: Response, @GetCurrentUserId() userId: bigint, @Param('id') customer_id: string, @Body() sellProductDto: CommonDto) {
     try {
       const customer = await this.customerService.sellProduct(userId, BigInt(customer_id), sellProductDto);
@@ -42,7 +59,10 @@ export class CustomerController {
     }
   }
 
-  @Put("list")
+  @Put('list')
+  @ApiOperation({ summary: 'Get all customers for logged-in agent' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Customer list fetched successfully' })
   async findAll(@Res() res: Response, @GetCurrentUserId() userId: bigint, @Body() commonDto: CommonDto) {
     try {
       const customer = await this.customerService.findAll(userId, commonDto);
@@ -58,6 +78,9 @@ export class CustomerController {
   }
 
   @Get(':id')
+  @ApiOperation({ summary: 'Get customer details by ID' })
+  @ApiParam({ name: 'id', example: 1 })
+  @SwaggerApiResponse({ status: 200, description: 'Customer fetched successfully' })
   async findOne(@Res() res: Response, @GetCurrentUserId() userId: bigint, @Param('id') id: string) {
     try {
       const customer = await this.customerService.findOne(userId, BigInt(id));
@@ -72,7 +95,11 @@ export class CustomerController {
     }
   }
 
-  @Patch("sale/:id")
+  @Patch('sale/:id')
+  @ApiOperation({ summary: 'Update sold product details' })
+  @ApiParam({ name: 'id', description: 'Sale ID', example: 10 })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Sale updated successfully' })
   async updateSellProduct(@Res() res: Response, @GetCurrentUserId() userId: bigint, @Param('id') sell_id: string, @Body() sellProductDto: CommonDto) {
     try {
       const customer = await this.customerService.updateSale(userId, BigInt(sell_id), sellProductDto);
@@ -88,6 +115,9 @@ export class CustomerController {
   }
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete customer by ID' })
+  @ApiParam({ name: 'id', example: 1 })
+  @SwaggerApiResponse({ status: 200, description: 'Customer deleted successfully' })
   remove(@Param('id') id: string) {
     return this.customerService.remove(+id);
   }

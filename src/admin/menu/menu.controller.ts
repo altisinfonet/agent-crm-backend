@@ -9,7 +9,18 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Role } from 'src/common/enum/role.enum';
 import { Roles } from 'src/common/decorators/roles.decorator';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiBody,
+  ApiResponse as SwaggerApiResponse,
+} from '@nestjs/swagger';
 
+
+@ApiTags('Admin - Menus')
+@ApiBearerAuth('access-token')
 @Controller({ path: '', version: '1' })
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
@@ -17,6 +28,9 @@ export class MenuController {
   constructor(private readonly menuService: MenuService, private prisma: PrismaService) { }
 
   @Post()
+  @ApiOperation({ summary: 'Create menu (Admin)' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Menu created successfully' })
   async create(@Res() res: Response, @Body() createMenuDto: CommonDto,
     @Req() req: Request) {
     try {
@@ -33,7 +47,9 @@ export class MenuController {
     }
   }
 
-  @Get("list")
+  @Get('list')
+  @ApiOperation({ summary: 'Get all menus (Admin)' })
+  @SwaggerApiResponse({ status: 200, description: 'All menus fetched successfully' })
   async findAll(@Res() res: Response) {
     try {
       const menuType = await this.menuService.findAll();
@@ -50,6 +66,10 @@ export class MenuController {
   }
 
   @Patch(':id')
+  @ApiOperation({ summary: 'Update menu (Admin)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Menu updated successfully' })
   async update(@Res() res: Response, @Body() updateMenuDto: CommonDto,
     @Req() req: Request, @Param('id') id: string,) {
     try {
@@ -70,6 +90,9 @@ export class MenuController {
 
 
   @Delete(':id')
+  @ApiOperation({ summary: 'Delete menu (Admin)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @SwaggerApiResponse({ status: 200, description: 'Menu deleted successfully' })
   async remove(@Res() res: Response, @Param('id') id: string) {
     try {
       const menuType = await this.menuService.remove(BigInt(id),);
@@ -87,7 +110,10 @@ export class MenuController {
 
   ///////////////////////////////////////////////////////
 
-  @Post("type")
+  @Post('type')
+  @ApiOperation({ summary: 'Create menu type (Admin)' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Menu type created successfully' })
   async createMenuType(@Res() res: Response, @Body() createMenuTypeDto: CommonDto,
     @Req() req: Request,) {
     try {
@@ -104,7 +130,10 @@ export class MenuController {
     }
   }
 
-  @Put("type/list")
+  @Put('type/list')
+  @ApiOperation({ summary: 'Get list of menu types (Admin)' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'All menu types fetched successfully' })
   async findAllMenuType(@Res() res: Response, @Body() getAllMenuTypeDto: CommonDto) {
     try {
       const menuType = await this.menuService.findAllMenuType(getAllMenuTypeDto);
@@ -121,6 +150,9 @@ export class MenuController {
   }
 
   @Get('type/:slug')
+  @ApiOperation({ summary: 'Get menu type by slug (Admin)' })
+  @ApiParam({ name: 'slug', example: 'footer-menu' })
+  @SwaggerApiResponse({ status: 200, description: 'Menu type fetched successfully' })
   async findOneMenuTypeBySlug(@Res() res: Response, @Param('slug') menu_type: string) {
     try {
       const menuType = await this.menuService.findOneMenuType(menu_type);
@@ -137,6 +169,10 @@ export class MenuController {
   }
 
   @Patch('type/:id')
+  @ApiOperation({ summary: 'Update menu type (Admin)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Menu type updated successfully' })
   async updateType(@Res() res: Response, @Param('id') id: string, @Body() updateMenuTypeDto: CommonDto) {
     try {
       const menuType = await this.menuService.updateType(BigInt(id), updateMenuTypeDto);
@@ -153,6 +189,9 @@ export class MenuController {
   }
 
   @Delete('type/:id')
+  @ApiOperation({ summary: 'Delete menu type (Admin)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @SwaggerApiResponse({ status: 200, description: 'Menu type deleted successfully' })
   async removeType(@Res() res: Response, @Param('id') id: string) {
     try {
       const menuType = await this.menuService.removeType(BigInt(id),);

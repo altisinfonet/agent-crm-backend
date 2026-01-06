@@ -2,10 +2,11 @@ import { Module } from '@nestjs/common';
 import { TaskService } from './task.service';
 import { SettingsService } from 'src/settings/settings.service';
 import { NotificationModule } from '@/notification/notification.module';
+import { MailModule } from '@/mail/mail.module';
 
 
 @Module({
-    imports: [NotificationModule],
+    imports: [NotificationModule, MailModule],
     providers: [TaskService, SettingsService]
 })
 export class TaskModule { }
