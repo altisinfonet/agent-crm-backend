@@ -6,7 +6,7 @@ import { Role } from '@/common/enum/role.enum';
 import { Roles } from '@/common/decorators/roles.decorator';
 import { CommonDto } from '@/auth/dto/common.dto';
 import type { Response } from 'express';
-import { ApiResponse } from '@/helper/response.helper';
+import { ApiResponse } from '@/common/helper/response.helper';
 
 @Controller({ path: '', version: '1' })
 @UseGuards(JwtAuthGuard, RolesGuard)

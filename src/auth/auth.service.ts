@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CryptoUtil } from 'src/common/utils/crypto.util';
-import { decryptData, encryptData, generateRandomID } from 'src/helper/common.helper';
+import { decryptData, encryptData, generateRandomID } from '@/common/helper/common.helper';
 import { CommonDto } from './dto/common.dto';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -12,7 +12,7 @@ import { Request } from 'express';
 import { verifyOtpDto } from 'src/otp/dto/verify-otp.dto';
 import { MailService } from '@/mail/mail.service';
 import { OtpService } from '@/otp/otp.service';
-import { handleAuthFailure, resetAuthLimits } from '@/helper/rate-limit.helper';
+import { handleAuthFailure, resetAuthLimits } from '@/common/helper/rate-limit.helper';
 
 @Injectable()
 export class AuthService {
@@ -112,6 +112,16 @@ export class AuthService {
                     status: true
                 },
             });
+            const org = await this.prisma.organization.create({
+                data: {
+                    name: `${first_name} ${last_name}`,
+                    created_by: user?.id,
+                    gst_number: "",
+                    pan_number: "",
+                    contact_email: email,
+                    contact_phone: phone_no,
+                }
+            })
         }
 
         // 6️⃣ Generate tokens

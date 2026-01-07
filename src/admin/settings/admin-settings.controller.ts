@@ -4,9 +4,9 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { Role } from 'src/common/enum/role.enum';
-import { ApiResponse } from 'src/helper/response.helper';
+import { ApiResponse } from '@/common/helper/response.helper';
 import { AdminSettingsService } from './admin-settings.service';
-import { encryptData } from 'src/helper/common.helper';
+import { encryptData } from '@/common/helper/common.helper';
 import { CommonDto } from 'src/auth/dto/common.dto';
 import {
   ApiTags,

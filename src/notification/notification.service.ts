@@ -2,7 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { CommonDto } from '@/auth/dto/common.dto';
 import { PrismaService } from '@/prisma/prisma.service';
 import { FirebaseAdminService } from '@/utils/firebase.utils';
-import { createNotification, decryptData } from '@/helper/common.helper';
+import { createNotification, decryptData } from '@/common/helper/common.helper';
 import { MailService } from '@/mail/mail.service';
 
 @Injectable()

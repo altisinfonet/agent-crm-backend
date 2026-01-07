@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CommonDto } from 'src/auth/dto/common.dto';
-import { decryptData, generateSlug } from 'src/helper/common.helper';
+import { decryptData, generateSlug } from '@/common/helper/common.helper';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 

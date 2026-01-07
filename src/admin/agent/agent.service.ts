@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { CommonDto } from 'src/auth/dto/common.dto';
-import { decryptData } from 'src/helper/common.helper';
-import { R2Service } from 'src/helper/r2.helper';
+import { decryptData } from '@/common/helper/common.helper';
+import { R2Service } from '@/common/helper/r2.helper';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 

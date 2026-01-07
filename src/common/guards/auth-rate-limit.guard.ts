@@ -5,8 +5,8 @@ import {
     HttpStatus,
     Injectable,
 } from '@nestjs/common';
-import { decryptData } from '@/helper/common.helper';
-import { getActiveBlockTtl } from '@/helper/rate-limit.helper';
+import { decryptData } from '@/common/helper/common.helper';
+import { getActiveBlockTtl } from '@/common/helper/rate-limit.helper';
 
 @Injectable()
 export class AuthRateLimitGuard implements CanActivate {

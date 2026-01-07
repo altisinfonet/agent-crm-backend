@@ -1,15 +1,15 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, HttpStatus, Res, BadRequestException, UploadedFile, UseInterceptors, Req, UploadedFiles } from '@nestjs/common';
 import { UserService } from './user.service';
 import { GetCurrentUserId } from 'src/common/decorators/current-user-id.decorator';
-import { buildUserRootFolder, decryptData, encryptData } from 'src/helper/common.helper';
-import { ApiResponse } from 'src/helper/response.helper';
 import type { Request, Response } from 'express';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { CommonDto } from 'src/auth/dto/common.dto';
 import { isValidImageBuffer, upload } from 'src/common/config/multer.config';
 import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { File as MulterFile } from 'multer';
-import { R2Service } from 'src/helper/r2.helper';
+import { ApiResponse } from '@/common/helper/response.helper';
+import { buildUserRootFolder, decryptData, encryptData } from '@/common/helper/common.helper';
+import { R2Service } from '@/common/helper/r2.helper';
 
 @Controller({ path: 'user', version: '1' })
 export class UserController {

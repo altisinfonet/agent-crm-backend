@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { CommonDto } from 'src/auth/dto/common.dto';
-import { addDays, addYearsFrom, decryptData } from 'src/helper/common.helper';
+import { addDays, addYearsFrom, decryptData } from '@/common/helper/common.helper';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SettingsService } from 'src/settings/settings.service';
 import Razorpay = require("razorpay");

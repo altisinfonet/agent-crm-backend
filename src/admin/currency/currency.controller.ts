@@ -1,8 +1,8 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Res, HttpStatus, BadRequestException, Put, UseGuards } from '@nestjs/common';
 import { CurrencyService } from './currency.service';
 import { CommonDto } from 'src/auth/dto/common.dto';
-import { encryptData } from 'src/helper/common.helper';
-import { ApiResponse } from 'src/helper/response.helper';
+import { encryptData } from '@/common/helper/common.helper';
+import { ApiResponse } from '@/common/helper/response.helper';
 import type { Response } from 'express';
 import { Role } from 'src/common/enum/role.enum';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';

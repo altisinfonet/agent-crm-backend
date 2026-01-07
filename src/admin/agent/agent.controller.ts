@@ -6,8 +6,8 @@ import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { Role } from 'src/common/enum/role.enum';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import type { Request, Response } from 'express';
-import { ApiResponse } from 'src/helper/response.helper';
-import { encryptData } from 'src/helper/common.helper';
+import { ApiResponse } from '@/common/helper/response.helper';
+import { encryptData } from '@/common/helper/common.helper';
 import {
   ApiTags,
   ApiBearerAuth,

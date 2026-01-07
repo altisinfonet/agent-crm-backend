@@ -3,7 +3,7 @@ import { SendOtpDto } from './dto/send-otp.dto';
 import { verifyOtpDto } from './dto/verify-otp.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { MailService } from 'src/mail/mail.service';
-import { decryptData, generateOTP } from 'src/helper/common.helper';
+import { decryptData, generateOTP } from '@/common/helper/common.helper';
 import { WhatsappService } from '@/whatsapp/whatsapp.service';
 import { CommonDto } from '@/auth/dto/common.dto';
 

@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CommonDto } from 'src/auth/dto/common.dto';
-import { createNotification, decryptData } from 'src/helper/common.helper';
+import { createNotification, decryptData } from '@/common/helper/common.helper';
 import { MailService } from 'src/mail/mail.service';
 import { PrismaService } from 'src/prisma/prisma.service';
 

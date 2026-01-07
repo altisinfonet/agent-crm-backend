@@ -1,8 +1,8 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, HttpStatus, Res, BadRequestException, UseGuards, Put } from '@nestjs/common';
 import { MeetingService } from './meeting.service';
 import { CommonDto } from 'src/auth/dto/common.dto';
-import { encryptData } from 'src/helper/common.helper';
-import { ApiResponse } from 'src/helper/response.helper';
+import { encryptData } from '@/common/helper/common.helper';
+import { ApiResponse } from '@/common/helper/response.helper';
 import type { Response } from 'express';
 import { GetCurrentUserId } from 'src/common/decorators/current-user-id.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';

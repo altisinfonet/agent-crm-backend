@@ -3,9 +3,9 @@ import { NotificationService } from './notification.service';
 import { CommonDto } from '@/auth/dto/common.dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import type { Response } from 'express';
-import { ApiResponse } from '@/helper/response.helper';
+import { ApiResponse } from '@/common/helper/response.helper';
 import { GetCurrentUserId } from '@/common/decorators/current-user-id.decorator';
-import { encryptData } from '@/helper/common.helper';
+import { encryptData } from '@/common/helper/common.helper';
 import {
   ApiTags,
   ApiBearerAuth,

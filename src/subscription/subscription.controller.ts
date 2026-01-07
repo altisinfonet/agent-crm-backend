@@ -1,8 +1,8 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, HttpStatus, BadRequestException, UseGuards, Res, Req, Headers } from '@nestjs/common';
 import { SubscriptionService } from './subscription.service';
 import { CommonDto } from 'src/auth/dto/common.dto';
-import { encryptData } from 'src/helper/common.helper';
-import { ApiResponse } from 'src/helper/response.helper';
+import { encryptData } from '@/common/helper/common.helper';
+import { ApiResponse } from '@/common/helper/response.helper';
 import type { Request, Response } from 'express';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { GetCurrentUserId } from 'src/common/decorators/current-user-id.decorator';

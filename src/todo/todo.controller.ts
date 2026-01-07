@@ -3,8 +3,8 @@ import { TodoService } from './todo.service';
 import { CommonDto } from '@/auth/dto/common.dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { GetCurrentUserId } from '@/common/decorators/current-user-id.decorator';
-import { ApiResponse } from '@/helper/response.helper';
-import { encryptData } from '@/helper/common.helper';
+import { ApiResponse } from '@/common/helper/response.helper';
+import { encryptData } from '@/common/helper/common.helper';
 import type { Response } from 'express';
 import {
   ApiTags,

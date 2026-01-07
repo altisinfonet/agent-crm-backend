@@ -1,8 +1,8 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, HttpStatus, BadRequestException, Res, UseGuards, Put } from '@nestjs/common';
 import { CustomerService } from './customer.service';
 import { CommonDto } from '@/auth/dto/common.dto';
-import { encryptData } from '@/helper/common.helper';
-import { ApiResponse } from '@/helper/response.helper';
+import { encryptData } from '@/common/helper/common.helper';
+import { ApiResponse } from '@/common/helper/response.helper';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { GetCurrentUserId } from '@/common/decorators/current-user-id.decorator';

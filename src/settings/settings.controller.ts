@@ -1,9 +1,9 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Res, HttpStatus, BadRequestException } from '@nestjs/common';
 import { SettingsService } from './settings.service';
-import { CommonDto } from 'src/auth/dto/common.dto';
+import { CommonDto } from '@/auth/dto/common.dto';
 import type { Response } from 'express';
-import { ApiResponse } from 'src/helper/response.helper';
-import { encryptData } from 'src/helper/common.helper';
+import { ApiResponse } from '@/common/helper/response.helper';
+import { encryptData } from '@/common/helper/common.helper';
 import { ApiExcludeEndpoint } from '@nestjs/swagger';
 
 

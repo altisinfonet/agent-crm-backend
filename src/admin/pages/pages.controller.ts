@@ -1,9 +1,9 @@
 import { Get, Post, Body, Patch, Param, Delete, UseGuards, Res, Req, HttpStatus, BadRequestException, Controller, Put } from '@nestjs/common';
-import { ApiResponse } from 'src/helper/response.helper';
+import { ApiResponse } from '@/common/helper/response.helper';
 import { PagesService } from './pages.service';
 import type { Response } from 'express';
 import { CommonDto } from 'src/auth/dto/common.dto';
-import { encryptData } from 'src/helper/common.helper';
+import { encryptData } from '@/common/helper/common.helper';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
 import { Role } from 'src/common/enum/role.enum';

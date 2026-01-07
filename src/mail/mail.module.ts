@@ -4,7 +4,7 @@ import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handleba
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { join } from 'path';
 import { MailService } from './mail.service';
-import { registerHandlebarsHelpers } from '@/helper/handlebars.helper';
+import { registerHandlebarsHelpers } from '@/common/helper/handlebars.helper';
 
 registerHandlebarsHelpers();
 

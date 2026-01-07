@@ -4,7 +4,7 @@ import { JwtUtil } from 'src/common/utils/jwt.util';
 import { CryptoUtil } from 'src/common/utils/crypto.util';
 import { randomUUID } from 'crypto';
 import { RoleName } from 'generated/prisma';
-import { decryptData, encryptData } from 'src/helper/common.helper';
+import { decryptData, encryptData } from '@/common/helper/common.helper';
 import { Request } from 'express';
 
 @Injectable()

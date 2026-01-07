@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CommonDto } from 'src/auth/dto/common.dto';
-import { createMetaData, decryptData, generateSlug } from 'src/helper/common.helper';
+import { createMetaData, decryptData, generateSlug } from '@/common/helper/common.helper';
 
 @Injectable()
 export class PagesService {

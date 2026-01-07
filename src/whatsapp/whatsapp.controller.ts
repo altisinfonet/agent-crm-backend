@@ -2,8 +2,8 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Res, HttpStatus, Bad
 import { WhatsappService } from './whatsapp.service';
 import { CommonDto } from '@/auth/dto/common.dto';
 import type { Response } from 'express';
-import { ApiResponse } from '@/helper/response.helper';
-import { encryptData } from '@/helper/common.helper';
+import { ApiResponse } from '@/common/helper/response.helper';
+import { encryptData } from '@/common/helper/common.helper';
 
 
 @Controller({ path: 'whatsapp', version: '1' })

@@ -1,9 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CommonDto } from 'src/auth/dto/common.dto';
-import { decryptData, hashPassword } from 'src/helper/common.helper';
 import * as bcrypt from 'bcrypt';
-import { R2Service } from 'src/helper/r2.helper';
+import { decryptData, hashPassword } from '@/common/helper/common.helper';
+import { R2Service } from '@/common/helper/r2.helper';
 
 @Injectable()
 export class UserService {

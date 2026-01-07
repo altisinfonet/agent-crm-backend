@@ -2,8 +2,8 @@ import { Controller, Get, Post, Body, Patch, Param, Delete, Res, HttpStatus, Bad
 import { ProductsService } from './products.service';
 import { CommonDto } from 'src/auth/dto/common.dto';
 import type { Response } from 'express';
-import { encryptData } from 'src/helper/common.helper';
-import { ApiResponse } from 'src/helper/response.helper';
+import { encryptData } from '@/common/helper/common.helper';
+import { ApiResponse } from '@/common/helper/response.helper';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { GetCurrentUserId } from '@/common/decorators/current-user-id.decorator';
 import {
