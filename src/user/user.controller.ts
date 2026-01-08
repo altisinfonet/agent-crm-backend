@@ -10,6 +10,9 @@ import { File as MulterFile } from 'multer';
 import { ApiResponse } from '@/common/helper/response.helper';
 import { buildUserRootFolder, decryptData, encryptData } from '@/common/helper/common.helper';
 import { R2Service } from '@/common/helper/r2.helper';
+import { Account } from '@/common/enum/account.enum';
+import { AccountStatus } from '@/common/decorators/status.decorator';
+import { AccountStatusGuard } from '@/common/guards/status.guard';
 
 @Controller({ path: 'user', version: '1' })
 export class UserController {
@@ -25,7 +28,8 @@ export class UserController {
     return this.userService.findAll();
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AccountStatusGuard)
+  @AccountStatus(Account.ACTIVE)
   @Get('me')
   async getCurrentUser(
     @GetCurrentUserId() userId: bigint,
@@ -44,7 +48,8 @@ export class UserController {
   }
 
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AccountStatusGuard)
+  @AccountStatus(Account.ACTIVE)
   @Patch('profile')
   async updateUserProfile(
     @GetCurrentUserId() userId: bigint,
@@ -63,7 +68,8 @@ export class UserController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AccountStatusGuard)
+  @AccountStatus(Account.ACTIVE)
   @Patch("profile-pic")
   @UseInterceptors(FileInterceptor("image", upload))
   async editUser(
@@ -112,7 +118,8 @@ export class UserController {
   }
 
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AccountStatusGuard)
+  @AccountStatus(Account.ACTIVE)
   @Post("kyc")
   @UseInterceptors(
     FileFieldsInterceptor(
@@ -184,7 +191,8 @@ export class UserController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AccountStatusGuard)
+  @AccountStatus(Account.ACTIVE)
   @Get("kyc")
   async getAgentKYCDetails(
     @GetCurrentUserId() userId: bigint,

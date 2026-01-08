@@ -6,6 +6,9 @@ import { ApiResponse } from '@/common/helper/response.helper';
 import type { Request, Response } from 'express';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { GetCurrentUserId } from 'src/common/decorators/current-user-id.decorator';
+import { AccountStatusGuard } from '@/common/guards/status.guard';
+import { Account } from '@/common/enum/account.enum';
+import { AccountStatus } from '@/common/decorators/status.decorator';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -22,7 +25,8 @@ import {
 export class SubscriptionController {
   constructor(private readonly subscriptionService: SubscriptionService) { }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AccountStatusGuard)
+  @AccountStatus(Account.ACTIVE)
   @Get('plans')
   @ApiOperation({ summary: 'Get all available subscription plans' })
   @SwaggerApiResponse({ status: 200, description: 'Subscription plans fetched successfully' })
@@ -40,7 +44,8 @@ export class SubscriptionController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AccountStatusGuard)
+  @AccountStatus(Account.ACTIVE)
   @Post('subscribe/:id')
   @ApiOperation({ summary: 'Subscribe to a plan' })
   @ApiParam({ name: 'id', description: 'Subscription plan ID', example: 1 })
@@ -78,7 +83,8 @@ export class SubscriptionController {
   }
 
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AccountStatusGuard)
+  @AccountStatus(Account.ACTIVE)
   @Post('upgrade')
   @ApiOperation({ summary: 'Upgrade current subscription plan' })
   @ApiBody({ type: CommonDto })
@@ -98,7 +104,8 @@ export class SubscriptionController {
   }
 
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AccountStatusGuard)
+  @AccountStatus(Account.ACTIVE)
   @Post('cancel')
   @ApiOperation({ summary: 'Cancel active subscription (at cycle end)' })
   @SwaggerApiResponse({ status: 200, description: 'Subscription cancellation requested' })

@@ -6,6 +6,9 @@ import { ApiResponse } from '@/common/helper/response.helper';
 import type { Response } from 'express';
 import { GetCurrentUserId } from 'src/common/decorators/current-user-id.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
+import { AccountStatusGuard } from '@/common/guards/status.guard';
+import { AccountStatus } from '@/common/decorators/status.decorator';
+import { Account } from '@/common/enum/account.enum';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -18,7 +21,8 @@ import {
 @ApiTags('Agent - Meetings')
 @ApiBearerAuth('access-token')
 @Controller({ path: 'meeting', version: '1' })
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, AccountStatusGuard)
+@AccountStatus(Account.ACTIVE)
 export class MeetingController {
   constructor(private readonly meetingService: MeetingService) { }
 

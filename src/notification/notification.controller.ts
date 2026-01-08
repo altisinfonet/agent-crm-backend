@@ -14,12 +14,16 @@ import {
   ApiBody,
   ApiResponse as SwaggerApiResponse,
 } from '@nestjs/swagger';
+import { Account } from '@/common/enum/account.enum';
+import { AccountStatus } from '@/common/decorators/status.decorator';
+import { AccountStatusGuard } from '@/common/guards/status.guard';
 
 
 @ApiTags('Agent - Notifications')
 @ApiBearerAuth('access-token')
 @Controller({ path: 'notification', version: '1' })
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, AccountStatusGuard)
+@AccountStatus(Account.ACTIVE)
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) { }
 

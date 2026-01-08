@@ -17,7 +17,7 @@ registerHandlebarsHelpers();
                 transport: {
                     host: config.get<string>('MAIL_HOST'),
                     port: config.get<string>('MAIL_PORT'),
-                    secure: false, // true for 465, false for 587
+                    secure: config.get('MAIL_PORT') === '465',
                     // service: "gmail",
                     auth: {
                         user: config.get<string>('MAIL_USER'),

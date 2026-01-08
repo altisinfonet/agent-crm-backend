@@ -91,7 +91,7 @@ export async function generateRandomID(length = 12) {
 }
 
 export const decryptData = (data: any) => {
-    const secretKey = process.env.PUBLIC_ENCRYPTION_KEY;
+    const secretKey = process.env.PRIVATE_ENCRYPTION_KEY;
     if (!secretKey) {
         console.error("Decryption key is missing!");
         return null;
@@ -109,7 +109,7 @@ export const decryptData = (data: any) => {
 };
 
 export const encryptData = (data: any) => {
-    const secretKey = process.env.PUBLIC_ENCRYPTION_KEY;
+    const secretKey = process.env.PRIVATE_ENCRYPTION_KEY;
 
     if (!secretKey) {
         console.error("Encryption key not found");

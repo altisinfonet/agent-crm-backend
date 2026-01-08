@@ -14,10 +14,14 @@ import {
   ApiBody,
   ApiResponse as SwaggerApiResponse,
 } from '@nestjs/swagger';
+import { AccountStatusGuard } from '@/common/guards/status.guard';
+import { Account } from '@/common/enum/account.enum';
+import { AccountStatus } from '@/common/decorators/status.decorator';
 
 @ApiTags('Agent - Todos')
 @ApiBearerAuth('access-token')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, AccountStatusGuard)
+@AccountStatus(Account.ACTIVE)
 @Controller({ path: 'todo', version: '1' })
 export class TodoController {
   constructor(private readonly todoService: TodoService) { }

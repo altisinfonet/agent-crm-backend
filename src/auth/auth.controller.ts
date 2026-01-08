@@ -63,7 +63,6 @@ export class AuthController {
     ) {
         try {
             const loginData = await this.authService.auth(loginDto, req);
-            // this.setCookies(res, tokens);
 
             let result = JSON.stringify(loginData, (key, value) =>
                 typeof value === 'bigint' ? value.toString() : value,

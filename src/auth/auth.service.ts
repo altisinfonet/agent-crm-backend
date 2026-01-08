@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CryptoUtil } from 'src/common/utils/crypto.util';
-import { decryptData, encryptData, generateRandomID } from '@/common/helper/common.helper';
+import { decryptData, encryptData, generateRandomID, hashPassword } from '@/common/helper/common.helper';
 import { CommonDto } from './dto/common.dto';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -89,12 +89,17 @@ export class AuthService {
             throw new BadRequestException('Auth method required');
         }
 
-
-        await this.verifyAuth(payload, req.ip as string);
+        if (
+            auth_method === 'EMAIL_PW' ||
+            auth_method === 'EMAIL_OTP' ||
+            auth_method === 'PHONE_OTP'
+        ) {
+            await this.verifyAuth(payload, req.ip as string);
+        }
 
         const where: any = {};
 
-        if ((auth_method === 'EMAIL_OTP' || auth_method === "EMAIL_PW") && email) {
+        if ((auth_method === 'EMAIL_PW' || auth_method === 'EMAIL_OTP' || auth_method === 'GOOGLE' || auth_method === 'APPLE') && email) {
             where.email = email.toLowerCase();
         }
 
@@ -102,14 +107,6 @@ export class AuthService {
             where.phone_no = phone_no;
         }
 
-        if (
-            (auth_method === 'GOOGLE' || auth_method === 'APPLE') &&
-            provider_id
-        ) {
-            where.provider_id = provider_id;
-        }
-
-        // 4️⃣ Find user
         let user: any = await this.prisma.user.findUnique({
             where,
             select: {
@@ -118,6 +115,7 @@ export class AuthService {
                 last_name: true,
                 email: true,
                 phone_no: true,
+                provider_id: true,
                 role: {
                     select: {
                         id: true,
@@ -128,7 +126,21 @@ export class AuthService {
             },
         });
 
-        // 5️⃣ Register if not exists
+        if (auth_method === 'GOOGLE' || auth_method === 'APPLE') {
+            if (!provider_id) {
+                throw new BadRequestException('Provider ID required');
+            }
+
+            if (user) {
+                const ok = await bcrypt.compare(provider_id, user.provider_id);
+                if (!ok) {
+                    await handleAuthFailure(email, req.ip as string);
+                    throw new UnauthorizedException('Invalid credentials');
+                }
+                await resetAuthLimits(email, req.ip as string);
+            }
+        }
+
         if (!user) {
             user = await this.prisma.user.create({
                 data: {
@@ -137,7 +149,10 @@ export class AuthService {
                     email: email?.toLowerCase(),
                     phone_no,
                     auth_method: auth_method,
-                    provider_id,
+                    provider_id:
+                        auth_method === 'GOOGLE' || auth_method === 'APPLE'
+                            ? await hashPassword(provider_id)
+                            : null,
                     role_id: BigInt(2),
                     country_id: 1,
                     currency_id: 1
@@ -195,64 +210,8 @@ export class AuthService {
         };
     }
 
-    // private async verifyAuth(payload: any) {
-    //     const { auth_method, otp, email, phone_no, password, provider_id } = payload;
-    //     const verifyOtp: any = {
-    //         otp
-    //     }
-    //     try {
-    //         if (auth_method === 'EMAIL_PW') {
-    //             const user = await this.prisma.user.findUnique({
-    //                 where: { email },
-    //             });
-    //             if (!user) {
-    //                 throw new UnauthorizedException('Invalid credentials');
-    //             }
-    //             const passwordMatches = await bcrypt.compare(password, user.password);
-    //             if (!passwordMatches) {
-    //                 throw new UnauthorizedException('Invalid credentials');
-    //             }
-    //             return true;
-    //         }
-
-    //         if (auth_method === 'EMAIL_OTP') {
-    //             if (!email || !otp) {
-    //                 throw new BadRequestException('Email and OTP are required.');
-    //             }
-
-    //             verifyOtp.credential = email;
-    //             verifyOtp.is_email = true;
-    //             await this.otpService.verifyOtp(verifyOtp);
-    //             return;
-    //         }
-
-    //         if (auth_method === 'PHONE_OTP') {
-    //             if (!phone_no || !otp) {
-    //                 throw new BadRequestException('Phone number and OTP are required.');
-    //             }
-
-    //             verifyOtp.credential = phone_no;
-    //             verifyOtp.is_email = false;
-    //             await this.otpService.verifyOtp(verifyOtp);
-    //             return;
-    //         }
-
-    //         if (auth_method === 'GOOGLE' || auth_method === 'APPLE') {
-    //             if (!provider_id) {
-    //                 throw new BadRequestException('Provider ID is required.');
-    //             }
-    //             // Provider token already verified upstream
-    //             return;
-    //         }
-
-    //         throw new BadRequestException('Invalid authentication method.');
-    //     } catch (e) {
-    //         throw new UnauthorizedException(e.message || 'Invalid credentials');
-    //     }
-    // }
-
     private async verifyAuth(payload: any, ip: string) {
-        const { auth_method, otp, email, phone_no, password, provider_id } = payload;
+        const { auth_method, otp, email, phone_no, password } = payload;
 
         const identifier =
             auth_method === 'EMAIL_PW' || auth_method === 'EMAIL_OTP'
@@ -264,7 +223,9 @@ export class AuthService {
         try {
             // ========== EMAIL PASSWORD ==========
             if (auth_method === 'EMAIL_PW') {
-                const user = await this.prisma.user.findUnique({ where: { email } });
+                const user = await this.prisma.user.findUnique({
+                    where: { email: email.toLowerCase() },
+                });
 
                 if (!user) {
                     await handleAuthFailure(identifier, ip);
@@ -283,7 +244,7 @@ export class AuthService {
             // ========== EMAIL OTP ==========
             if (auth_method === 'EMAIL_OTP') {
                 if (!email || !otp) {
-                    throw new BadRequestException('Email and OTP are required');
+                    throw new BadRequestException('Email and OTP required');
                 }
 
                 verifyOtp.credential = email;
@@ -298,23 +259,13 @@ export class AuthService {
             // ========== PHONE OTP ==========
             if (auth_method === 'PHONE_OTP') {
                 if (!phone_no || !otp) {
-                    throw new BadRequestException('Phone number and OTP are required');
+                    throw new BadRequestException('Phone number and OTP required');
                 }
 
                 verifyOtp.credential = phone_no;
                 verifyOtp.is_email = false;
 
                 await this.otpService.verifyOtp(verifyOtp);
-
-                await resetAuthLimits(identifier, ip);
-                return true;
-            }
-
-            // ========== SOCIAL LOGIN ==========
-            if (auth_method === 'GOOGLE' || auth_method === 'APPLE') {
-                if (!provider_id) {
-                    throw new BadRequestException('Provider ID is required');
-                }
 
                 await resetAuthLimits(identifier, ip);
                 return true;

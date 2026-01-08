@@ -6,6 +6,9 @@ import { ApiResponse } from '@/common/helper/response.helper';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { GetCurrentUserId } from '@/common/decorators/current-user-id.decorator';
+import { AccountStatus } from '@/common/decorators/status.decorator';
+import { AccountStatusGuard } from '@/common/guards/status.guard';
+import { Account } from '@/common/enum/account.enum';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -17,7 +20,8 @@ import {
 
 @ApiTags('Agent - Customers')
 @ApiBearerAuth('access-token')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, AccountStatusGuard)
+@AccountStatus(Account.ACTIVE)
 @Controller({ path: 'customer', version: '1' })
 export class CustomerController {
   constructor(private readonly customerService: CustomerService) { }

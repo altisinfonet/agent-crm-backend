@@ -6,6 +6,9 @@ import { encryptData } from '@/common/helper/common.helper';
 import { ApiResponse } from '@/common/helper/response.helper';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { GetCurrentUserId } from '@/common/decorators/current-user-id.decorator';
+import { AccountStatusGuard } from '@/common/guards/status.guard';
+import { Account } from '@/common/enum/account.enum';
+import { AccountStatus } from '@/common/decorators/status.decorator';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -58,7 +61,8 @@ export class ProductsController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AccountStatusGuard)
+  @AccountStatus(Account.ACTIVE)
   @Post('agent/product/entity/:id')
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Create agent product entity (Agent only)' })
@@ -80,7 +84,8 @@ export class ProductsController {
     }
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AccountStatusGuard)
+  @AccountStatus(Account.ACTIVE)
   @Get('agent/product-entity/list')
   @ApiOperation({ summary: 'Get All Agent product entities' })
   @ApiBody({ type: CommonDto })
@@ -105,7 +110,8 @@ export class ProductsController {
     return this.productsService.update(+id, updateProductDto);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AccountStatusGuard)
+  @AccountStatus(Account.ACTIVE)
   @Delete('agent/product-entity/:id')
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Delete agent product entity (Agent only)' })

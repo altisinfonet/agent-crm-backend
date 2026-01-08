@@ -287,7 +287,7 @@ model User {
     image                String?
     dob                  DateTime?
     auth_method          AuthType
-    provider_id          String?
+    provider_id          String?              @unique
     status               Status               @default(ACTIVE)
     refresh_token        String?
     reset_token          String?              @unique

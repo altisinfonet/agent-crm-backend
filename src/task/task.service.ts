@@ -5,6 +5,8 @@ import Razorpay = require("razorpay");
 import { SettingsService } from 'src/settings/settings.service';
 import { NotificationService } from '@/notification/notification.service';
 import { MailService } from '@/mail/mail.service';
+import { addWeeks, addMonths, addYears, differenceInCalendarDays } from 'date-fns';
+import { SubscriptionCycle } from '@generated/prisma';
 
 
 @Injectable()
@@ -100,16 +102,17 @@ export class TaskService {
         }
     }
 
-    @Cron(CronExpression.EVERY_DAY_AT_9AM)
+    @Cron(CronExpression.EVERY_DAY_AT_10AM)
     async sendSubscriptionExpiryReminders() {
         try {
-            const REMINDER_DAYS = [7, 3, 0];
+            const REMINDER_DAYS = [3, 0];
             const today = new Date();
 
             const subscriptions =
                 await this.prisma.organizationSubscription.findMany({
                     where: {
-                        status: "ACTIVE",
+                        status: 'ACTIVE',
+                        auto_renew: true,
                         end_at: {
                             gte: today,
                         },
@@ -129,17 +132,21 @@ export class TaskService {
                         plan: {
                             select: {
                                 name: true,
+                                billing_cycle: true,
                             },
                         },
                     },
                 });
 
             for (const sub of subscriptions) {
-                if (!sub.end_at) continue;
+                if (!sub.start_at || !sub.end_at) continue;
 
-                const daysLeft = Math.ceil(
-                    (sub.end_at.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+                const cycleEndDate = this.getCurrentCycleEndDate(
+                    sub.start_at,
+                    sub.plan.billing_cycle,
+                    today
                 );
+                const daysLeft = differenceInCalendarDays(cycleEndDate, today);
 
                 if (!REMINDER_DAYS.includes(daysLeft)) continue;
 
@@ -150,15 +157,17 @@ export class TaskService {
                 if (!user?.email) continue;
 
                 const userName = `${user.first_name} ${user.last_name}`.trim();
-                const renewalLink = `${process.env.WEB_BASE_PATH}`
+                const renewalLink = `${process.env.WEB_BASE_PATH}`;
+
                 await this.mailService.sendSubscriptionExpiryReminder({
                     to: user.email,
                     name: userName,
                     planName: sub.plan.name,
-                    expiryDate: sub.end_at,
+                    expiryDate: cycleEndDate,
                     daysLeft,
-                    renewalLink: renewalLink
+                    renewalLink,
                 });
+
                 await this.prisma.organizationSubscription.update({
                     where: { id: sub.id },
                     data: {
@@ -169,8 +178,40 @@ export class TaskService {
                 });
             }
         } catch (error) {
-            console.error("Subscription reminder error:", error);
+            console.error('Subscription cycle reminder error:', error);
         }
+    }
+
+    private getCurrentCycleEndDate(
+        startAt: Date,
+        billingCycle: SubscriptionCycle,
+        today: Date
+    ): Date {
+        let cycleEnd = new Date(startAt);
+
+        while (cycleEnd <= today) {
+            switch (billingCycle) {
+                case SubscriptionCycle.WEEKLY:
+                    cycleEnd = addWeeks(cycleEnd, 1);
+                    break;
+
+                case SubscriptionCycle.MONTHLY:
+                    cycleEnd = addMonths(cycleEnd, 1);
+                    break;
+
+                case SubscriptionCycle.QUARTERLY:
+                    cycleEnd = addMonths(cycleEnd, 3);
+                    break;
+
+                case SubscriptionCycle.YEARLY:
+                    cycleEnd = addYears(cycleEnd, 1);
+                    break;
+
+                default:
+                    throw new Error(`Unsupported billing cycle: ${billingCycle}`);
+            }
+        }
+        return cycleEnd;
     }
 
 

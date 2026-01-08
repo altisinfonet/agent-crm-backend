@@ -21,7 +21,6 @@ const storage = multer.diskStorage({
             ext = '.' + file.mimetype.split('/')[1];
         }
         const filename = `${uuidv4()}-${Date.now()}${ext}`
-        console.log("filename++++++", filename);
 
         cb(null, filename);
     }
