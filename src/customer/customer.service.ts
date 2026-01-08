@@ -11,8 +11,6 @@ export class CustomerService {
   async create(agent_id: bigint, createCustomerDto: CommonDto) {
     try {
       const payload = decryptData(createCustomerDto.data);
-      console.log(payload, "payload");
-
       const {
         firstName,
         lastName,
@@ -64,6 +62,35 @@ export class CustomerService {
       });
 
       return customer;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async updateCustomer(agent_id: bigint, customer_id: bigint, createCustomerDto: CommonDto) {
+    try {
+      const payload = decryptData(createCustomerDto.data);
+      const {
+        firstName,
+        lastName,
+        email,
+        phone,
+        aadhaarNumber,
+        panNumber,
+        address,
+      } = payload;
+
+      const org = await this.prisma.organization.findUnique({
+        where: { created_by: agent_id },
+        select: {
+          id: true,
+        },
+      });
+
+      if (!org?.id) {
+        throw new BadRequestException("Agent organization not found");
+      }
+
     } catch (error) {
       throw error;
     }
@@ -179,8 +206,6 @@ export class CustomerService {
         return sale;
       });
     } catch (error) {
-      console.log("error", error);
-
       throw error;
     }
   }

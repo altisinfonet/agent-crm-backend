@@ -40,6 +40,26 @@ export class CustomerController {
     }
   }
 
+  @Patch(':id')
+  @ApiOperation({ summary: 'Update customer details' })
+  @ApiParam({ name: 'id', description: 'Customer ID', example: 1 })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Customer details updated successfully' })
+  async updateCustomer(@Res() res: Response, @GetCurrentUserId() userId: bigint, @Param('id') customer_id: string, @Body() updateCustomerDto: CommonDto) {
+    try {
+      const customer = await this.customerService.updateCustomer(userId, BigInt(customer_id), updateCustomerDto);
+      let result = JSON.stringify(customer, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Customer details updated successfully."));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error: any) {
+      throw new BadRequestException(error.response);
+    }
+  }
+
+
   @Post('sale/:id')
   @ApiOperation({ summary: 'Sell product to a customer' })
   @ApiParam({ name: 'id', description: 'Customer ID', example: 1 })

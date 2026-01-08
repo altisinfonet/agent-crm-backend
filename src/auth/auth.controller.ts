@@ -17,6 +17,7 @@ import {
     ApiBody,
     ApiBearerAuth,
     ApiResponse as SwaggerApiResponse,
+    ApiExcludeEndpoint,
 } from '@nestjs/swagger';
 
 
@@ -27,6 +28,28 @@ export class AuthController {
         private readonly authService: AuthService,
         private config: ConfigService,
     ) { }
+
+    @ApiOperation({ summary: 'Check user is exists or not using cherentials ' })
+    @SwaggerApiResponse({ status: 200, description: 'User checked' })
+    @Post('check')
+    @HttpCode(HttpStatus.OK)
+    async check(
+        @Body() dto: CommonDto,
+        @Res({ passthrough: true }) res: Response) {
+        try {
+            const check = await this.authService.checkUser(dto);
+
+            let result = JSON.stringify(check, (key, value) =>
+                typeof value === 'bigint' ? value.toString() : value,
+            );
+            const resData = encryptData(new ApiResponse((JSON.parse(result)), "User checked."));
+            return res.status(HttpStatus.OK).json({ data: resData });
+        } catch (error: any) {
+            throw new BadRequestException(error.response);
+        }
+    }
+
+
     @ApiOperation({ summary: 'Login using password, OTP, Google, or Apple' })
     @ApiBody({ type: CommonDto })
     @SwaggerApiResponse({ status: 200, description: 'Login successful' })
@@ -152,7 +175,7 @@ export class AuthController {
             throw new BadRequestException(error.response);
         }
     }
-
+    @ApiExcludeEndpoint()
     @HttpCode(HttpStatus.CREATED)
     @Post('test-encryption')
     async TestEncryption(@Res() res: Response, @Body() body: any) {
@@ -167,7 +190,7 @@ export class AuthController {
             throw new BadRequestException(error.response);
         }
     }
-
+    @ApiExcludeEndpoint()
     @HttpCode(HttpStatus.CREATED)
     @Post('test-decryption')
     async TestDecryption(@Res() res: Response, @Body() body: any) {

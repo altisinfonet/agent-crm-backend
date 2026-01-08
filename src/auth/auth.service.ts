@@ -24,10 +24,55 @@ export class AuthService {
         private otpService: OtpService
     ) { }
 
+    async checkUser(commonDto: CommonDto) {
+        try {
+            const payload = decryptData(commonDto.data);
+            const { credential } = payload;
+
+            if (!credential) {
+                return {
+                    is_exists: false,
+                    is_admin: false,
+                };
+            }
+            const normalizedCredential = credential.trim();
+            const user = await this.prisma.user.findFirst({
+                where: {
+                    OR: [
+                        { email: { equals: normalizedCredential, mode: "insensitive" } },
+                        { phone_no: normalizedCredential },
+                    ],
+                    is_deleted: false,
+                },
+                select: {
+                    id: true,
+                    email: true,
+                    phone_no: true,
+                    role: {
+                        select: {
+                            name: true,
+                        },
+                    },
+                },
+            });
+
+            const data = {
+                // id: user?.id,
+                // email: user?.email,
+                // phone_no: user?.phone_no,
+                is_exists: !!user,
+                is_admin: user?.role?.name === "ADMIN",
+            }
+
+            return data;
+        } catch (error) {
+            throw error;
+        }
+    }
+
+
     async auth(commonDto: CommonDto, req: Request): Promise<Tokens> {
-        console.log("commonDto", commonDto);
         const payload = decryptData(commonDto.data);
-        console.log("payload", payload);
 
         const {
             auth_method,

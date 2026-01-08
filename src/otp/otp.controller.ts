@@ -4,7 +4,8 @@ import { ApiResponse } from '@/common/helper/response.helper';
 import type { Request, Response } from 'express';
 import { CommonDto } from 'src/auth/dto/common.dto';
 import { verifyOtpDto } from './dto/verify-otp.dto';
-
+import { ApiExcludeEndpoint, ApiTags } from '@nestjs/swagger';
+@ApiTags('OTP')
 @Controller({ path: 'otp', version: '1' })
 export class OtpController {
   constructor(private readonly otpService: OtpService) { }
@@ -39,11 +40,13 @@ export class OtpController {
   }
 
   @Get(':id')
+  @ApiExcludeEndpoint()
   findOne(@Param('id') id: string) {
     return this.otpService.findOne(+id);
   }
 
   @Delete(':id')
+  @ApiExcludeEndpoint()
   remove(@Param('id') id: string) {
     return this.otpService.remove(+id);
   }

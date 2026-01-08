@@ -126,11 +126,96 @@ export class ProductsService {
     }
   }
 
+  async findAllAgentProductEntityList(agent_id: bigint) {
+    try {
+      const agentProductEntity =
+        await this.prisma.agentProductEntity.findMany({
+          where: { agent_id },
+          orderBy: {
+            created_at: "desc"
+          },
+          select: {
+            id: true,
+            productEntity: {
+              select: {
+                id: true,
+                name: true,
+                slug: true,
+                status: true,
+                products: {
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                    status: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+      // const groupedData = Object.values(
+      //   agentProductEntity.reduce((acc, item) => {
+      //     const product = item.productEntity.products;
+      //     const entity = item.productEntity;
+
+      //     const productKey = product.id.toString();
+
+      //     if (!acc[productKey]) {
+      //       acc[productKey] = {
+      //         id: item.id,
+      //         product: {
+      //           id: product.id.toString(),
+      //           name: product.name,
+      //           slug: product.slug,
+      //           status: product.status,
+      //           entities: [],
+      //         },
+      //       };
+      //     }
+
+      //     acc[productKey].product.entities.push({
+      //       id: entity.id.toString(),
+      //       name: entity.name,
+      //       slug: entity.slug,
+      //       status: entity.status,
+      //     });
+
+      //     return acc;
+      //   }, {} as Record<string, any>)
+      // );
+      // return groupedData;
+      return agentProductEntity;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+
   update(id: number, updateProductDto: CommonDto) {
     return `This action updates a #${id} product`;
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} product`;
+  async remove(agent_id: bigint, agent_product_entity_id: bigint) {
+    try {
+      const findEntity = await this.prisma.agentProductEntity.findFirst({
+        where: {
+          id: agent_product_entity_id,
+          agent_id
+        }
+      })
+      if (!findEntity) {
+        throw new BadRequestException("Agent product entity not found")
+      }
+      const removeAgentEntity = await this.prisma.agentProductEntity.delete({
+        where: {
+          id: findEntity?.id,
+        }
+      })
+      return true;
+    } catch (error) {
+      throw error
+    }
   }
 }

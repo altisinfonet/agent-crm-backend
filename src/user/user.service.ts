@@ -19,53 +19,106 @@ export class UserService {
   }
 
   async getCurrentUser(userId: bigint) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        first_name: true,
-        last_name: true,
-        email: true,
-        phone_no: true,
-        image: true,
-        auth_method: true,
-        role: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        is_deleted: true,
-        is_temporary: true,
-        created_at: true,
-      },
-    });
-
-    if (!user) {
-      throw new NotFoundException("User not found");
-    }
-
-    const isAgent = user.role?.name === "AGENT";
-    if (isAgent) {
-      const agentData = await this.prisma.user.findUnique({
+    try {
+      const user = await this.prisma.user.findUnique({
         where: { id: userId },
         select: {
-          country: true,
-          currency: true,
+          id: true,
+          first_name: true,
+          last_name: true,
+          email: true,
+          phone_no: true,
+          image: true,
+          auth_method: true,
+          role: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          is_deleted: true,
+          is_temporary: true,
+          created_at: true,
         },
       });
 
-      Object.assign(user, agentData);
-    }
+      if (!user) {
+        throw new NotFoundException("User not found");
+      }
 
-    if (user.image) {
-      user.image = await R2Service.getSignedUrl(user.image);
-    }
+      const isAgent = user.role?.name === "AGENT";
+      if (isAgent) {
+        const agentData = await this.prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            country: true,
+            currency: true,
+          },
+        });
 
-    return user;
+        Object.assign(user, agentData);
+      }
+
+      if (user.image) {
+        user.image = await R2Service.getSignedUrl(user.image);
+      }
+
+      return user;
+    } catch (error) {
+      throw error
+    }
   }
 
+  //   async getCurrentUser(userId: bigint) {
+  //   try {
+  //     const user = await this.prisma.user.findUnique({
+  //       where: { id: userId },
+  //       select: {
+  //         id: true,
+  //         first_name: true,
+  //         last_name: true,
+  //         email: true,
+  //         phone_no: true,
+  //         image: true,
+  //         auth_method: true,
+  //         is_deleted: true,
+  //         is_temporary: true,
+  //         created_at: true,
+  //         role: {
+  //           select: {
+  //             id: true,
+  //             name: true,
+  //           },
+  //         },
+  //         country: true,
+  //         currency: true,
+  //       },
+  //     });
 
+  //     if (!user) {
+  //       throw new NotFoundException("User not found");
+  //     }
+
+  //     const timezone =
+  //       user.country?.timezone ||
+  //       process.env.DEFAULT_TIMEZONE ||
+  //       "UTC";
+
+  //     const formattedUser = {
+  //       ...user,
+  //       created_at: convertUTCToTimezone(user.created_at, timezone),
+  //     };
+
+  //     if (user.image) {
+  //       formattedUser.image = await R2Service.getSignedUrl(user.image);
+  //     }
+
+  //     return formattedUser;
+
+  //   } catch (error) {
+  //     throw error
+  //   }
+  // }
 
   async getUserForUpload(userId: bigint) {
     const user = await this.prisma.user.findUnique({

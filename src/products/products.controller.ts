@@ -17,11 +17,11 @@ import {
 
 
 @ApiTags('Agent - Products')
-@Controller({ path: 'products', version: '1' })
+@Controller({ path: '', version: '1' })
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) { }
 
-  @Get('list')
+  @Get('products/list')
   @ApiOperation({ summary: 'Get all available products (Public)' })
   @SwaggerApiResponse({ status: 200, description: 'All products fetched successfully' })
   async findAll(@Res() res: Response) {
@@ -37,7 +37,7 @@ export class ProductsController {
     }
   }
 
-  @Put(':id/entity/list')
+  @Put('products/:id/entity/list')
   @ApiOperation({ summary: 'Get product entities by product ID (Public)' })
   @ApiParam({ name: 'id', description: 'Product ID', example: 1 })
   @ApiBody({ type: CommonDto })
@@ -59,7 +59,7 @@ export class ProductsController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Post('agent/entity/:id')
+  @Post('agent/product/entity/:id')
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Create agent product entity (Agent only)' })
   @ApiParam({ name: 'id', description: 'Product ID', example: 1 })
@@ -80,13 +80,50 @@ export class ProductsController {
     }
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Get('agent/product-entity/list')
+  @ApiOperation({ summary: 'Get All Agent product entities' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Product entity list fetched successfully' })
+  async findAllAgentProductEntityList(@Res() res: Response, @GetCurrentUserId() userId: bigint,) {
+    try {
+      const entity = await this.productsService.findAllAgentProductEntityList(userId);
+
+      let result = JSON.stringify(entity, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Get All Agent product entities"));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error: any) {
+      throw new BadRequestException(error.response);
+    }
+  }
+
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateProductDto: CommonDto) {
     return this.productsService.update(+id, updateProductDto);
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.productsService.remove(+id);
+  @UseGuards(JwtAuthGuard)
+  @Delete('agent/product-entity/:id')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Delete agent product entity (Agent only)' })
+  @ApiParam({ name: 'id', description: 'Agent product entity ID', example: 1 })
+  @SwaggerApiResponse({ status: 200, description: 'Agent product entity deleted successfully' })
+  async remove(@Res() res: Response, @GetCurrentUserId() userId: bigint, @Param('id') id: string,) {
+    try {
+      const entity = await this.productsService.remove(userId, BigInt(id));
+
+      let result = JSON.stringify(entity, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Agent product enetity deleted successfully."));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error: any) {
+      console.log('error: ', error);
+      throw new BadRequestException(error.response);
+    }
   }
 }
