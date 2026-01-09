@@ -19,6 +19,7 @@ import { NotificationModule } from './notification/notification.module';
 import { CustomerModule } from './customer/customer.module';
 import { TodoModule } from './todo/todo.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
+import { OrganizationModule } from './organization/organization.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { WhatsappModule } from './whatsapp/whatsapp.module';
     OtpModule,
     UserModule,
     ProductsModule,
+    OrganizationModule,
     SettingsModule,
     SubscriptionModule,
     MeetingModule,

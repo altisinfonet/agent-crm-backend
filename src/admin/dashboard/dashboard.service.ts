@@ -43,6 +43,90 @@ export class DashboardService {
     }
   }
 
+  async planUsage() {
+    try {
+      const totalActiveSubscriptions =
+        await this.prisma.organizationSubscription.count({
+          where: {
+            status: 'ACTIVE',
+          },
+        });
+
+      if (totalActiveSubscriptions === 0) {
+        return {
+          totalActiveSubscriptions: 0,
+          plans: [],
+        };
+      }
+
+      const planUsage = await this.prisma.organizationSubscription.groupBy({
+        by: ['plan_id'],
+        where: {
+          status: 'ACTIVE',
+          OR: [
+            {
+              end_at: {
+                gt: new Date(),
+              },
+            },
+            {
+              end_at: null,
+            },
+          ],
+        },
+        _count: {
+          _all: true,
+        },
+      });
+
+
+      const planIds = planUsage.map(p => p.plan_id);
+
+      const plans = await this.prisma.subscriptionPlan.findMany({
+        where: {
+          id: { in: planIds },
+        },
+        select: {
+          id: true,
+          code: true,
+          name: true,
+          billing_cycle: true,
+          price: true,
+          is_active: true,
+        },
+      });
+
+      const result = planUsage
+        .map(usage => {
+          const plan = plans.find(p => p.id === usage.plan_id);
+
+          const count = usage._count._all;
+          const percentage = Number(
+            ((count / totalActiveSubscriptions) * 100).toFixed(2),
+          );
+
+          return {
+            plan_id: usage.plan_id,
+            plan_code: plan?.code,
+            plan_name: plan?.name,
+            billing_cycle: plan?.billing_cycle,
+            price: plan?.price,
+            active_subscriptions: count,
+            percentage_share: percentage,
+          };
+        })
+        .sort((a, b) => b.active_subscriptions - a.active_subscriptions);
+
+      return {
+        totalActiveSubscriptions,
+        mostUsedPlan: result[0] ?? null,
+        plans: result,
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
   findAll() {
     return `This action returns all dashboard`;
   }

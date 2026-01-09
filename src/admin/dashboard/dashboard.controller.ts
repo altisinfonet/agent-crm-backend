@@ -7,6 +7,7 @@ import { Roles } from '@/common/decorators/roles.decorator';
 import { CommonDto } from '@/auth/dto/common.dto';
 import type { Response } from 'express';
 import { ApiResponse } from '@/common/helper/response.helper';
+import { encryptData } from '@/common/helper/common.helper';
 
 @Controller({ path: '', version: '1' })
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -36,13 +37,28 @@ export class DashboardController {
       let result = JSON.stringify(dashboard, (key, value) =>
         typeof value === 'bigint' ? value.toString() : value,
       );
-      return res.status(HttpStatus.OK).json(new ApiResponse(JSON.parse(result), "Dashboard."));
-
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Total Dashboard."));
+      return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error) {
       throw new BadRequestException(error?.response);
     }
   }
 
+
+  @Get("plans")
+  async planUsage(@Res() res: Response) {
+    try {
+      const dashboard = await this.dashboardService.planUsage();
+
+      let result = JSON.stringify(dashboard, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Dashboard plan usage limit."));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error) {
+      throw new BadRequestException(error?.response);
+    }
+  }
 
   @Get(':id')
   findOne(@Param('id') id: string) {

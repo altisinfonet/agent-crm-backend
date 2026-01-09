@@ -192,11 +192,6 @@ export class ProductsService {
     }
   }
 
-
-  update(id: number, updateProductDto: CommonDto) {
-    return `This action updates a #${id} product`;
-  }
-
   async remove(agent_id: bigint, agent_product_entity_id: bigint) {
     try {
       const findEntity = await this.prisma.agentProductEntity.findFirst({

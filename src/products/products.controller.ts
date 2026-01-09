@@ -105,11 +105,6 @@ export class ProductsController {
     }
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateProductDto: CommonDto) {
-    return this.productsService.update(+id, updateProductDto);
-  }
-
   @UseGuards(JwtAuthGuard, AccountStatusGuard)
   @AccountStatus(Account.ACTIVE)
   @Delete('agent/product-entity/:id')
