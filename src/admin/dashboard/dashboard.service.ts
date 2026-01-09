@@ -128,7 +128,7 @@ export class DashboardService {
   }
 
   findAll() {
-    return `This action returns all dashboard`;
+
   }
 
   findOne(id: number) {

@@ -327,7 +327,7 @@ export class AuthService {
         });
 
         if (!session) {
-            throw new UnauthorizedException('Invalid credentials');
+            throw new UnauthorizedException('Session expired');
         }
 
         // rotate refresh token

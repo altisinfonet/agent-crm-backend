@@ -57,8 +57,23 @@ export class ProductsService {
         select: {
           id: true,
           name: true,
+          slug: true,
           status: true,
-          created_at: true
+          created_at: true,
+          _count: {
+            select: {
+              entities: true,
+            }
+          },
+          entities: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              status: true,
+              created_at: true,
+            }
+          },
         }
       })
       return products;
