@@ -31,7 +31,11 @@ export class AuthRateLimitGuard implements CanActivate {
 
         if (ttl > 0) {
             throw new HttpException(
-                `Too many failed attempts. Try again after ${ttl} seconds.`,
+                {
+                    message: `Too many failed attempts. Try again after ${ttl} seconds.`,
+                    retry_after_seconds: ttl,
+                    statusCode: HttpStatus.TOO_MANY_REQUESTS,
+                },
                 HttpStatus.TOO_MANY_REQUESTS,
             );
         }

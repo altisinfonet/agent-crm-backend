@@ -127,6 +127,12 @@ export class UserService {
         id: true,
         first_name: true,
         last_name: true,
+        role: {
+          select: {
+            id: true,
+            name: true,
+          }
+        },
         agentKYC: {
           select: {
             pan_number: true,
@@ -179,7 +185,7 @@ export class UserService {
 
       const hasOld = !!old_password;
       const hasNew = !!new_password;
-
+      let passwordChanged = false;
       if (hasOld || hasNew) {
         if (!hasOld) {
           throw new BadRequestException('Old password is required');
@@ -199,22 +205,25 @@ export class UserService {
           throw new BadRequestException('Old password is incorrect');
         }
         updateData.password = await hashPassword(new_password);
+        passwordChanged = true;
       }
 
       await this.prisma.user.update({
         where: { id: userId },
         data: updateData,
       });
-      await this.prisma.userSession.updateMany({
-        where: {
-          user_id: userId,
-          revoked: false,
-        },
-        data: {
-          revoked: true,
-          last_used_at: new Date(),
-        },
-      });
+      if (passwordChanged) {
+        await this.prisma.userSession.updateMany({
+          where: {
+            user_id: userId,
+            revoked: false,
+          },
+          data: {
+            revoked: true,
+            last_used_at: new Date(),
+          },
+        });
+      }
       return this.getCurrentUser(userId);
     } catch (error) {
       console.log("error", error);

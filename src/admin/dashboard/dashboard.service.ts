@@ -30,11 +30,21 @@ export class DashboardService {
         }
       })
 
+      const totalInactiveAgents = await this.prisma.user.count({
+        where: {
+          role_id: {
+            in: [2]
+          },
+          status: "INACTIVE"
+        }
+      })
+
       const totalCustomers = await this.prisma.customer.count({})
 
       return {
         TotalAgents: totalAgents,
         TotalActiveAgents: totalActiveAgents,
+        TotalInactiveAgents: totalInactiveAgents,
         TotalCustomers: totalCustomers,
 
       }

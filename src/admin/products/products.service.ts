@@ -1,14 +1,104 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CommonDto } from 'src/auth/dto/common.dto';
-import { createMetaData, decryptData, generateSlug } from '@/common/helper/common.helper';
+import { decryptData, generateSlug } from '@/common/helper/common.helper';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { R2Service } from '@/common/helper/r2.helper';
 
 
 @Injectable()
 export class ProductsService {
   constructor(private readonly prisma: PrismaService) { }
 
-  async create(product_id: bigint, dto: CommonDto) {
+  async updateProducts(product_id: bigint, dto: CommonDto, file?: { key?: string },) {
+    try {
+      const payload = decryptData(dto.data);
+      const dataToUpdate: any = {};
+
+      if (payload?.delete === true) {
+        dataToUpdate.image = null;
+      } else if (file?.key) {
+        dataToUpdate.image = file.key;
+      }
+
+      if (
+        typeof payload?.desc === 'string' &&
+        payload.desc.trim().length > 0
+      ) {
+        dataToUpdate.desc = payload.desc.trim();
+      }
+
+      const res = await this.prisma.products.update({
+        where: { id: product_id },
+        data: dataToUpdate,
+      });
+
+      return res;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async findById(id: bigint) {
+    return this.prisma.products.findUnique({
+      where: { id },
+      select: { image: true },
+    });
+  }
+
+  async findAllProducts() {
+    try {
+      const products = await this.prisma.products.findMany({
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          desc: true,
+          image: true,
+          status: true,
+          created_at: true,
+          _count: {
+            select: {
+              entities: true,
+            },
+          },
+          entities: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              desc: true,
+              image: true,
+              status: true,
+              created_at: true,
+            },
+          },
+        },
+      });
+
+      const result = await Promise.all(
+        products.map(async (product) => ({
+          ...product,
+          image: product.image
+            ? await R2Service.getSignedUrl(product.image)
+            : null,
+          entities: await Promise.all(
+            product.entities.map(async (entity) => ({
+              ...entity,
+              image: entity.image
+                ? await R2Service.getSignedUrl(entity.image)
+                : null,
+            })),
+          ),
+        })),
+      );
+
+      return result;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async create(product_id: bigint, dto: CommonDto, file?: { image?: string },) {
     try {
       const payload = decryptData(dto.data);
       const existingEntity = await this.prisma.productEntity.findFirst({
@@ -40,6 +130,8 @@ export class ProductsService {
         data: {
           name: payload.name,
           slug,
+          desc: payload?.desc,
+          image: file?.image ?? null,
           product_id,
           status: "ACTIVE",
         },
@@ -50,38 +142,6 @@ export class ProductsService {
       throw error;
     }
   };
-
-  async findAllProducts() {
-    try {
-      const products = await this.prisma.products.findMany({
-        select: {
-          id: true,
-          name: true,
-          slug: true,
-          status: true,
-          created_at: true,
-          _count: {
-            select: {
-              entities: true,
-            }
-          },
-          entities: {
-            select: {
-              id: true,
-              name: true,
-              slug: true,
-              status: true,
-              created_at: true,
-            }
-          },
-        }
-      })
-      return products;
-    } catch (error) {
-      throw error;
-    }
-  }
-
   async findAll(product_id: bigint, dto: CommonDto) {
     try {
       const payload = decryptData(dto.data);
@@ -153,7 +213,17 @@ export class ProductsService {
     }
   }
 
-  async update(id: bigint, updateEntityDto: CommonDto) {
+  async findEntityById(id: bigint) {
+    return this.prisma.productEntity.findUnique({
+      where: { id },
+      select: { image: true },
+    });
+  }
+  async updateEntity(
+    id: bigint,
+    updateEntityDto: CommonDto,
+    file?: { image?: string },
+  ) {
     try {
       const payload = decryptData(updateEntityDto.data);
       const entity = await this.prisma.productEntity.findUnique({
@@ -161,38 +231,50 @@ export class ProductsService {
       });
 
       if (!entity) {
-        throw new NotFoundException(`Entity not found`);
+        throw new NotFoundException('Entity not found');
       }
+      const dataToUpdate: any = {};
 
-      let slug = entity.slug;
-      if (payload.name && payload.name !== entity.name) {
-        const entitySlug = await generateSlug(
+      if (
+        typeof payload?.name === 'string' &&
+        payload.name.trim() &&
+        payload.name !== entity.name
+      ) {
+        let baseSlug = await generateSlug(
           payload.name,
           this.prisma.productEntity,
-          'slug'
+          'slug',
         );
 
-        slug = entitySlug;
+        let slug = baseSlug;
         let counter = 1;
 
         while (
-          await this.prisma.productEntity.findUnique({
-            where: { slug },
-          })
+          await this.prisma.productEntity.findUnique({ where: { slug } })
         ) {
-          slug = `${entitySlug}-${counter++}`;
+          slug = `${baseSlug}-${counter++}`;
         }
-      }
-      const updated = await this.prisma.productEntity.update({
-        where: { id },
-        data: {
-          name: payload.name ?? entity.name,
-          slug,
-          status: payload.status,
-        },
-      });
 
-      return updated
+        dataToUpdate.name = payload.name.trim();
+        dataToUpdate.slug = slug;
+      }
+
+      if (typeof payload?.desc === 'string') {
+        dataToUpdate.desc = payload.desc.trim();
+      }
+
+      if (payload?.status !== undefined) {
+        dataToUpdate.status = payload.status;
+      }
+
+      if (file?.image !== undefined) {
+        dataToUpdate.image = file.image;
+      }
+
+      return await this.prisma.productEntity.update({
+        where: { id },
+        data: dataToUpdate,
+      });
     } catch (error) {
       throw error;
     }
@@ -200,22 +282,30 @@ export class ProductsService {
 
 
   async remove(id: bigint) {
-    try {
-      const entity = await this.prisma.productEntity.findUnique({
-        where: { id },
-      });
+    const entity = await this.prisma.productEntity.findUnique({
+      where: { id },
+    });
 
-      if (!entity) {
-        throw new NotFoundException('Product entity not found');
-      }
-
-      await this.prisma.productEntity.delete({
-        where: { id },
-      });
-
-      return null;
-    } catch (error) {
-      throw error;
+    if (!entity) {
+      throw new NotFoundException('Product entity not found');
     }
+
+    const associationCount =
+      await this.prisma.agentProductEntity.count({
+        where: {
+          product_entity_id: id,
+        },
+      });
+
+    if (associationCount > 0) {
+      throw new BadRequestException('This product entity is associated with one or more agents and cannot be deleted.',);
+    }
+
+    await this.prisma.productEntity.delete({
+      where: { id },
+    });
+
+    return true;
   }
+
 }

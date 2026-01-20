@@ -242,7 +242,7 @@ model MenuType {
     created_at       DateTime   @default(now())
     updated_at       DateTime   @updatedAt()
 
-    @@index([id])
+    @@index([id, name, slug])
     @@map("tbl_menu_types")
 }
 
@@ -497,6 +497,8 @@ model Products {
     id         BigInt          @id @default(autoincrement())
     name       String          @unique
     slug       String
+    desc       String?
+    image      String?
     status     Status          @default(ACTIVE)
     created_at DateTime        @default(now())
     updated_at DateTime        @updatedAt
@@ -516,6 +518,8 @@ model ProductEntity {
     id                   BigInt               @id @default(autoincrement())
     name                 String
     slug                 String               @unique
+    desc                 String?
+    image                String?
     product_id           BigInt
     products             Products             @relation(fields: [product_id], references: [id])
     status               Status               @default(ACTIVE)

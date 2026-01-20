@@ -88,15 +88,16 @@ export class UserController {
         throw new BadRequestException("Invalid image file");
       }
 
-      // 🔹 Fetch user basic info
       const findUser = await this.userService.getUserForUpload(userId);
-      if (!findUser?.agentKYC?.pan_number) {
+      const panNumber = findUser?.agentKYC?.pan_number;
+
+      if (findUser?.role?.name !== "ADMIN" && !panNumber) {
         throw new BadRequestException("PAN not found. Complete KYC first.");
       }
 
       const rootFolder = buildUserRootFolder(
         `${findUser.first_name} ${findUser.last_name}`,
-        findUser.agentKYC?.pan_number
+        panNumber ?? "ADMIN"
       );
 
       const ext = file.mimetype.split("/")[1];
