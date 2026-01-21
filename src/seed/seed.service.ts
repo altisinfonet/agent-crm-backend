@@ -286,6 +286,16 @@ export class SeedService {
             ]
         });
 
+        await this.prisma.adminSettings.create({
+            data: {
+                title: "payment-settings",
+                metadata: {
+                    razorpayid: "rzp_test_4zb9K0qHh06srW",
+                    razorpaysecretkey: "B8uxIDjFDuk5MbB9Nq4q9YF8"
+                }
+            }
+        })
+
         console.log('Seed data inserted');
     }
 }
