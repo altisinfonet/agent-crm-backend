@@ -126,150 +126,150 @@ export class SeedService {
             ]
         })
 
-        await this.prisma.subscriptionFeature.createMany({
-            data: [
-                {
-                    key: "customer_management",
-                    name: "Customer Management",
-                    description: "Manage up to 500 customers with full profile details, notes, and contact history."
-                },
-                {
-                    key: "product_tracking",
-                    name: "Product & Policy Tracking",
-                    description: "Track sold products like Life, Medical Insurance, and Real Estate with policy details."
-                },
-                {
-                    key: "company_entities",
-                    name: "Insurance & Company Entities",
-                    description: "Manage multiple entities such as LIC, ICICI Life, HDFC Ergo, and others."
-                },
-                {
-                    key: "renewal_reminders",
-                    name: "Renewal Reminders",
-                    description: "Get automated reminders for policy renewals and follow-ups."
-                },
-                {
-                    key: "basic_reports",
-                    name: "Basic Reports",
-                    description: "View basic sales, commission, and customer reports."
-                },
-                {
-                    key: "document_storage",
-                    name: "Document Storage",
-                    description: "Upload and store customer documents and policy files securely."
-                },
-                {
-                    key: "email_support",
-                    name: "Standard Support",
-                    description: "Email-based customer support during business hours."
-                },
-                {
-                    key: "unlimited_customers",
-                    name: "Unlimited Customers",
-                    description: "Add and manage unlimited customers without any restrictions."
-                },
-                {
-                    key: "advanced_crm",
-                    name: "Advanced CRM Tools",
-                    description: "Advanced tagging, segmentation, and smart search for customers."
-                },
-                {
-                    key: "commission_management",
-                    name: "Commission Management",
-                    description: "Automatically calculate and track commissions by product and company."
-                },
-                {
-                    key: "team_management",
-                    name: "Team & Sub-Agent Management",
-                    description: "Add sub-agents or staff and control access with role-based permissions."
-                },
-                {
-                    key: "analytics_dashboard",
-                    name: "Advanced Analytics Dashboard",
-                    description: "Visual dashboards for sales performance, renewals, and revenue insights."
-                },
-                {
-                    key: "automation",
-                    name: "Task & Follow-up Automation",
-                    description: "Automate follow-ups, reminders, and customer communication workflows."
-                },
-                {
-                    key: "data_export",
-                    name: "Data Export & Backup",
-                    description: "Export customer, policy, and sales data in Excel or CSV format."
-                },
-                {
-                    key: "priority_support",
-                    name: "Priority Support",
-                    description: "Priority email and chat support with faster response times."
-                }
-            ]
-        })
+        // await this.prisma.subscriptionFeature.createMany({
+        //     data: [
+        //         {
+        //             key: "customer_management",
+        //             name: "Customer Management",
+        //             description: "Manage up to 500 customers with full profile details, notes, and contact history."
+        //         },
+        //         {
+        //             key: "product_tracking",
+        //             name: "Product & Policy Tracking",
+        //             description: "Track sold products like Life, Medical Insurance, and Real Estate with policy details."
+        //         },
+        //         {
+        //             key: "company_entities",
+        //             name: "Insurance & Company Entities",
+        //             description: "Manage multiple entities such as LIC, ICICI Life, HDFC Ergo, and others."
+        //         },
+        //         {
+        //             key: "renewal_reminders",
+        //             name: "Renewal Reminders",
+        //             description: "Get automated reminders for policy renewals and follow-ups."
+        //         },
+        //         {
+        //             key: "basic_reports",
+        //             name: "Basic Reports",
+        //             description: "View basic sales, commission, and customer reports."
+        //         },
+        //         {
+        //             key: "document_storage",
+        //             name: "Document Storage",
+        //             description: "Upload and store customer documents and policy files securely."
+        //         },
+        //         {
+        //             key: "email_support",
+        //             name: "Standard Support",
+        //             description: "Email-based customer support during business hours."
+        //         },
+        //         {
+        //             key: "unlimited_customers",
+        //             name: "Unlimited Customers",
+        //             description: "Add and manage unlimited customers without any restrictions."
+        //         },
+        //         {
+        //             key: "advanced_crm",
+        //             name: "Advanced CRM Tools",
+        //             description: "Advanced tagging, segmentation, and smart search for customers."
+        //         },
+        //         {
+        //             key: "commission_management",
+        //             name: "Commission Management",
+        //             description: "Automatically calculate and track commissions by product and company."
+        //         },
+        //         {
+        //             key: "team_management",
+        //             name: "Team & Sub-Agent Management",
+        //             description: "Add sub-agents or staff and control access with role-based permissions."
+        //         },
+        //         {
+        //             key: "analytics_dashboard",
+        //             name: "Advanced Analytics Dashboard",
+        //             description: "Visual dashboards for sales performance, renewals, and revenue insights."
+        //         },
+        //         {
+        //             key: "automation",
+        //             name: "Task & Follow-up Automation",
+        //             description: "Automate follow-ups, reminders, and customer communication workflows."
+        //         },
+        //         {
+        //             key: "data_export",
+        //             name: "Data Export & Backup",
+        //             description: "Export customer, policy, and sales data in Excel or CSV format."
+        //         },
+        //         {
+        //             key: "priority_support",
+        //             name: "Priority Support",
+        //             description: "Priority email and chat support with faster response times."
+        //         }
+        //     ]
+        // })
 
-        await this.prisma.subscriptionPlanFeature.createMany({
-            data: [
-                {
-                    plan_id: 1,
-                    feature_id: 1
-                },
-                {
-                    plan_id: 1,
-                    feature_id: 2
-                },
-                {
-                    plan_id: 1,
-                    feature_id: 3
-                },
-                {
-                    plan_id: 1,
-                    feature_id: 4
-                },
-                {
-                    plan_id: 1,
-                    feature_id: 5
-                },
-                {
-                    plan_id: 1,
-                    feature_id: 6
-                },
-                {
-                    plan_id: 1,
-                    feature_id: 7
-                },
-                {
-                    plan_id: 2,
-                    feature_id: 1
-                },
-                {
-                    plan_id: 2,
-                    feature_id: 2
-                },
-                {
-                    plan_id: 2,
-                    feature_id: 3
-                },
-                {
-                    plan_id: 2,
-                    feature_id: 4
-                },
-                {
-                    plan_id: 2,
-                    feature_id: 5
-                },
-                {
-                    plan_id: 2,
-                    feature_id: 6
-                },
-                {
-                    plan_id: 2,
-                    feature_id: 7
-                },
-                {
-                    plan_id: 2,
-                    feature_id: 8
-                },
-            ]
-        })
+        // await this.prisma.subscriptionPlanFeature.createMany({
+        //     data: [
+        //         {
+        //             plan_id: 1,
+        //             feature_id: 1
+        //         },
+        //         {
+        //             plan_id: 1,
+        //             feature_id: 2
+        //         },
+        //         {
+        //             plan_id: 1,
+        //             feature_id: 3
+        //         },
+        //         {
+        //             plan_id: 1,
+        //             feature_id: 4
+        //         },
+        //         {
+        //             plan_id: 1,
+        //             feature_id: 5
+        //         },
+        //         {
+        //             plan_id: 1,
+        //             feature_id: 6
+        //         },
+        //         {
+        //             plan_id: 1,
+        //             feature_id: 7
+        //         },
+        //         {
+        //             plan_id: 2,
+        //             feature_id: 1
+        //         },
+        //         {
+        //             plan_id: 2,
+        //             feature_id: 2
+        //         },
+        //         {
+        //             plan_id: 2,
+        //             feature_id: 3
+        //         },
+        //         {
+        //             plan_id: 2,
+        //             feature_id: 4
+        //         },
+        //         {
+        //             plan_id: 2,
+        //             feature_id: 5
+        //         },
+        //         {
+        //             plan_id: 2,
+        //             feature_id: 6
+        //         },
+        //         {
+        //             plan_id: 2,
+        //             feature_id: 7
+        //         },
+        //         {
+        //             plan_id: 2,
+        //             feature_id: 8
+        //         },
+        //     ]
+        // })
 
         await this.prisma.user.createMany({
             data: [
