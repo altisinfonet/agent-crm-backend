@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ValidationPipe, VersioningType } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import express from 'express';
+import * as  express from 'express';
 import { ExpressAdapter } from '@nestjs/platform-express';
 
 const port = process.env.PORT || 6969

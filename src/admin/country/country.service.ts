@@ -44,6 +44,8 @@ export class CountryService {
     const limit = Number(payload.limit) || 10;
     const search = payload.search?.trim();
     const status = payload.status?.trim();
+    console.log("payload", payload);
+    console.log("search", search);
 
     const skip = (page - 1) * limit;
 

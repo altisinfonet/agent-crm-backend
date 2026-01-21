@@ -21,6 +21,7 @@ import { isValidImageBuffer, upload } from '@/common/config/multer.config';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { R2Service } from '@/common/helper/r2.helper';
 import { extname, basename } from 'path';
+import { FileService } from '@/file/file.service';
 
 @ApiTags('Admin - Products')
 @ApiBearerAuth('access-token')
@@ -47,34 +48,39 @@ export class ProductsController {
     @Res() res: Response,
     @Param('id') id: string,
     @Body() updateProductDto: CommonDto,
-    @UploadedFile() file: MulterFile,
+    @UploadedFile() file?: MulterFile,
   ) {
     try {
-      if (!file?.buffer) {
-        throw new BadRequestException('Image file is required');
+      const productId = BigInt(id);
+      const existingProduct = await this.productsService.findById(productId);
+
+      if (!existingProduct) {
+        throw new BadRequestException('Product not found');
       }
 
-      const isValid = await isValidImageBuffer(file.buffer);
-      if (!isValid) {
-        throw new BadRequestException('Invalid image file');
+      let newImageKey: string | undefined;
+      if (file) {
+        const sanitizedFileName = await this.sanitizeFileName(file.originalname);
+        newImageKey = `products/product_${id}/${sanitizedFileName}`;
+        console.log("file", file);
+
+        const fileBuffer = await FileService.readFileBuffer(file.path);
+        console.log("fileBuffer", fileBuffer);
+
+        try {
+          await R2Service.upload(fileBuffer, newImageKey, file.mimetype);
+        } finally {
+          // await FileService.removeFile(file.path);
+        }
       }
-
-      const existingProduct = await this.productsService.findById(BigInt(id));
-      const oldImageKey = existingProduct?.image;
-
-      const sanitizedFileName = await this.sanitizeFileName(file.originalname);
-      const newKey = `products/product_${id}/${sanitizedFileName}`;
-
-      await R2Service.upload(file.buffer, newKey, file.mimetype);
-
       const products = await this.productsService.updateProducts(
-        BigInt(id),
+        productId,
         updateProductDto,
-        { key: newKey },
+        newImageKey ? { key: newImageKey } : undefined,
       );
 
-      if (oldImageKey && oldImageKey !== newKey) {
-        await R2Service.remove(oldImageKey);
+      if (newImageKey && existingProduct.image && existingProduct.image !== newImageKey) {
+        await R2Service.remove(existingProduct.image);
       }
 
       const result = JSON.stringify(products, (_, value) =>

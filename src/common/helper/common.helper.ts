@@ -6,7 +6,7 @@
  * @returns A unique slug string
  */
 
-import CryptoJS from 'crypto-js';
+import * as CryptoJS from 'crypto-js';
 import * as bcrypt from 'bcrypt';
 import slugify from 'slugify';
 import { PrismaService } from '@/prisma/prisma.service';

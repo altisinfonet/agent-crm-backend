@@ -188,23 +188,29 @@ export class ProductsService {
         this.prisma.productEntity.count({ where }),
       ]);
 
-      const { products } = entities[0];
       if (!entities.length) {
         return {
-          Product: {
-            id: products.id,
-            name: products.name,
-            entities: [],
-          },
+          Product: null,
           Total: 0,
         };
       }
+
+      const { products } = entities[0];
+
+      const transformedEntities = await Promise.all(
+        entities.map(async ({ products, ...entity }) => ({
+          ...entity,
+          image: entity.image
+            ? await R2Service.getSignedUrl(entity.image)
+            : null,
+        })),
+      );
 
       return {
         Product: {
           id: products.id,
           name: products.name,
-          entities: entities.map(({ products, ...entity }) => entity),
+          entities: transformedEntities,
         },
         Total: total,
       };
@@ -212,6 +218,7 @@ export class ProductsService {
       throw error;
     }
   }
+
 
   async findEntityById(id: bigint) {
     return this.prisma.productEntity.findUnique({
