@@ -9,7 +9,7 @@
 import * as CryptoJS from 'crypto-js';
 import * as bcrypt from 'bcrypt';
 import slugify from 'slugify';
-import { PrismaService } from '@/prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 
 
 const prisma = new PrismaService();
