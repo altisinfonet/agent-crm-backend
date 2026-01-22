@@ -274,9 +274,9 @@ export class SeedService {
         await this.prisma.user.createMany({
             data: [
                 {
-                    first_name: "Super",
-                    last_name: "Admin",
-                    email: "admin@gmail.com",
+                    first_name: "Agent",
+                    last_name: "CRM",
+                    email: "altisdev1@gmail.com",
                     password: await hashPassword("l8n4n#On%c@m4JF&17$?"),
                     auth_method: "EMAIL_PW",
                     role_id: 1,
