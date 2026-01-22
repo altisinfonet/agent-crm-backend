@@ -37,6 +37,7 @@ function checkFileType(file: any, cb: multer.FileFilterCallback) {
         mimetype: file.mimetype,
         encoding: file.encoding,
     });
+    console.log(file, 'file');
     console.log('--------------------------------------');
 
     try {

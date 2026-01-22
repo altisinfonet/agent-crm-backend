@@ -48,6 +48,9 @@ export class ProductsService {
   async findAllProducts() {
     try {
       const products = await this.prisma.products.findMany({
+        orderBy: {
+          created_at: "desc"
+        },
         select: {
           id: true,
           name: true,
@@ -62,6 +65,9 @@ export class ProductsService {
             },
           },
           entities: {
+            orderBy: {
+              created_at: "desc"
+            },
             select: {
               id: true,
               name: true,
