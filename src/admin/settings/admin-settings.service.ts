@@ -31,19 +31,24 @@ export class AdminSettingsService {
     }
   }
 
-  async findAll() {
+  async findAll(setting?: string) {
     try {
-      const setting = await this.prisma.adminSettings.findMany({
+      const whereClause = setting
+        ? { title: setting }
+        : {};
+
+      const settings = await this.prisma.adminSettings.findMany({
+        where: whereClause,
         select: {
           id: true,
           title: true,
           metadata: true,
           created_at: true,
-          updated_at: true
-        }
-      })
+          updated_at: true,
+        },
+      });
 
-      return setting
+      return settings;
     } catch (error) {
       throw error;
     }

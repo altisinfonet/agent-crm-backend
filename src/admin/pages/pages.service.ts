@@ -216,10 +216,6 @@ export class PagesService {
           }
         })
       }
-      console.log("up", up);
-      console.log("id", id);
-
-
 
       // ----------- META DATA HANDLING -----------
       if (updatedPage) {

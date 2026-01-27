@@ -17,7 +17,7 @@ export class SubscriptionService {
     await this.initRazorpay();
   }
   private async initRazorpay() {
-    const RazorpaySetting = await this.settingsService.paymentSettings();
+    const RazorpaySetting = await this.settingsService.paymentSettings("payment-settings");
 
     this.razorpay = new Razorpay({
       key_id: RazorpaySetting.RAZORPAY_KEY_ID,

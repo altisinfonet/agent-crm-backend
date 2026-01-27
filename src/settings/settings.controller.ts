@@ -16,11 +16,11 @@ export class SettingsController {
     return this.settingsService.create(createSettingDto);
   }
 
-  @Get('payment')
+  @Get(':setting')
   @ApiExcludeEndpoint()
-  async paymentSettings(@Res() res: Response) {
+  async paymentSettings(@Res() res: Response, @Param('setting') setting: string) {
     try {
-      const settings = await this.settingsService.paymentSettings();
+      const settings = await this.settingsService.paymentSettings(setting);
       let result = JSON.stringify(settings, (key, value) =>
         typeof value === 'bigint' ? value.toString() : value,
       );
