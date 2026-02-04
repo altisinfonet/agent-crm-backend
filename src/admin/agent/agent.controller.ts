@@ -39,7 +39,10 @@ export class AgentController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Agents fetched successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch agents list.");
     }
   }
 
@@ -57,7 +60,10 @@ export class AgentController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Agent details fetched successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch agent details.");
     }
   }
 
@@ -80,7 +86,10 @@ export class AgentController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Agent details updated successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to update agent details.");
     }
   }
 
@@ -98,7 +107,10 @@ export class AgentController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Agent details deleted successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to delete agent details.");
     }
   }
 }

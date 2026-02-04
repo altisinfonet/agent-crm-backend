@@ -34,8 +34,10 @@ export class FaqController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Faq category created successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to create FAQ module.");
     }
   }
 
@@ -49,8 +51,10 @@ export class FaqController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "All Faq categories."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch FAQ modules.");
     }
   }
 
@@ -64,8 +68,10 @@ export class FaqController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Faq category."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch FAQ module details.");
     }
   }
 
@@ -82,8 +88,10 @@ export class FaqController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Faq category updated successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to update FAQ module.");
     }
   }
 
@@ -101,8 +109,10 @@ export class FaqController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Faq category deleted successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to delete FAQ module.");
     }
   }
 
@@ -120,8 +130,10 @@ export class FaqController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Faq created successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to create FAQ.");
     }
   }
 
@@ -135,8 +147,10 @@ export class FaqController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "All Faqs."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch FAQ list.");
     }
   }
 
@@ -150,8 +164,10 @@ export class FaqController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Faqs."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch FAQ.");
     }
   }
 
@@ -168,8 +184,10 @@ export class FaqController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Faqs updated successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to update FAQ.");
     }
   }
 
@@ -186,8 +204,10 @@ export class FaqController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Faqs deleted successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to delete FAQ.");
     }
   }
 }

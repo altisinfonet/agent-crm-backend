@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CommonDto } from 'src/auth/dto/common.dto';
 import { decryptData } from '@/common/helper/common.helper';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -65,7 +65,7 @@ export class SubscriptionService {
             price,
             currency_id: currency.id,
             billing_cycle: billingCycle,
-            max_agents: 5,
+            max_customers: 5,
             is_active: false,
             code: rzpPlan.item.name
           }
@@ -94,6 +94,7 @@ export class SubscriptionService {
           description: true,
           price: true,
           billing_cycle: true,
+          max_customers: true,
           is_active: true,
           rzp_plan_id: true,
           created_at: true,
@@ -129,6 +130,7 @@ export class SubscriptionService {
           billing_cycle: true,
           is_active: true,
           rzp_plan_id: true,
+          max_customers: true,
           created_at: true,
           currency: {
             select: {
@@ -138,16 +140,10 @@ export class SubscriptionService {
               symbol: true
             }
           },
-          subscriptionPlanFeatures: {
+          subscriptionFeatures: {
             select: {
-              feature: {
-                select: {
-                  id: true,
-                  key: true,
-                  name: true,
-                  description: true
-                }
-              }
+              features: true,
+              created_at: true
             }
           }
         }
@@ -160,9 +156,11 @@ export class SubscriptionService {
         price: plan?.price,
         currency: plan?.currency,
         billing_cycle: plan?.billing_cycle,
+        is_active: plan?.is_active,
+        max_customers: plan?.max_customers,
         rzp_plan_id: plan?.rzp_plan_id,
         created_at: plan?.created_at,
-        features: plan?.subscriptionPlanFeatures.map(spf => spf.feature)
+        features: plan?.subscriptionFeatures.map(spf => spf.features)
       };
 
       return formattedPlan;
@@ -172,36 +170,57 @@ export class SubscriptionService {
   }
 
   async updatePlan(plan_id: bigint, dto: CommonDto) {
-    try {
-      const payload = decryptData(dto.data);
-      const { max_agents, is_active, code } = payload;
+    const payload = decryptData(dto.data);
+    const {
+      name,
+      description,
+      max_customers,
+      is_active,
+      code,
+      features,
+    } = payload;
 
-      const duplicatePlan = await this.prisma.subscriptionPlan.findFirst({
-        where: {
+    return this.prisma.$transaction(async (tx) => {
+      if (code) {
+        const duplicatePlan = await tx.subscriptionPlan.findFirst({
+          where: {
+            code,
+            id: { not: plan_id },
+          },
+          select: { id: true },
+        });
+
+        if (duplicatePlan) {
+          throw new BadRequestException('Duplicate plan code.');
+        }
+      }
+
+      const updatedPlan = await tx.subscriptionPlan.update({
+        where: { id: plan_id },
+        data: {
+          name,
+          description,
+          max_customers,
+          is_active,
           code,
-          id: {
-            not: plan_id
-          }
         },
       });
 
-      if (duplicatePlan) {
-        throw new BadRequestException("Duplicate plan code.");
+      if (Array.isArray(features)) {
+        await tx.subscriptionFeature.upsert({
+          where: { plan_id },
+          update: {
+            features,
+          },
+          create: {
+            plan_id,
+            features,
+          },
+        });
       }
 
-      const update = await this.prisma.subscriptionPlan.update({
-        where: { id: plan_id },
-        data: {
-          max_agents,
-          is_active,
-          code
-        }
-      });
-
-      return update;
-    } catch (error) {
-      throw error;
-    }
+      return updatedPlan;
+    });
   }
 
   async adminUpgradeSubscription(dto: CommonDto) {
@@ -465,7 +484,43 @@ export class SubscriptionService {
   }
 
 
-  remove(id: number) {
-    return `This action removes a #${id} subscription`;
+  async removePlan(plan_id: bigint) {
+    try {
+      return this.prisma.$transaction(async (tx) => {
+        const subscriptionCount = await tx.organizationSubscription.count({
+          where: {
+            plan_id,
+          },
+        });
+
+        if (subscriptionCount > 0) {
+          throw new BadRequestException(
+            'Cannot delete plan. One or more Agents have subscribed to this plan.',
+          );
+        }
+
+        const planCount = await tx.subscriptionPlan.count({
+          where: { id: plan_id },
+        });
+
+        if (planCount === 0) {
+          throw new NotFoundException(
+            'Subscription plan not found.',
+          );
+        }
+
+        await tx.subscriptionFeature.deleteMany({
+          where: { plan_id },
+        });
+
+        await tx.subscriptionPlan.delete({
+          where: { id: plan_id },
+        });
+        return true;
+      });
+    } catch (error) {
+      throw error;
+    }
   }
+
 }

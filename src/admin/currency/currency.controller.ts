@@ -47,7 +47,10 @@ export class CurrencyController {
 
       return res.status(HttpStatus.OK).json({ data: encrypted });
     } catch (error: any) {
-      throw new BadRequestException(error.response || error.message);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to create currency.");
     }
   }
 
@@ -72,7 +75,10 @@ export class CurrencyController {
 
       return res.status(HttpStatus.OK).json({ data: encrypted });
     } catch (error: any) {
-      throw new BadRequestException(error.response || error.message);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch currency list.");
     }
   }
 
@@ -97,7 +103,10 @@ export class CurrencyController {
 
       return res.status(HttpStatus.OK).json({ data: encrypted });
     } catch (error: any) {
-      throw new BadRequestException(error.response || error.message);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch currency details.");
     }
   }
 
@@ -124,8 +133,11 @@ export class CurrencyController {
 
       return res.status(HttpStatus.OK).json({ data: encrypted });
 
-    } catch (error) {
-      throw new BadRequestException(error.response);
+    } catch (error: any) {
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to update currency details.");
     }
   }
 
@@ -147,7 +159,10 @@ export class CurrencyController {
 
       return res.status(HttpStatus.OK).json({ data: encrypted });
     } catch (error: any) {
-      throw new BadRequestException(error.response || error.message);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to delete currency details.");
     }
   }
 }

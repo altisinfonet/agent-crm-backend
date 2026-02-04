@@ -49,16 +49,10 @@ export class SubscriptionService {
           billing_cycle: true,
           rzp_plan_id: true,
           created_at: true,
-          subscriptionPlanFeatures: {
+          subscriptionFeatures: {
             select: {
-              feature: {
-                select: {
-                  id: true,
-                  key: true,
-                  name: true,
-                  description: true
-                }
-              }
+              features: true,
+              created_at: true
             }
           }
         }
@@ -75,7 +69,7 @@ export class SubscriptionService {
         billing_cycle: plan.billing_cycle,
         rzp_plan_id: plan.rzp_plan_id,
         created_at: plan.created_at,
-        features: plan.subscriptionPlanFeatures.map(spf => spf.feature)
+        features: plan.subscriptionFeatures.map(spf => spf.features)
       }));
 
       return formattedPlans;
