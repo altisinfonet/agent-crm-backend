@@ -87,7 +87,10 @@ export class ProductsController {
 
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error?.response || error?.message);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to update product.");
     }
   }
 
@@ -105,7 +108,10 @@ export class ProductsController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Fetched all products."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch all products.");
     }
   }
 
@@ -194,7 +200,10 @@ export class ProductsController {
 
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error?.response || error?.message);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to create product entity.");
     }
   }
 
@@ -218,7 +227,10 @@ export class ProductsController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Product enetity list"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch product entities.");
     }
   }
 
@@ -339,7 +351,10 @@ export class ProductsController {
 
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error?.response || error?.message);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to update product entity.");
     }
   }
 
@@ -361,7 +376,10 @@ export class ProductsController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Product enetity deleted successfully"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to delete product entity.");
     }
 
   }

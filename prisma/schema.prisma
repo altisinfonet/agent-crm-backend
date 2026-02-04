@@ -682,21 +682,22 @@ model ProductRealEstate {
  * ==============================================================
  */
 model SubscriptionPlan {
-    id                       BigInt                     @id @default(autoincrement())
-    code                     String                     @unique
-    name                     String
-    description              String?
-    price                    Int
-    currency_id              BigInt
-    currency                 Currency                   @relation(fields: [currency_id], references: [id])
-    billing_cycle            SubscriptionCycle
-    max_agents               Int?
-    rzp_plan_id              String?                    @unique
-    is_active                Boolean                    @default(true)
-    created_at               DateTime                   @default(now())
-    updated_at               DateTime                   @updatedAt
-    subscriptions            OrganizationSubscription[]
-    subscriptionPlanFeatures SubscriptionPlanFeature[]
+    id                   BigInt                     @id @default(autoincrement())
+    code                 String                     @unique
+    name                 String
+    description          String?
+    price                Int
+    currency_id          BigInt
+    currency             Currency                   @relation(fields: [currency_id], references: [id])
+    billing_cycle        SubscriptionCycle
+    max_customers        Int?
+    rzp_plan_id          String?                    @unique
+    is_active            Boolean                    @default(true)
+    is_popular           Boolean                    @default(false)
+    created_at           DateTime                   @default(now())
+    updated_at           DateTime                   @updatedAt
+    subscriptions        OrganizationSubscription[]
+    subscriptionFeatures SubscriptionFeature[]
 
     @@index([code, billing_cycle, is_active])
     @@map("tbl_subscription_plan")
@@ -728,24 +729,14 @@ model OrganizationSubscription {
 }
 
 model SubscriptionFeature {
-    id          BigInt                    @id @default(autoincrement())
-    key         String                    @unique
-    name        String
-    description String?
-    plans       SubscriptionPlanFeature[]
+    id         BigInt           @id @default(autoincrement())
+    plan_id    BigInt           @unique
+    plan       SubscriptionPlan @relation(fields: [plan_id], references: [id])
+    features   Json
+    created_at DateTime         @default(now())
+    updated_at DateTime         @updatedAt
 
     @@map("tbl_subscription_feature")
-}
-
-model SubscriptionPlanFeature {
-    id         BigInt              @id @default(autoincrement())
-    plan_id    BigInt
-    plan       SubscriptionPlan    @relation(fields: [plan_id], references: [id])
-    feature_id BigInt
-    feature    SubscriptionFeature @relation(fields: [feature_id], references: [id])
-
-    @@unique([plan_id, feature_id])
-    @@map("tbl_subscription_plan_feature")
 }
 
 model RazorpaySubscription {

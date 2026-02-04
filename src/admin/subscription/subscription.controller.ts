@@ -25,7 +25,7 @@ import {
 export class SubscriptionController {
   constructor(private readonly subscriptionService: SubscriptionService) { }
 
-  @Post('sync/plan')
+  @Post('plan/sync')
   @ApiOperation({ summary: 'Sync subscription plans from Razorpay (Admin)' })
   @SwaggerApiResponse({ status: 200, description: 'Subscription plans synced successfully' })
   async create(@Res() res: Response) {
@@ -35,10 +35,13 @@ export class SubscriptionController {
         typeof value === 'bigint' ? value.toString() : value,
       );
 
-      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription plan created successfully."));
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription plan synced successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to sync subscription plans.");
     }
   }
 
@@ -55,7 +58,10 @@ export class SubscriptionController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "All subscription plans."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch subscription plans.");
     }
   }
 
@@ -73,7 +79,10 @@ export class SubscriptionController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "All subscription plans."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch subscription plan.");
     }
   }
 
@@ -94,7 +103,10 @@ export class SubscriptionController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Admin subscription upgraded."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to upgrade subscription.");
     }
   }
 
@@ -116,7 +128,10 @@ export class SubscriptionController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Admin subscription grant."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to assign subscription to agent.");
     }
   }
 
@@ -139,7 +154,11 @@ export class SubscriptionController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription plan updated successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      console.log("erorr", error);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to update subscription plan.");
     }
   }
 
@@ -160,12 +179,34 @@ export class SubscriptionController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "All subscribers list."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch subscribers list.");
     }
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.subscriptionService.remove(+id);
+  @Delete('plan/:id')
+  @ApiOperation({ summary: 'Delete subscription plan (Admin)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Subscription plan removed successfully' })
+  async remove(
+    @Param('id') id: string,
+    @Res() res: Response) {
+    try {
+      const plans = await this.subscriptionService.removePlan(BigInt(id));
+      let result = JSON.stringify(plans, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription plan removed successfully."));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error: any) {
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to remove subscription plan.");
+    }
   }
 }

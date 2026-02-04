@@ -45,7 +45,10 @@ export class AuthController {
             const resData = encryptData(new ApiResponse((JSON.parse(result)), "User checked."));
             return res.status(HttpStatus.OK).json({ data: resData });
         } catch (error: any) {
-            throw new BadRequestException(error.response);
+            if (error.status && error.response) {
+                return res.status(error.status).json(error.response);
+            }
+            throw new BadRequestException("Failed to check user.");
         }
     }
 
@@ -70,8 +73,10 @@ export class AuthController {
             const resData = encryptData(new ApiResponse((JSON.parse(result)), "Login successful."));
             return res.status(HttpStatus.OK).json({ data: resData });
         } catch (error: any) {
-            console.log('error: ', error);
-            throw new BadRequestException(error.response);
+            if (error.status && error.response) {
+                return res.status(error.status).json(error.response);
+            }
+            throw new BadRequestException("Failed to login user.");
         }
     }
 
@@ -89,8 +94,10 @@ export class AuthController {
             );
             return res.status(HttpStatus.OK).json({ data: resData });
         } catch (error: any) {
-            console.log('error: ', error);
-            throw new BadRequestException(error.response);
+            if (error.status && error.response) {
+                return res.status(error.status).json(error.response);
+            }
+            throw new BadRequestException("Failed to refresh tokens.");
         }
     }
 
@@ -111,8 +118,10 @@ export class AuthController {
             );
             return res.status(HttpStatus.OK).json(resData);
         } catch (error: any) {
-            console.log('error: ', error);
-            throw new BadRequestException(error.response);
+            if (error.status && error.response) {
+                return res.status(error.status).json(error.response);
+            }
+            throw new BadRequestException("Failed to logout user.");
         }
     }
 
@@ -132,8 +141,10 @@ export class AuthController {
             );
             return res.status(HttpStatus.OK).json(resData);
         } catch (error: any) {
-            console.log('error: ', error);
-            throw new BadRequestException(error.response);
+            if (error.status && error.response) {
+                return res.status(error.status).json(error.response);
+            }
+            throw new BadRequestException("Failed to update subscription plan.");
         }
     }
 
@@ -146,13 +157,15 @@ export class AuthController {
         try {
             let result = await this.authService.forgotPassword(dto);
             if (result) {
-                return res.status(HttpStatus.OK).json(new ApiResponse(null, "Password reset request accepted. Email will be sent if the user exists."));
+                return res.status(HttpStatus.OK).json(new ApiResponse(null, "Password reset request accepted. An email will be sent if the email exists."));
             } else {
                 throw new BadRequestException(new ApiResponse(null, 'User not found.', false));
             }
         } catch (error: any) {
-            console.log('error: ', error);
-            throw new BadRequestException(error.response);
+            if (error.status && error.response) {
+                return res.status(error.status).json(error.response);
+            }
+            throw new BadRequestException("Failed to request password reset.");
         }
     }
 
@@ -186,7 +199,10 @@ export class AuthController {
 
             return res.status(HttpStatus.OK).json(new ApiResponse(JSON.parse(result), "Encrypted data."));
         } catch (error) {
-            throw new BadRequestException(error.response);
+            if (error.status && error.response) {
+                return res.status(error.status).json(error.response);
+            }
+            throw new BadRequestException("Failed to encrypt data.");
         }
     }
     @ApiExcludeEndpoint()
@@ -201,7 +217,10 @@ export class AuthController {
 
             return res.status(HttpStatus.OK).json(new ApiResponse(JSON.parse(result), "Decrypted data."));
         } catch (error) {
-            throw new BadRequestException(error.response);
+            if (error.status && error.response) {
+                return res.status(error.status).json(error.response);
+            }
+            throw new BadRequestException("Failed to decrypt data.");
         }
     }
 

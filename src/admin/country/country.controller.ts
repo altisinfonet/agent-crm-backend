@@ -44,7 +44,10 @@ export class CountryController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Country settings created successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to create country settings.");
     }
   }
 
@@ -69,7 +72,10 @@ export class CountryController {
 
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch countries list.");
     }
   }
 
@@ -94,7 +100,10 @@ export class CountryController {
 
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch country details.");
     }
   }
 
@@ -124,7 +133,10 @@ export class CountryController {
 
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to update country details.");
     }
   }
 
@@ -145,7 +157,10 @@ export class CountryController {
 
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to delete country details.");
     }
   }
 

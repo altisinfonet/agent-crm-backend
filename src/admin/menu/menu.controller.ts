@@ -43,7 +43,10 @@ export class MenuController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Menu created successfully"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to create menu.");
     }
   }
 
@@ -60,8 +63,10 @@ export class MenuController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "All Menus"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch menus.");
     }
   }
 
@@ -83,8 +88,10 @@ export class MenuController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Menu updated successfully"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error) {
-      console.log("error", error);
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to update menu.");
     }
   }
 
@@ -103,8 +110,10 @@ export class MenuController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Menu deleted successfully"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to delete menu.");
     }
   }
 
@@ -126,7 +135,10 @@ export class MenuController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Menu Type created successfully"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to create menu type.");
     }
   }
 
@@ -144,8 +156,10 @@ export class MenuController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "All menu types"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch menu types.");
     }
   }
 
@@ -163,8 +177,10 @@ export class MenuController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Menu type"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch menu type.");
     }
   }
 
@@ -183,8 +199,10 @@ export class MenuController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Menu Type updated successfully"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to update menu type.");
     }
   }
 
@@ -202,8 +220,10 @@ export class MenuController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Menu Type deleted successfully"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to delete menu type.");
     }
   }
 }
