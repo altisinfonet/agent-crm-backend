@@ -11,23 +11,23 @@ export class SettingsService {
     return 'This action adds a new setting';
   }
 
-  async paymentSettings() {
+  async paymentSettings(setting: string) {
     try {
-      const payment_settings = await this.prisma.adminSettings.findFirst({
+      const admin_settings = await this.prisma.adminSettings.findFirst({
         where: {
-          title: "payment-settings",
+          title: setting,
         }
       })
       const {
         razorpayid,
         razorpaysecretkey
-      } = payment_settings?.metadata as Record<string, any> || {};
-      const setting = {
+      } = admin_settings?.metadata as Record<string, any> || {};
+      const payment_settings = {
         RAZORPAY_KEY_ID: razorpayid,
         RAZORPAY_KEY_SECRET: razorpaysecretkey
       }
 
-      return setting;
+      return payment_settings;
     } catch (error) {
       throw error
     }

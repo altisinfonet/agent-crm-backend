@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Res, HttpStatus, BadRequestException, UseGuards, Req, Put } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Res, HttpStatus, BadRequestException, UseGuards, Req, Put, Query } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
@@ -50,18 +50,22 @@ export class AdminSettingsController {
     }
   }
 
-  @Put()
-  @ApiOperation({ summary: 'Get all admin settings (Admin)' })
+  @Get()
+  @ApiOperation({ summary: 'Get admin settings (Admin)' })
   @SwaggerApiResponse({ status: 200, description: 'Settings fetched successfully' })
-  async findAll(@Res() res: Response) {
+  async findAll(
+    @Res() res: Response,
+    @Query('setting') setting?: string,
+  ) {
     try {
-      const settings = await this.adminSettingsService.findAll();
-      let result = JSON.stringify(settings, (key, value) =>
+      const settings = await this.adminSettingsService.findAll(setting);
+      const result = JSON.stringify(settings, (key, value) =>
         typeof value === 'bigint' ? value.toString() : value,
       );
 
-      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Settings."));
+      const resData = encryptData(new ApiResponse(JSON.parse(result), "Settings."));
       return res.status(HttpStatus.OK).json({ data: resData });
+
     } catch (error: any) {
       throw new BadRequestException(error.response);
     }

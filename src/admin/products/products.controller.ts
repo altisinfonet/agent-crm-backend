@@ -7,8 +7,7 @@ import { Role } from 'src/common/enum/role.enum';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import type { Request, Response } from 'express';
 import { ApiResponse } from '@/common/helper/response.helper';
-import { encryptData } from '@/common/helper/common.helper';
-import { File as MulterFile } from 'multer';
+import { decryptData, encryptData } from '@/common/helper/common.helper';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -17,11 +16,10 @@ import {
   ApiBody,
   ApiResponse as SwaggerApiResponse,
 } from '@nestjs/swagger';
-import { isValidImageBuffer, upload } from '@/common/config/multer.config';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { AnyFilesInterceptor } from '@nestjs/platform-express';
+import { ImageUploadService } from '@/common/services/image-upload.service';
 import { R2Service } from '@/common/helper/r2.helper';
 import { extname, basename } from 'path';
-import { FileService } from '@/file/file.service';
 
 @ApiTags('Admin - Products')
 @ApiBearerAuth('access-token')
@@ -43,15 +41,15 @@ export class ProductsController {
   @Patch(':id')
   @ApiOperation({ summary: 'Update product (Admin)' })
   @SwaggerApiResponse({ status: 200, description: 'Update products' })
-  @UseInterceptors(FileInterceptor('image', upload))
+  @UseInterceptors(AnyFilesInterceptor())
   async update(
     @Res() res: Response,
     @Param('id') id: string,
     @Body() updateProductDto: CommonDto,
-    @UploadedFile() file?: MulterFile,
   ) {
     try {
       const productId = BigInt(id);
+      const data = decryptData(updateProductDto.data);
       const existingProduct = await this.productsService.findById(productId);
 
       if (!existingProduct) {
@@ -59,19 +57,15 @@ export class ProductsController {
       }
 
       let newImageKey: string | undefined;
-      if (file) {
-        const sanitizedFileName = await this.sanitizeFileName(file.originalname);
-        newImageKey = `products/product_${id}/${sanitizedFileName}`;
-        console.log("file", file);
+      if (data?.image) {
+        const folderPath = `products/product_${id}`;
 
-        const fileBuffer = await FileService.readFileBuffer(file.path);
-        console.log("fileBuffer", fileBuffer);
-
-        try {
-          await R2Service.upload(fileBuffer, newImageKey, file.mimetype);
-        } finally {
-          // await FileService.removeFile(file.path);
-        }
+        const uploadResult = await ImageUploadService.uploadBase64ImageToR2(
+          data.image,
+          folderPath,
+          `img_${Date.now()}`
+        );
+        newImageKey = uploadResult.key;
       }
       const products = await this.productsService.updateProducts(
         productId,
@@ -116,30 +110,72 @@ export class ProductsController {
   }
 
 
+  // @Post(':id/entity')
+  // @ApiOperation({ summary: 'Create product entity (Admin)' })
+  // @ApiParam({ name: 'id', example: 1, description: 'Product ID' })
+  // @ApiBody({ type: CommonDto })
+  // @SwaggerApiResponse({ status: 200, description: 'Product entity created successfully', })
+  // @UseInterceptors(FileInterceptor('image', upload))
+  // async create(
+  //   @Res() res: Response,
+  //   @Param('id') id: string,
+  //   @Body() createEntityDto: CommonDto,
+  //   @UploadedFile() file?: MulterFile,
+  // ) {
+  //   try {
+  //     let imageKey: string | null = null;
+  //     if (file?.buffer) {
+  //       const isValid = await isValidImageBuffer(file.buffer);
+  //       if (!isValid) {
+  //         throw new BadRequestException('Invalid image file');
+  //       }
+
+  //       const sanitizedFileName = await this.sanitizeFileName(file.originalname);
+  //       imageKey = `entities/entity_${id}/${sanitizedFileName}`;
+
+  //       await R2Service.upload(file.buffer, imageKey, file.mimetype);
+  //     }
+
+  //     const entity = await this.productsService.create(
+  //       BigInt(id),
+  //       createEntityDto,
+  //       imageKey ? { image: imageKey } : undefined,
+  //     );
+
+  //     const result = JSON.stringify(entity, (_, value) =>
+  //       typeof value === 'bigint' ? value.toString() : value,
+  //     );
+
+  //     const resData = encryptData(new ApiResponse(JSON.parse(result), 'Product entity added successfully'));
+  //     return res.status(HttpStatus.OK).json({ data: resData });
+  //   } catch (error: any) {
+  //     throw new BadRequestException(error?.response || error?.message);
+  //   }
+  // };
+
   @Post(':id/entity')
   @ApiOperation({ summary: 'Create product entity (Admin)' })
   @ApiParam({ name: 'id', example: 1, description: 'Product ID' })
   @ApiBody({ type: CommonDto })
-  @SwaggerApiResponse({ status: 200, description: 'Product entity created successfully', })
-  @UseInterceptors(FileInterceptor('image', upload))
+  @SwaggerApiResponse({ status: 200, description: 'Product entity created successfully' })
+  @UseInterceptors(AnyFilesInterceptor())
   async create(
     @Res() res: Response,
     @Param('id') id: string,
     @Body() createEntityDto: CommonDto,
-    @UploadedFile() file?: MulterFile,
   ) {
     try {
+      const data = decryptData(createEntityDto.data);
       let imageKey: string | null = null;
-      if (file?.buffer) {
-        const isValid = await isValidImageBuffer(file.buffer);
-        if (!isValid) {
-          throw new BadRequestException('Invalid image file');
-        }
 
-        const sanitizedFileName = await this.sanitizeFileName(file.originalname);
-        imageKey = `entities/entity_${id}/${sanitizedFileName}`;
-
-        await R2Service.upload(file.buffer, imageKey, file.mimetype);
+      if (data?.image) {
+        const folderPath = `entities/entity_${id}`;
+        const { key } = await ImageUploadService.uploadBase64ImageToR2(
+          data.image,
+          folderPath,
+          `img_${Date.now()}`
+        );
+        imageKey = key;
       }
 
       const entity = await this.productsService.create(
@@ -152,12 +188,15 @@ export class ProductsController {
         typeof value === 'bigint' ? value.toString() : value,
       );
 
-      const resData = encryptData(new ApiResponse(JSON.parse(result), 'Product entity added successfully'));
+      const resData = encryptData(
+        new ApiResponse(JSON.parse(result), 'Product entity added successfully'),
+      );
+
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
       throw new BadRequestException(error?.response || error?.message);
     }
-  };
+  }
 
   @Put(':id/entity/list')
   @ApiOperation({ summary: 'Get product entity list (Admin)' })
@@ -183,22 +222,83 @@ export class ProductsController {
     }
   }
 
+  // @Patch('entity/:id')
+  // @ApiOperation({ summary: 'Update product entity (Admin)' })
+  // @ApiParam({ name: 'id', example: 10, description: 'Product entity ID' })
+  // @ApiBody({ type: CommonDto })
+  // @SwaggerApiResponse({ status: 200, description: 'Product entity updated successfully', })
+  // @UseInterceptors(FileInterceptor('image', upload))
+  // async updateEntity(
+  //   @Res() res: Response,
+  //   @Param('id') id: string,
+  //   @Body() updateEntityDto: CommonDto,
+  //   @UploadedFile() file?: MulterFile,
+  // ) {
+  //   try {
+  //     const existingEntity = await this.productsService.findEntityById(
+  //       BigInt(id),
+  //     );
+
+  //     if (!existingEntity) {
+  //       throw new BadRequestException('Product entity not found');
+  //     }
+
+  //     const oldImageKey = existingEntity.image;
+  //     let newImageKey: string | undefined;
+
+  //     if (file?.buffer) {
+  //       const isValid = await isValidImageBuffer(file.buffer);
+  //       if (!isValid) {
+  //         throw new BadRequestException('Invalid image file');
+  //       }
+  //       const sanitizedFileName = await this.sanitizeFileName(file.originalname);
+  //       newImageKey = `entities/entity_${id}/${sanitizedFileName}`;
+  //       await R2Service.upload(file.buffer, newImageKey, file.mimetype);
+  //     }
+
+  //     const entity = await this.productsService.updateEntity(
+  //       BigInt(id),
+  //       updateEntityDto,
+  //       newImageKey ? { image: newImageKey } : undefined,
+  //     );
+
+  //     if (newImageKey && oldImageKey && oldImageKey !== newImageKey) {
+  //       await R2Service.remove(oldImageKey);
+  //     }
+
+  //     const result = JSON.stringify(entity, (_, value) =>
+  //       typeof value === 'bigint' ? value.toString() : value,
+  //     );
+
+  //     const resData = encryptData(
+  //       new ApiResponse(
+  //         JSON.parse(result),
+  //         'Product entity updated successfully',
+  //       ),
+  //     );
+
+  //     return res.status(HttpStatus.OK).json({ data: resData });
+  //   } catch (error: any) {
+  //     throw new BadRequestException(error?.response || error?.message);
+  //   }
+  // }
+
+
   @Patch('entity/:id')
   @ApiOperation({ summary: 'Update product entity (Admin)' })
   @ApiParam({ name: 'id', example: 10, description: 'Product entity ID' })
   @ApiBody({ type: CommonDto })
-  @SwaggerApiResponse({ status: 200, description: 'Product entity updated successfully', })
-  @UseInterceptors(FileInterceptor('image', upload))
+  @SwaggerApiResponse({ status: 200, description: 'Product entity updated successfully' })
+  @UseInterceptors(AnyFilesInterceptor())
   async updateEntity(
     @Res() res: Response,
     @Param('id') id: string,
     @Body() updateEntityDto: CommonDto,
-    @UploadedFile() file?: MulterFile,
   ) {
     try {
-      const existingEntity = await this.productsService.findEntityById(
-        BigInt(id),
-      );
+      const data = decryptData(updateEntityDto.data);
+
+      const existingEntity = await this.productsService.findEntityById(BigInt(id));
 
       if (!existingEntity) {
         throw new BadRequestException('Product entity not found');
@@ -207,14 +307,16 @@ export class ProductsController {
       const oldImageKey = existingEntity.image;
       let newImageKey: string | undefined;
 
-      if (file?.buffer) {
-        const isValid = await isValidImageBuffer(file.buffer);
-        if (!isValid) {
-          throw new BadRequestException('Invalid image file');
-        }
-        const sanitizedFileName = await this.sanitizeFileName(file.originalname);
-        newImageKey = `entities/entity_${id}/${sanitizedFileName}`;
-        await R2Service.upload(file.buffer, newImageKey, file.mimetype);
+      if (data?.image) {
+        const folderPath = `entities/entity_${id}`;
+
+        const { key } = await ImageUploadService.uploadBase64ImageToR2(
+          data.image,
+          folderPath,
+          `img_${Date.now()}`
+        );
+
+        newImageKey = key;
       }
 
       const entity = await this.productsService.updateEntity(
@@ -232,10 +334,7 @@ export class ProductsController {
       );
 
       const resData = encryptData(
-        new ApiResponse(
-          JSON.parse(result),
-          'Product entity updated successfully',
-        ),
+        new ApiResponse(JSON.parse(result), 'Product entity updated successfully'),
       );
 
       return res.status(HttpStatus.OK).json({ data: resData });

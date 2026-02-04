@@ -4,12 +4,10 @@ import { GetCurrentUserId } from 'src/common/decorators/current-user-id.decorato
 import type { Request, Response } from 'express';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { CommonDto } from 'src/auth/dto/common.dto';
-import { isValidImageBuffer, upload } from 'src/common/config/multer.config';
-import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
-import { File as MulterFile } from 'multer';
+import { AnyFilesInterceptor } from '@nestjs/platform-express';
+import { ImageUploadService } from '@/common/services/image-upload.service';
 import { ApiResponse } from '@/common/helper/response.helper';
 import { buildUserRootFolder, decryptData, encryptData } from '@/common/helper/common.helper';
-import { R2Service } from '@/common/helper/r2.helper';
 import { Account } from '@/common/enum/account.enum';
 import { AccountStatus } from '@/common/decorators/status.decorator';
 import { AccountStatusGuard } from '@/common/guards/status.guard';
@@ -17,16 +15,6 @@ import { AccountStatusGuard } from '@/common/guards/status.guard';
 @Controller({ path: 'user', version: '1' })
 export class UserController {
   constructor(private readonly userService: UserService) { }
-
-  @Post()
-  create(@Body() createUserDto: CommonDto) {
-    return this.userService.create(createUserDto);
-  }
-
-  @Get()
-  findAll() {
-    return this.userService.findAll();
-  }
 
   @UseGuards(JwtAuthGuard, AccountStatusGuard)
   @AccountStatus(Account.ACTIVE)
@@ -71,47 +59,50 @@ export class UserController {
   @UseGuards(JwtAuthGuard, AccountStatusGuard)
   @AccountStatus(Account.ACTIVE)
   @Patch("profile-pic")
-  @UseInterceptors(FileInterceptor("image", upload))
+  @UseInterceptors(AnyFilesInterceptor())
   async editUser(
     @GetCurrentUserId() userId: bigint,
-    @UploadedFile() file: MulterFile,
+    @Body() commonDto: CommonDto,
     @Res() res: Response,
     @Req() req: Request
   ) {
     try {
-      if (!file?.buffer) {
-        throw new BadRequestException("Image file is required");
-      }
+      const data = decryptData(commonDto.data);
 
-      const isValid = await isValidImageBuffer(file.buffer);
-      if (!isValid) {
-        throw new BadRequestException("Invalid image file");
+      if (!data?.image) {
+        throw new BadRequestException("Image is required");
       }
 
       const findUser = await this.userService.getUserForUpload(userId);
       const panNumber = findUser?.agentKYC?.pan_number;
 
-      if (findUser?.role?.name !== "ADMIN" && !panNumber) {
+      if (findUser?.role?.name === "AGENT" && !panNumber) {
         throw new BadRequestException("PAN not found. Complete KYC first.");
       }
 
       const rootFolder = buildUserRootFolder(
         `${findUser.first_name} ${findUser.last_name}`,
-        panNumber ?? "ADMIN"
+        panNumber ?? "admin"
       );
 
-      const ext = file.mimetype.split("/")[1];
-      const key = `${rootFolder}/profile.${ext}`;
-
-      await R2Service.upload(file.buffer, key, file.mimetype);
-
-      const user = await this.userService.updateProfileImage(userId, req.body, { key: key });
-
-
-      let result = JSON.stringify(user, (key, value) =>
-        typeof value === 'bigint' ? value.toString() : value,
+      const uploadResult = await ImageUploadService.uploadBase64ImageToR2(
+        data.image,
+        rootFolder,
+        `profile_${userId}`
       );
-      const resData = encryptData(new ApiResponse((JSON.parse(result)), "User profile updated successfully."));
+
+      const user = await this.userService.updateProfileImage(userId, data?.delete, {
+        key: uploadResult.key,
+      });
+
+      const result = JSON.stringify(user, (key, value) =>
+        typeof value === "bigint" ? value.toString() : value
+      );
+
+      const resData = encryptData(
+        new ApiResponse(JSON.parse(result), "User profile updated successfully.")
+      );
+
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error) {
       throw new BadRequestException(error.message);
@@ -122,19 +113,9 @@ export class UserController {
   @UseGuards(JwtAuthGuard, AccountStatusGuard)
   @AccountStatus(Account.ACTIVE)
   @Post("kyc")
-  @UseInterceptors(
-    FileFieldsInterceptor(
-      [
-        { name: "pan_image", maxCount: 1 },
-        { name: "aadhar_image", maxCount: 1 },
-        { name: "qr_code", maxCount: 1 },
-      ],
-      upload
-    )
-  )
+  @UseInterceptors(AnyFilesInterceptor())
   async submitKyc(
     @GetCurrentUserId() userId: bigint,
-    @UploadedFiles() files: any,
     @Body() kycDto: CommonDto,
     @Res() res: Response
   ) {
@@ -147,37 +128,31 @@ export class UserController {
         kycData.pan_number
       );
 
-      if (files.pan_image?.[0]) {
-        const ext = files.pan_image[0].mimetype.split("/")[1];
-        uploads.pan_image = `${rootFolder}/pan.${ext}`;
-
-        await R2Service.upload(
-          files.pan_image[0].buffer,
-          uploads.pan_image,
-          files.pan_image[0].mimetype
+      if (kycData?.pan_image) {
+        const { key } = await ImageUploadService.uploadBase64ImageToR2(
+          kycData.pan_image,
+          rootFolder,
+          "pan"
         );
+        uploads.pan_image = key;
       }
 
-      if (files.aadhar_image?.[0]) {
-        const ext = files.aadhar_image[0].mimetype.split("/")[1];
-        uploads.aadhar_image = `${rootFolder}/aadhar.${ext}`;
-
-        await R2Service.upload(
-          files.aadhar_image[0].buffer,
-          uploads.aadhar_image,
-          files.aadhar_image[0].mimetype
+      if (kycData?.aadhar_image) {
+        const { key } = await ImageUploadService.uploadBase64ImageToR2(
+          kycData.aadhar_image,
+          rootFolder,
+          "aadhar"
         );
+        uploads.aadhar_image = key;
       }
 
-      if (files.qr_code?.[0]) {
-        const ext = files.qr_code[0].mimetype.split("/")[1];
-        uploads.qr_code = `${rootFolder}/qr.${ext}`;
-
-        await R2Service.upload(
-          files.qr_code[0].buffer,
-          uploads.qr_code,
-          files.qr_code[0].mimetype
+      if (kycData?.qr_code) {
+        const { key } = await ImageUploadService.uploadBase64ImageToR2(
+          kycData.qr_code,
+          rootFolder,
+          "qr"
         );
+        uploads.qr_code = key;
       }
 
       const saved = await this.userService.saveKyc(userId, kycData, uploads);

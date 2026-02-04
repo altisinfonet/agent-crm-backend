@@ -12,7 +12,6 @@ export class MenuService {
   async create(createMenuDto: CommonDto) {
     try {
       const payload = decryptData(createMenuDto.data);
-      console.log("payload", payload);
 
       const foundMenuType = await this.prisma.menuType.findFirst({
         where: {
@@ -115,7 +114,6 @@ export class MenuService {
   async createMenuType(createMenuTypeDto: CommonDto) {
     try {
       const payload = decryptData(createMenuTypeDto.data);
-      console.log("payload", payload);
 
       const categorySlug = await generateSlug(
         payload.name,

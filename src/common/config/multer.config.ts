@@ -30,16 +30,6 @@ const storage = multer.diskStorage({
 });
 
 function checkFileType(file: any, cb: multer.FileFilterCallback) {
-    console.log('--- RAW FILE FROM FRONTEND (MULTER) ---');
-    console.log({
-        fieldname: file.fieldname,
-        originalname: file.originalname,
-        mimetype: file.mimetype,
-        encoding: file.encoding,
-    });
-    console.log(file, 'file');
-    console.log('--------------------------------------');
-
     try {
         const allowedImageExts = ['.jpeg', '.jpg', '.png', '.webp', '.gif', '.heic'];
         const allowedImageMimes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif', 'image/heic'];
@@ -59,7 +49,7 @@ function checkFileType(file: any, cb: multer.FileFilterCallback) {
             return cb(new BadRequestException('Invalid file type'));
         }
     } catch (error) {
-        console.error(error);
+        console.error("error", error)
     }
 }
 

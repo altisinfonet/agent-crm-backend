@@ -28,8 +28,6 @@ export class MailService {
     }
 
     async sendResetPasswordEmail(email: string, resetLink: string, token: string = '', expiry_minutes: number) {
-        console.log("resetLink", resetLink);
-
         const mailOptions = {
             to: email,
             subject: 'Reset your password',

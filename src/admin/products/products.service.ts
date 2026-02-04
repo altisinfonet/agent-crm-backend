@@ -27,6 +27,13 @@ export class ProductsService {
         dataToUpdate.desc = payload.desc.trim();
       }
 
+      if (
+        typeof payload?.status === 'string' &&
+        payload.status.trim().length > 0
+      ) {
+        dataToUpdate.status = payload.status;
+      }
+
       const res = await this.prisma.products.update({
         where: { id: product_id },
         data: dataToUpdate,
@@ -49,7 +56,7 @@ export class ProductsService {
     try {
       const products = await this.prisma.products.findMany({
         orderBy: {
-          created_at: "desc"
+          id: "desc"
         },
         select: {
           id: true,
@@ -66,7 +73,7 @@ export class ProductsService {
           },
           entities: {
             orderBy: {
-              created_at: "desc"
+              id: "desc"
             },
             select: {
               id: true,

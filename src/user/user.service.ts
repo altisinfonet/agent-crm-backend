@@ -231,11 +231,11 @@ export class UserService {
     }
   }
 
-  async updateProfileImage(userId: bigint, dto: any, file: { key?: string }) {
+  async updateProfileImage(userId: bigint, isDelete: boolean, file: { key?: string }) {
     try {
       let dataToUpdate: any = {};
 
-      if (Boolean(dto?.delete)) {
+      if (isDelete) {
         dataToUpdate.image = null;
       } else if (file?.key) {
         dataToUpdate.image = file.key;

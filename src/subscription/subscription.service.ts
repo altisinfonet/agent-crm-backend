@@ -17,7 +17,7 @@ export class SubscriptionService {
     await this.initRazorpay();
   }
   private async initRazorpay() {
-    const RazorpaySetting = await this.settingsService.paymentSettings();
+    const RazorpaySetting = await this.settingsService.paymentSettings("payment-settings");
 
     this.razorpay = new Razorpay({
       key_id: RazorpaySetting.RAZORPAY_KEY_ID,
@@ -113,7 +113,6 @@ export class SubscriptionService {
       if (existing) {
         throw new BadRequestException("Organization already has an active subscription");
       }
-      console.log("existing", existing);
 
       const TRIAL_DAYS = 0;
       const TEN_YEARS = 10;
@@ -132,11 +131,8 @@ export class SubscriptionService {
           trial_days: TRIAL_DAYS.toString()
         }
       };
-      console.log("rzpPayload", rzpPayload);
-
       try {
         const rzpSub = await this.razorpay.subscriptions.create(rzpPayload);
-        console.log("rzpSub", rzpSub);
         const orgSubscription =
           await this.prisma.organizationSubscription.create({
             data: {
@@ -222,14 +218,12 @@ export class SubscriptionService {
       }
       try {
         const fetchrzpSub = await this.razorpay.subscriptions.fetch(currentSub.rzp_subscription_id);
-        console.log("fetchrzpSub++++", fetchrzpSub);
 
         const cancel = await this.razorpay.subscriptions.cancel(
           currentSub.rzp_subscription_id,
           false
           // { cancel_at_cycle_end: 1 }
         );
-        console.log("cancel++++", cancel);
 
         const startAt = addDays(0, 2);
         const endAt = addYearsFrom(startAt, 10);
