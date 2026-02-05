@@ -20,8 +20,10 @@ export class OtpController {
         throw new BadRequestException(new ApiResponse(null, 'Invalid Credential.', false));
       }
     } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to send OTP.");
     }
   }
 
@@ -35,7 +37,10 @@ export class OtpController {
         throw new BadRequestException(new ApiResponse(null, 'Invalid Credential.', false));
       }
     } catch (error) {
-      throw error;
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to verify OTP.");
     }
   }
 

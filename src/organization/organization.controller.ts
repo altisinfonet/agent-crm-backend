@@ -38,8 +38,10 @@ export class OrganizationController {
             const resData = encryptData(new ApiResponse((JSON.parse(result)), "Agent organizations data fetched successfully."));
             return res.status(HttpStatus.OK).json({ data: resData });
         } catch (error: any) {
-            console.log('error: ', error);
-            throw new BadRequestException(error.response);
+            if (error.status && error.response) {
+                return res.status(error.status).json(error.response);
+            }
+            throw new BadRequestException("Failed to read organization data.");
         }
     }
 
@@ -58,8 +60,10 @@ export class OrganizationController {
             const resData = encryptData(new ApiResponse((JSON.parse(result)), "Agent organization`s inforamtion updated successfully."));
             return res.status(HttpStatus.OK).json({ data: resData });
         } catch (error: any) {
-            console.log('error: ', error);
-            throw new BadRequestException(error.response);
+            if (error.status && error.response) {
+                return res.status(error.status).json(error.response);
+            }
+            throw new BadRequestException("Failed to update organization data.");
         }
     }
 

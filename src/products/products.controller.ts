@@ -36,7 +36,10 @@ export class ProductsController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Fetched all products."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to read products.");
     }
   }
 
@@ -56,8 +59,10 @@ export class ProductsController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Product enetity list"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to read product entities.");
     }
   }
 
@@ -79,8 +84,10 @@ export class ProductsController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Agent product enetity created successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to create agent product entity.");
     }
   }
 
@@ -101,7 +108,10 @@ export class ProductsController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Get All Agent product entities"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to read agent product entities.");
     }
   }
 
@@ -123,8 +133,10 @@ export class ProductsController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Agent product enetity deleted successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to delete agent product entity.");
     }
   }
 }

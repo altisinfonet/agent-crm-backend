@@ -10,12 +10,108 @@ export class UserService {
   constructor(
     private prisma: PrismaService,
   ) { }
-  create(createUserDto: CommonDto) {
-    return 'This action adds a new user';
+
+  async getCountryLists(
+    page = 1,
+    limit = 10,
+    search?: string,
+  ) {
+    try {
+      const skip = (page - 1) * limit;
+
+      const where: any = {
+        status: 'ACTIVE',
+      };
+
+      if (search) {
+        where.OR = [
+          { name: { contains: search, mode: 'insensitive' } },
+          { iso_code: { contains: search, mode: 'insensitive' } },
+          { phone_code: { contains: search, mode: 'insensitive' } },
+          { region: { contains: search, mode: 'insensitive' } },
+          { timezone: { contains: search, mode: 'insensitive' } },
+        ];
+      }
+
+      const [countries, total] = await this.prisma.$transaction([
+        this.prisma.country.findMany({
+          where,
+          select: {
+            id: true,
+            name: true,
+            region: true,
+            image: true,
+            iso_code: true,
+            phone_code: true,
+            phoneLength: true,
+            timezone: true,
+            utc_offset_min: true,
+            created_at: true,
+          },
+          skip,
+          take: limit,
+          orderBy: {
+            name: 'asc',
+          },
+        }),
+        this.prisma.country.count({ where }),
+      ]);
+
+      return {
+        Countries: countries,
+        Total: total
+      };
+    } catch (error) {
+      throw error;
+    }
   }
 
-  findAll() {
-    return `This action returns all user`;
+  async getCurrencyLists(
+    page = 1,
+    limit = 10,
+    search?: string,
+  ) {
+    try {
+      const skip = (page - 1) * limit;
+
+      const where: any = {
+        status: 'ACTIVE',
+      };
+
+      if (search) {
+        where.OR = [
+          { name: { contains: search, mode: 'insensitive' } },
+          { code: { contains: search, mode: 'insensitive' } },
+          { symbol: { contains: search, mode: 'insensitive' } },
+        ];
+      }
+
+      const [currencies, total] = await this.prisma.$transaction([
+        this.prisma.currency.findMany({
+          where,
+          select: {
+            id: true,
+            name: true,
+            code: true,
+            symbol: true,
+            exchange_rate: true,
+          },
+          skip,
+          take: limit,
+          orderBy: {
+            name: 'asc',
+          },
+        }),
+        this.prisma.currency.count({ where }),
+      ]);
+
+      return {
+        Currencies: currencies,
+        Total: total
+      };
+    } catch (error) {
+      throw error;
+    }
   }
 
   async getCurrentUser(userId: bigint) {
@@ -30,6 +126,7 @@ export class UserService {
           phone_no: true,
           image: true,
           auth_method: true,
+          onboardingStatus: true,
           role: {
             select: {
               id: true,
@@ -46,7 +143,27 @@ export class UserService {
         throw new NotFoundException("User not found");
       }
 
-      const isAgent = user.role?.name === "AGENT";
+      const agentOrg = await this.prisma.organizationUser.findFirst({
+        where: {
+          user_id: userId,
+        },
+      })
+
+      const subscriptionCount = agentOrg
+        ? await this.prisma.organizationSubscription.count({
+          where: {
+            org_id: agentOrg.org_id,
+            status: {
+              in: ['ACTIVE', 'UPGRADED'],
+            },
+          },
+        })
+        : 0;
+
+      const isSubscribed = subscriptionCount > 0;
+
+      const isAgent = user.role?.name === 'AGENT';
+      let agentExtras = {};
       if (isAgent) {
         const agentData = await this.prisma.user.findUnique({
           where: { id: userId },
@@ -55,70 +172,25 @@ export class UserService {
             currency: true,
           },
         });
-
-        Object.assign(user, agentData);
+        agentExtras = agentData ?? {};
       }
 
-      if (user.image) {
-        user.image = await R2Service.getSignedUrl(user.image);
+      let image = user.image;
+      if (image) {
+        image = await R2Service.getSignedUrl(image);
       }
 
-      return user;
+      return {
+        ...user,
+        ...agentExtras,
+        image,
+        isSubscribed,
+      };
+
     } catch (error) {
       throw error
     }
   }
-
-  //   async getCurrentUser(userId: bigint) {
-  //   try {
-  //     const user = await this.prisma.user.findUnique({
-  //       where: { id: userId },
-  //       select: {
-  //         id: true,
-  //         first_name: true,
-  //         last_name: true,
-  //         email: true,
-  //         phone_no: true,
-  //         image: true,
-  //         auth_method: true,
-  //         is_deleted: true,
-  //         is_temporary: true,
-  //         created_at: true,
-  //         role: {
-  //           select: {
-  //             id: true,
-  //             name: true,
-  //           },
-  //         },
-  //         country: true,
-  //         currency: true,
-  //       },
-  //     });
-
-  //     if (!user) {
-  //       throw new NotFoundException("User not found");
-  //     }
-
-  //     const timezone =
-  //       user.country?.timezone ||
-  //       process.env.DEFAULT_TIMEZONE ||
-  //       "UTC";
-
-  //     const formattedUser = {
-  //       ...user,
-  //       created_at: convertUTCToTimezone(user.created_at, timezone),
-  //     };
-
-  //     if (user.image) {
-  //       formattedUser.image = await R2Service.getSignedUrl(user.image);
-  //     }
-
-  //     return formattedUser;
-
-  //   } catch (error) {
-  //     throw error
-  //   }
-  // }
 
   async getUserForUpload(userId: bigint) {
     const user = await this.prisma.user.findUnique({
@@ -226,7 +298,6 @@ export class UserService {
       }
       return this.getCurrentUser(userId);
     } catch (error) {
-      console.log("error", error);
       throw error
     }
   }
@@ -300,6 +371,15 @@ export class UserService {
               product_entity_id: BigInt(entityId),
             })),
             skipDuplicates: true,
+          });
+        }
+
+        if (kycData?.onboardingStatus) {
+          await tx.user.update({
+            where: { id: userId },
+            data: {
+              onboardingStatus: kycData.onboardingStatus,
+            },
           });
         }
 
@@ -425,7 +505,4 @@ export class UserService {
     }
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} user`;
-  }
 }

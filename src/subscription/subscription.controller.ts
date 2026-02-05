@@ -40,7 +40,10 @@ export class SubscriptionController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "All Plans"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to read subscription plans.");
     }
   }
 
@@ -60,7 +63,10 @@ export class SubscriptionController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription initiated"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to initiate subscription.");
     }
   }
 
@@ -78,7 +84,10 @@ export class SubscriptionController {
         .status(HttpStatus.OK)
         .json({ message: 'Webhook processed successfully' });
     } catch (error) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to process webhook.");
     }
   }
 
@@ -99,7 +108,10 @@ export class SubscriptionController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription upgraded"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to upgrade subscription.");
     }
   }
 
@@ -119,7 +131,10 @@ export class SubscriptionController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription cancelled"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to cancel subscription.");
     }
   }
 

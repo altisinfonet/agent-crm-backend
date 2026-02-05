@@ -46,6 +46,12 @@ enum ApprovalStatus {
     REJECTED
 }
 
+enum OnboardingStatus {
+    INCOMPLETED
+    ONGOING
+    COMPLETED
+}
+
 enum SubscriptionStatus {
     PENDING
     ACTIVE
@@ -300,6 +306,7 @@ model User {
     is_deleted           Boolean              @default(false)
     created_at           DateTime             @default(now())
     updated_at           DateTime             @updatedAt
+    onboardingStatus     OnboardingStatus     @default(INCOMPLETED)
     invalidatedTokens    InvalidatedToken[]
     userFCMTokens        UserFCMToken[]
     organizations        Organization[]       @relation("OrgCreatedBy")

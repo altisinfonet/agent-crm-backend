@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, HttpStatus, Res, BadRequestException, UploadedFile, UseInterceptors, Req, UploadedFiles } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, HttpStatus, Res, BadRequestException, UploadedFile, UseInterceptors, Req, UploadedFiles, Query } from '@nestjs/common';
 import { UserService } from './user.service';
 import { GetCurrentUserId } from 'src/common/decorators/current-user-id.decorator';
 import type { Request, Response } from 'express';
@@ -8,9 +8,9 @@ import { AnyFilesInterceptor } from '@nestjs/platform-express';
 import { ImageUploadService } from '@/common/services/image-upload.service';
 import { ApiResponse } from '@/common/helper/response.helper';
 import { buildUserRootFolder, decryptData, encryptData } from '@/common/helper/common.helper';
-import { Account } from '@/common/enum/account.enum';
-import { AccountStatus } from '@/common/decorators/status.decorator';
-import { AccountStatusGuard } from '@/common/guards/status.guard';
+import { Account, Onboarding } from '@/common/enum/account.enum';
+import { AccountStatus, OnboardingStatus } from '@/common/decorators/status.decorator';
+import { AccountStatusGuard, OnboardingStatusGuard } from '@/common/guards/status.guard';
 
 @Controller({ path: 'user', version: '1' })
 export class UserController {
@@ -31,7 +31,10 @@ export class UserController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Fetched user data"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to read user data.");
     }
   }
 
@@ -52,7 +55,10 @@ export class UserController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "User profile updated successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to update user profile.");
     }
   }
 
@@ -105,7 +111,10 @@ export class UserController {
 
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error) {
-      throw new BadRequestException(error.message);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to update user profile.");
     }
   }
 
@@ -162,8 +171,11 @@ export class UserController {
           new ApiResponse(saved, "KYC details updated successfully")
         ),
       });
-    } catch (error) {
-      throw new BadRequestException(error.message);
+    } catch (error: any) {
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to submit KYC details.");
     }
   }
 
@@ -182,7 +194,10 @@ export class UserController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Fetched agent KYC details."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch agent KYC details.");
     }
   }
 
@@ -197,13 +212,56 @@ export class UserController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Faqs."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to read FAQs.");
     }
   }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.userService.remove(+id);
+  @Get('country/list')
+  async getCountries(
+    @Res({ passthrough: true }) res: Response,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+  ) {
+    try {
+      const data = await this.userService.getCountryLists(page, limit, search);
+      let result = JSON.stringify(data, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Fetched country lists"));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error: any) {
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to read country lists.");
+    }
   }
+
+
+  @Get('currency/list')
+  async getCurrencies(
+    @Res({ passthrough: true }) res: Response,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('search') search?: string,
+  ) {
+    try {
+      const data = await this.userService.getCurrencyLists(page, limit, search);
+      let result = JSON.stringify(data, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Fetched currency lists"));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error: any) {
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to read currency lists.");
+    }
+  }
+
 }

@@ -30,7 +30,25 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
             throw new UnauthorizedException('Session expired');
         }
 
-        return payload;
+        const user = await this.prisma.user.findUnique({
+            where: { id: BigInt(payload.sub) },
+            select: {
+                id: true,
+                email: true,
+                onboardingStatus: true,
+            },
+        });
+
+        if (!user) {
+            throw new UnauthorizedException('Invalid token');
+        }
+
+        return {
+            ...payload,
+            userId: user.id,
+            email: user.email,
+            onboardingStatus: user.onboardingStatus,
+        };
     }
 
 }

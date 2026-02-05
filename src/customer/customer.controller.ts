@@ -40,7 +40,10 @@ export class CustomerController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Customer created successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to create customer.");
     }
   }
 
@@ -59,7 +62,10 @@ export class CustomerController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Customer details updated successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to update customer details.");
     }
   }
 
@@ -79,7 +85,10 @@ export class CustomerController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Product sell to customer."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to sell product to customer.");
     }
   }
 
@@ -97,7 +106,10 @@ export class CustomerController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "All customer lists."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch customer list.");
     }
   }
 
@@ -115,7 +127,10 @@ export class CustomerController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Customer."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch customer details.");
     }
   }
 
@@ -134,7 +149,10 @@ export class CustomerController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Sell product updated successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to update customer details.");
     }
   }
 

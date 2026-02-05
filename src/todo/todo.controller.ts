@@ -40,7 +40,10 @@ export class TodoController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Todo created successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to read notifications.");
     }
   }
 
@@ -58,7 +61,10 @@ export class TodoController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Todo list."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to read todo list.");
     }
   }
 
@@ -76,7 +82,10 @@ export class TodoController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Todo list."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to read todo details.");
     }
   }
 
@@ -95,7 +104,10 @@ export class TodoController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Todo updated successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to update todo.");
     }
   }
 
@@ -113,7 +125,10 @@ export class TodoController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Todo deleted successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to delete todo.");
     }
   }
 }

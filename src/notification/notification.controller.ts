@@ -41,7 +41,10 @@ export class NotificationController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "FCM token added."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to add FCM token.");
     }
   }
 
@@ -60,7 +63,10 @@ export class NotificationController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Send firbase notification"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to send notification.");
     }
   }
 
@@ -78,8 +84,10 @@ export class NotificationController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "All in-app notification list."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch in-app notification list.");
     }
   }
 
@@ -96,7 +104,10 @@ export class NotificationController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "All notifications read."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to read notifications.");
     }
   }
 
@@ -113,7 +124,10 @@ export class NotificationController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Birthday notification sended to agents."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to send birthday notifications.");
     }
   }
 

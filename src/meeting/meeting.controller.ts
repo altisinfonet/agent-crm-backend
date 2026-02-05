@@ -39,7 +39,10 @@ export class MeetingController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Meeting created successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to create meeting.");
     }
   }
 
@@ -56,7 +59,10 @@ export class MeetingController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "All meeting lists."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch meeting list.");
     }
   }
 
@@ -73,7 +79,10 @@ export class MeetingController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Meeting."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch meeting details.");
     }
   }
 
@@ -91,7 +100,10 @@ export class MeetingController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Meeting updated successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to update meeting details.");
     }
   }
 
@@ -108,7 +120,10 @@ export class MeetingController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Meeting deleted successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to delete meeting.");
     }
   }
 }

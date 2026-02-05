@@ -46,7 +46,10 @@ export class AdminSettingsController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Settings created successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to create admin settings.");
     }
   }
 
@@ -67,7 +70,10 @@ export class AdminSettingsController {
       return res.status(HttpStatus.OK).json({ data: resData });
 
     } catch (error: any) {
-      throw new BadRequestException(error.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to read admin settings.");
     }
   }
 
@@ -100,7 +106,10 @@ export class AdminSettingsController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Settings updated successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      throw new BadRequestException((error.response));
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to update admin settings.");
     }
   }
 
