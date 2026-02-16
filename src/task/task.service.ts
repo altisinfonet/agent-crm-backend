@@ -214,6 +214,30 @@ export class TaskService {
         return cycleEnd;
     }
 
+    async finalizeCancelledSubscriptions() {
+        const now = new Date();
+        const subscriptions =
+            await this.prisma.organizationSubscription.findMany({
+                where: {
+                    status: "ACTIVE",
+                    auto_renew: false,
+                    end_at: {
+                        lte: now,
+                    },
+                },
+            });
+
+        for (const sub of subscriptions) {
+            await this.prisma.organizationSubscription.update({
+                where: { id: sub.id },
+                data: {
+                    status: "CANCELLED",
+                    cancelled_at: now,
+                },
+            });
+        }
+        this.logger.log(`[CRON] Finalized ${subscriptions.length} cancelled subscriptions`);
+    }
 
 
     @Cron(CronExpression.EVERY_DAY_AT_10AM)

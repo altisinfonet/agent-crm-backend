@@ -31,34 +31,40 @@ export class SubscriptionService {
         weekly: SubscriptionCycle.WEEKLY,
         monthly: SubscriptionCycle.MONTHLY,
         quarterly: SubscriptionCycle.QUARTERLY,
-        yearly: SubscriptionCycle.YEARLY
+        yearly: SubscriptionCycle.YEARLY,
       };
 
-      const rzpPlans = await this.razorpay.plans.all({
-        count: 100
-      });
+      const rzpPlans = await this.razorpay.plans.all({ count: 100 });
+      const results: any[] = [];
 
-      const results: any = [];
       for (const rzpPlan of rzpPlans.items) {
-        const price = Number(rzpPlan.item.amount);
-        const currencyCode = rzpPlan.item.currency;
+        const existingPlan = await this.prisma.subscriptionPlan.findUnique({
+          where: { rzp_plan_id: rzpPlan.id },
+          select: { id: true },
+        });
 
+        if (existingPlan) {
+          continue;
+        }
         const billingCycle = cycleMap[rzpPlan.period];
         if (!billingCycle) continue;
 
+        const price = Number(rzpPlan.item.amount);
+        const currencyCode = rzpPlan.item.currency;
+
         const currency = await this.prisma.currency.findFirst({
-          where: { code: currencyCode }
+          where: { code: currencyCode },
         });
         if (!currency) continue;
-        const plan = await this.prisma.subscriptionPlan.upsert({
-          where: { rzp_plan_id: rzpPlan.id },
-          update: {
-            name: rzpPlan.item.name,
-            description: rzpPlan.item.description,
-            price,
-            billing_cycle: billingCycle
-          },
-          create: {
+
+        const baseCode = rzpPlan.item.name.trim()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '')
+
+        const finalCode = await this.generateUniquePlanCode(baseCode);
+
+        const plan = await this.prisma.subscriptionPlan.create({
+          data: {
             rzp_plan_id: rzpPlan.id,
             name: rzpPlan.item.name,
             description: rzpPlan.item.description,
@@ -67,17 +73,16 @@ export class SubscriptionService {
             billing_cycle: billingCycle,
             max_customers: 5,
             is_active: false,
-            code: rzpPlan.item.name
-          }
+            code: finalCode,
+          },
         });
 
         results.push(plan);
       }
 
       return results;
-
     } catch (error) {
-      throw error
+      throw error;
     }
   }
 
@@ -93,6 +98,7 @@ export class SubscriptionService {
           name: true,
           description: true,
           price: true,
+          is_popular: true,
           billing_cycle: true,
           max_customers: true,
           is_active: true,
@@ -127,6 +133,7 @@ export class SubscriptionService {
           name: true,
           description: true,
           price: true,
+          is_popular: true,
           billing_cycle: true,
           is_active: true,
           rzp_plan_id: true,
@@ -154,6 +161,7 @@ export class SubscriptionService {
         name: plan?.name,
         description: plan?.description,
         price: plan?.price,
+        is_popular: plan?.is_popular,
         currency: plan?.currency,
         billing_cycle: plan?.billing_cycle,
         is_active: plan?.is_active,
@@ -176,6 +184,7 @@ export class SubscriptionService {
       description,
       max_customers,
       is_active,
+      is_popular,
       code,
       features,
     } = payload;
@@ -202,6 +211,7 @@ export class SubscriptionService {
           description,
           max_customers,
           is_active,
+          is_popular,
           code,
         },
       });
@@ -226,10 +236,16 @@ export class SubscriptionService {
   async adminUpgradeSubscription(dto: CommonDto) {
     try {
       const payload = decryptData(dto.data);
-      const { orgId, planId, durationDays } = payload;
+      console.log("payload", payload);
+
+      const { orgId, planId, endDate } = payload;
 
       if (!orgId || !planId) {
         throw new BadRequestException("organization Id and plan Id are required.");
+      }
+
+      if (!endDate) {
+        throw new BadRequestException("Subscription end date is required.");
       }
 
       const plan = await this.prisma.subscriptionPlan.findUnique({
@@ -247,6 +263,7 @@ export class SubscriptionService {
             status: "ACTIVE"
           }
         });
+        console.log("activeSub", activeSub);
 
         if (activeSub && activeSub.source === "ADMIN") {
           await tx.organizationSubscription.update({
@@ -254,9 +271,7 @@ export class SubscriptionService {
             data: {
               plan_id: planId,
               start_at: new Date(),
-              end_at: durationDays
-                ? new Date(Date.now() + durationDays * 86400000)
-                : null
+              end_at: endDate
             }
           });
           return;
@@ -278,9 +293,7 @@ export class SubscriptionService {
             status: "ACTIVE",
             source: "ADMIN",
             start_at: new Date(),
-            end_at: durationDays
-              ? new Date(Date.now() + durationDays * 86400000)
-              : null,
+            end_at: endDate,
             auto_renew: false
           }
         });
@@ -295,7 +308,7 @@ export class SubscriptionService {
   async adminAssignSubscriptionToAgent(dto: CommonDto) {
     try {
       const payload = decryptData(dto.data);
-      const { orgId, planId, durationDays } = payload;
+      const { orgId, planId, endDate } = payload;
       if (!orgId || !planId) {
         throw new BadRequestException("organization Id and plan Id are required.");
       }
@@ -327,9 +340,70 @@ export class SubscriptionService {
           status: "ACTIVE",
           source: "ADMIN",
           start_at: new Date(),
-          end_at: durationDays
-            ? new Date(Date.now() + durationDays * 86400000)
-            : null,
+          end_at: endDate,
+          auto_renew: false,
+        },
+      });
+
+      return true;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+
+  async cancelSubscription(user_id: bigint) {
+    try {
+      const org = await this.prisma.organization.findUnique({
+        where: { created_by: user_id },
+        select: { id: true },
+      });
+
+      if (!org) return;
+
+      const orgSubscription =
+        await this.prisma.organizationSubscription.findFirst({
+          orderBy: { created_at: "desc" },
+          where: {
+            org_id: org.id,
+            status: "ACTIVE",
+          },
+        });
+
+      if (!orgSubscription?.rzp_subscription_id) return;
+
+      let rzpSub: any;
+
+      try {
+        rzpSub = await this.razorpay.subscriptions.fetch(
+          orgSubscription.rzp_subscription_id
+        );
+      } catch (error) {
+        console.error("[RAZORPAY_FETCH_FAILED]", error?.error || error);
+        return;
+      }
+
+      try {
+        if (rzpSub.paid_count === 0) {
+          await this.razorpay.subscriptions.pause(
+            orgSubscription.rzp_subscription_id
+          );
+        } else {
+          await this.razorpay.subscriptions.cancel(
+            orgSubscription.rzp_subscription_id,
+            true
+          );
+        }
+      } catch (error: any) {
+        console.error(
+          "[RAZORPAY_TERMINATION_FAILED]",
+          error?.error || error
+        );
+      }
+
+      await this.prisma.organizationSubscription.update({
+        where: { id: orgSubscription.id },
+        data: {
           auto_renew: false,
         },
       });
@@ -480,6 +554,25 @@ export class SubscriptionService {
       };
     } catch (error) {
       throw error;
+    }
+  }
+
+  private async generateUniquePlanCode(baseCode: string) {
+    let code = baseCode;
+    let counter = 1;
+
+    while (true) {
+      const exists = await this.prisma.subscriptionPlan.findUnique({
+        where: { code },
+        select: { id: true },
+      });
+
+      if (!exists) {
+        return code;
+      }
+
+      code = `${baseCode}-${counter}`;
+      counter++;
     }
   }
 

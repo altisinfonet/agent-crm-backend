@@ -128,6 +128,10 @@ export class AuthService {
                 },
             });
 
+            if (user?.status === "INACTIVE") {
+                throw new BadRequestException('Sorry, your account is Suspended.');
+            }
+
             if (auth_method === 'GOOGLE' || auth_method === 'APPLE') {
                 if (!provider_id) {
                     throw new BadRequestException('Provider ID required');
@@ -174,16 +178,16 @@ export class AuthService {
                         status: true
                     },
                 });
-                const org = await this.prisma.organization.create({
-                    data: {
-                        name: `${first_name} ${last_name}`,
-                        created_by: user?.id,
-                        gst_number: "",
-                        pan_number: "",
-                        contact_email: email,
-                        contact_phone: phone_no,
-                    }
-                })
+                // const org = await this.prisma.organization.create({
+                //     data: {
+                //         name: `${first_name} ${last_name}`,
+                //         created_by: user?.id,
+                //         gst_number: "",
+                //         pan_number: "",
+                //         contact_email: email,
+                //         contact_phone: phone_no,
+                //     }
+                // })
             }
 
             // 6️⃣ Generate tokens

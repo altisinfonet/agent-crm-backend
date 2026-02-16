@@ -53,22 +53,22 @@ function checkFileType(file: any, cb: multer.FileFilterCallback) {
     }
 }
 
-const upload = multer({
-    storage: storage,
-    fileFilter: function (req, file, cb) {
-        checkFileType(file, cb);
-    }
-});
-
 // const upload = multer({
-//     storage: multer.memoryStorage(),
-//     fileFilter: (req, file, cb) => {
+//     storage: storage,
+//     fileFilter: function (req, file, cb) {
 //         checkFileType(file, cb);
-//     },
-//     limits: {
-//         fileSize: 5 * 1024 * 1024,
-//     },
+//     }
 // });
+
+const upload = multer({
+    storage: multer.memoryStorage(),
+    fileFilter: (req, file, cb) => {
+        checkFileType(file, cb);
+    },
+    limits: {
+        fileSize: 5 * 1024 * 1024,
+    },
+});
 
 
 

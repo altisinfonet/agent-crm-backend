@@ -59,7 +59,7 @@ enum SubscriptionStatus {
     UPGRADED
     CANCELLED
     EXPIRED
-    HALTED
+    INCOMPLETE
 }
 
 enum SubscriptionSource {
@@ -330,9 +330,10 @@ model AgentKYC {
     agent          User           @relation(fields: [agent_id], references: [id])
     kyc_status     ApprovalStatus @default(PENDING)
     pan_number     String
-    pan_image      String
+    pan_image      String?
     aadhar_number  String
-    aadhar_image   String
+    aadhar_front   String?
+    aadhar_back    String?
     bank_name      String
     account_number String
     branch_name    String
@@ -726,6 +727,8 @@ model OrganizationSubscription {
     reconciliation_attempts   Int                    @default(0)
     last_reconciled_at        DateTime?
     expiry_reminder_days_sent Int[]                  @default([])
+    rzp_payment_id            String?                @unique
+    signature                 String?                @unique
     created_at                DateTime               @default(now())
     updated_at                DateTime               @updatedAt
     razorpaySubscriptions     RazorpaySubscription[]

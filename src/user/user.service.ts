@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CommonDto } from 'src/auth/dto/common.dto';
 import * as bcrypt from 'bcrypt';
@@ -114,6 +114,87 @@ export class UserService {
     }
   }
 
+  // async getCurrentUser(userId: bigint) {
+  //   try {
+  //     const user = await this.prisma.user.findUnique({
+  //       where: { id: userId },
+  //       select: {
+  //         id: true,
+  //         first_name: true,
+  //         last_name: true,
+  //         email: true,
+  //         phone_no: true,
+  //         image: true,
+  //         auth_method: true,
+  //         dob: true,
+  //         country: true,
+  //         currency: true,
+  //         onboardingStatus: true,
+  //         role: {
+  //           select: {
+  //             id: true,
+  //             name: true,
+  //           },
+  //         },
+  //         is_deleted: true,
+  //         is_temporary: true,
+  //         created_at: true,
+  //       },
+  //     });
+
+  //     if (!user) {
+  //       throw new NotFoundException("User not found");
+  //     }
+
+  //     const agentOrg = await this.prisma.organizationUser.findFirst({
+  //       where: {
+  //         user_id: userId,
+  //       },
+  //     })
+
+  //     const subscriptionCount = agentOrg
+  //       ? await this.prisma.organizationSubscription.count({
+  //         where: {
+  //           org_id: agentOrg.org_id,
+  //           status: {
+  //             in: ['ACTIVE', 'UPGRADED'],
+  //           },
+  //         },
+  //       })
+  //       : 0;
+
+  //     const isSubscribed = subscriptionCount > 0;
+
+  //     const isAgent = user.role?.name === 'AGENT';
+  //     let agentExtras = {};
+  //     if (isAgent) {
+  //       const agentData = await this.prisma.user.findUnique({
+  //         where: { id: userId },
+  //         select: {
+  //           country: true,
+  //           currency: true,
+  //         },
+  //       });
+  //       agentExtras = agentData ?? {};
+  //     }
+
+  //     let image = user.image;
+  //     if (image) {
+  //       image = await R2Service.getSignedUrl(image);
+  //     }
+
+  //     return {
+  //       ...user,
+  //       ...agentExtras,
+  //       image,
+  //       isSubscribed,
+  //     };
+
+  //   } catch (error) {
+  //     throw error
+  //   }
+  // }
+
   async getCurrentUser(userId: bigint) {
     try {
       const user = await this.prisma.user.findUnique({
@@ -126,6 +207,9 @@ export class UserService {
           phone_no: true,
           image: true,
           auth_method: true,
+          dob: true,
+          country: true,
+          currency: true,
           onboardingStatus: true,
           role: {
             select: {
@@ -140,39 +224,42 @@ export class UserService {
       });
 
       if (!user) {
-        throw new NotFoundException("User not found");
+        throw new NotFoundException('User not found');
       }
 
-      const agentOrg = await this.prisma.organizationUser.findFirst({
-        where: {
-          user_id: userId,
-        },
-      })
-
-      const subscriptionCount = agentOrg
-        ? await this.prisma.organizationSubscription.count({
-          where: {
-            org_id: agentOrg.org_id,
-            status: {
-              in: ['ACTIVE', 'UPGRADED'],
-            },
-          },
-        })
-        : 0;
-
-      const isSubscribed = subscriptionCount > 0;
-
-      const isAgent = user.role?.name === 'AGENT';
       let agentExtras = {};
-      if (isAgent) {
+
+      if (user.role?.name === 'AGENT') {
         const agentData = await this.prisma.user.findUnique({
           where: { id: userId },
           select: {
-            country: true,
-            currency: true,
+            organizations: {
+              select: {
+                subscription: {
+                  orderBy: {
+                    created_at: 'desc', // get latest subscription
+                  },
+                  select: {
+                    status: true,
+                  },
+                  take: 1,
+                },
+              },
+            },
           },
         });
-        agentExtras = agentData ?? {};
+
+        const subscriptionStatus =
+          agentData?.organizations?.[0]?.subscription?.[0]?.status ?? null;
+
+        const isSubscribed =
+          subscriptionStatus === 'ACTIVE' ||
+          subscriptionStatus === 'UPGRADED';
+
+        agentExtras = {
+          subscriptionStatus,
+          isSubscribed,
+        };
       }
 
       let image = user.image;
@@ -184,11 +271,9 @@ export class UserService {
         ...user,
         ...agentExtras,
         image,
-        isSubscribed,
       };
-
     } catch (error) {
-      throw error
+      throw error;
     }
   }
 
@@ -233,6 +318,7 @@ export class UserService {
         dob,
         old_password,
         new_password,
+        onboardingStatus,
         country_id,
         currency_id
       } = payload;
@@ -252,6 +338,7 @@ export class UserService {
       if (first_name) updateData.first_name = first_name;
       if (last_name) updateData.last_name = last_name;
       if (dob) updateData.dob = dob;
+      if (onboardingStatus) updateData.onboardingStatus = onboardingStatus;
       if (country_id) updateData.country_id = country_id;
       if (currency_id) updateData.currency_id = currency_id;
 
@@ -329,16 +416,6 @@ export class UserService {
 
   async saveKyc(userId: bigint, kycData: any, files: any) {
     try {
-      if (!files?.pan_image) {
-        throw new BadRequestException("PAN card image is required.")
-      }
-      if (!files?.aadhar_image) {
-        throw new BadRequestException("AADHAR card image is required.")
-      }
-      if (!files?.qr_code) {
-        throw new BadRequestException("QR code is required.")
-      }
-
       const data = {
         pan_number: kycData?.pan_number,
         aadhar_number: kycData?.aadhar_number,
@@ -348,19 +425,33 @@ export class UserService {
         ifsc_code: kycData?.ifsc_code,
         upi_id: kycData?.upi_id,
       }
+      const organizationId = kycData?.organizationId ? BigInt(kycData.organizationId) : null;
       const entity_ids: bigint[] = kycData?.entity_ids || [];
 
       return await this.prisma.$transaction(async (tx) => {
+        const user = await tx.user.findUnique({
+          where: { id: userId },
+        });
+
+        if (!user) {
+          throw new UnauthorizedException("Unauthorized");
+        }
         const kyc = await tx.agentKYC.upsert({
           where: { agent_id: userId },
           update: {
             ...data,
-            ...files,
+            pan_image: files?.pan_image,
+            aadhar_front: files?.aadhar_front,
+            aadhar_back: files?.aadhar_back,
+            qr_code: files?.qr_code,
           },
           create: {
             agent_id: userId,
             ...data,
-            ...files,
+            pan_image: files?.pan_image,
+            aadhar_front: files?.aadhar_front,
+            aadhar_back: files?.aadhar_back,
+            qr_code: files?.qr_code,
           },
         });
 
@@ -374,13 +465,49 @@ export class UserService {
           });
         }
 
-        if (kycData?.onboardingStatus) {
-          await tx.user.update({
-            where: { id: userId },
-            data: {
-              onboardingStatus: kycData.onboardingStatus,
+        if (organizationId) {
+          const organizationUser = await tx.organizationUser.findFirst({
+            where: {
+              user_id: userId,
+              org_id: organizationId,
             },
           });
+          if (!organizationUser) {
+            await tx.organizationUser.create({
+              data: {
+                org_id: organizationId,
+                user_id: userId,
+                role_id: user?.role_id,
+                is_owner: false
+              }
+            })
+          }
+        } else {
+          const existingOrg = await tx.organization.findFirst({
+            where: {
+              created_by: userId,
+            },
+          });
+          if (!existingOrg) {
+            const org = await this.prisma.organization.create({
+              data: {
+                name: kycData?.username,
+                created_by: userId,
+                contact_email: user?.email,
+                contact_phone: user?.phone_no,
+                gst_number: kycData?.pan_number,
+                pan_number: kycData?.aadhar_number,
+              }
+            })
+            await tx.organizationUser.create({
+              data: {
+                org_id: org.id,
+                user_id: userId,
+                role_id: user?.role_id,
+                is_owner: true
+              }
+            })
+          }
         }
 
         return kyc;
@@ -410,7 +537,8 @@ export class UserService {
               pan_number: true,
               pan_image: true,
               aadhar_number: true,
-              aadhar_image: true,
+              aadhar_front: true,
+              aadhar_back: true,
               account_number: true,
               bank_name: true,
               branch_name: true,
@@ -427,7 +555,8 @@ export class UserService {
       const [
         profileImage,
         panImage,
-        aadharImage,
+        aadhar_front,
+        aadhar_back,
         qrCode,
       ] = await Promise.all([
         agent.image
@@ -436,8 +565,11 @@ export class UserService {
         agent.agentKYC?.pan_image
           ? R2Service.getSignedUrl(agent.agentKYC.pan_image)
           : null,
-        agent.agentKYC?.aadhar_image
-          ? R2Service.getSignedUrl(agent.agentKYC.aadhar_image)
+        agent.agentKYC?.aadhar_front
+          ? R2Service.getSignedUrl(agent.agentKYC.aadhar_front)
+          : null,
+        agent.agentKYC?.aadhar_back
+          ? R2Service.getSignedUrl(agent.agentKYC.aadhar_back)
           : null,
         agent.agentKYC?.qr_code
           ? R2Service.getSignedUrl(agent.agentKYC.qr_code)
@@ -451,7 +583,8 @@ export class UserService {
           ? {
             ...agent.agentKYC,
             pan_image: panImage,
-            aadhar_image: aadharImage,
+            aadhar_front: aadhar_front,
+            aadhar_back: aadhar_back,
             qr_code: qrCode,
           }
           : null,

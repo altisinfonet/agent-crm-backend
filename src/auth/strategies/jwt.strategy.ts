@@ -36,6 +36,11 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
                 id: true,
                 email: true,
                 onboardingStatus: true,
+                agentKYC: {
+                    select: {
+                        kyc_status: true,
+                    },
+                }
             },
         });
 
@@ -48,6 +53,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
             userId: user.id,
             email: user.email,
             onboardingStatus: user.onboardingStatus,
+            kycStatus: user.agentKYC?.kyc_status || null,
         };
     }
 

@@ -3,12 +3,14 @@ import { CommonDto } from 'src/auth/dto/common.dto';
 import { decryptData } from '@/common/helper/common.helper';
 import { R2Service } from '@/common/helper/r2.helper';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { SubscriptionService } from '@/subscription/subscription.service';
 
 
 @Injectable()
 export class AgentService {
   constructor(
     private prisma: PrismaService,
+    private subscriptionService: SubscriptionService,
   ) { }
   create(createAgentDto: CommonDto) {
     return 'This action adds a new agent';
@@ -74,6 +76,7 @@ export class AgentService {
             email: true,
             phone_no: true,
             image: true,
+            status: true,
             created_at: true,
             agentKYC: {
               select: {
@@ -95,6 +98,13 @@ export class AgentService {
 
   async findOne(agent_id: bigint) {
     try {
+      const organizationUser = await this.prisma.organizationUser.findFirst({
+        where: {
+          user_id: agent_id,
+          status: "ACTIVE"
+        },
+      });
+
       const agent = await this.prisma.user.findUnique({
         where: {
           id: agent_id
@@ -106,6 +116,7 @@ export class AgentService {
           email: true,
           phone_no: true,
           image: true,
+          status: true,
           country: true,
           currency: true,
           created_at: true,
@@ -115,7 +126,8 @@ export class AgentService {
               pan_number: true,
               pan_image: true,
               aadhar_number: true,
-              aadhar_image: true,
+              aadhar_front: true,
+              aadhar_back: true,
               account_number: true,
               bank_name: true,
               branch_name: true,
@@ -126,6 +138,10 @@ export class AgentService {
             },
           },
           organizations: {
+            where: {
+              id: organizationUser?.org_id,
+              status: "ACTIVE"
+            },
             select: {
               id: true,
               name: true,
@@ -146,6 +162,9 @@ export class AgentService {
               },
               created_at: true,
               subscription: {
+                orderBy: {
+                  created_at: 'desc',
+                },
                 select: {
                   id: true,
                   start_at: true,
@@ -160,9 +179,11 @@ export class AgentService {
                       name: true,
                       code: true,
                       description: true,
+                      billing_cycle: true,
                       price: true,
                       is_active: true,
                       rzp_plan_id: true,
+                      max_customers: true,
                       currency: {
                         select: {
                           name: true,
@@ -192,8 +213,13 @@ export class AgentService {
                 }
               }
             }
+          },
+          _count: {
+            select: {
+              customers: true,
+            }
           }
-        }
+        },
       })
       if (!agent) return null;
       const [
@@ -208,8 +234,11 @@ export class AgentService {
         agent?.agentKYC?.pan_image
           ? R2Service.getSignedUrl(agent?.agentKYC.pan_image)
           : null,
-        agent?.agentKYC?.aadhar_image
-          ? R2Service.getSignedUrl(agent?.agentKYC.aadhar_image)
+        agent?.agentKYC?.aadhar_front
+          ? R2Service.getSignedUrl(agent?.agentKYC.aadhar_front)
+          : null,
+        agent?.agentKYC?.aadhar_back
+          ? R2Service.getSignedUrl(agent?.agentKYC.aadhar_back)
           : null,
         agent?.agentKYC?.qr_code
           ? R2Service.getSignedUrl(agent?.agentKYC.qr_code)
@@ -274,7 +303,19 @@ export class AgentService {
           },
           kyc_status: payload?.kyc_status,
         }
-      })
+      });
+      if (payload?.status === "INACTIVE") {
+        await Promise.all([
+          this.prisma.invalidatedToken.deleteMany({
+            where: { user_id: agent_id },
+          }),
+          this.prisma.userSession.deleteMany({
+            where: { user_id: agent_id },
+          }),
+        ]);
+        await this.subscriptionService.cancelSubscription(agent_id)
+      }
+
       return true;
     } catch (error) {
       throw error;
@@ -283,12 +324,13 @@ export class AgentService {
 
   async remove(agent_id: bigint) {
     try {
-      await this.prisma.user.delete({ where: { id: agent_id } });
       await this.prisma.agentKYC.delete({ where: { agent_id } });
+      await this.prisma.userSession.deleteMany({ where: { user_id: agent_id } });
       await this.prisma.agentProductEntity.deleteMany({ where: { agent_id } })
       await this.prisma.invalidatedToken.deleteMany({ where: { user_id: agent_id } })
       await this.prisma.organization.deleteMany({ where: { created_by: agent_id } })
       await this.prisma.organizationUser.deleteMany({ where: { user_id: agent_id } })
+      await this.prisma.user.delete({ where: { id: agent_id } });
 
       return true;
     } catch (error) {

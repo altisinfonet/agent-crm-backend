@@ -6,5 +6,6 @@ import { SettingsService } from 'src/settings/settings.service';
 @Module({
   controllers: [SubscriptionController],
   providers: [SubscriptionService, SettingsService],
+  exports: [SubscriptionService],
 })
 export class SubscriptionModule { }

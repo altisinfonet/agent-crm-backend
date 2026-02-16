@@ -135,6 +135,27 @@ export class SubscriptionController {
     }
   }
 
+  @Post('cancel/:id')
+  @ApiOperation({ summary: 'Cancel active subscription (at cycle end)' })
+  @SwaggerApiResponse({ status: 200, description: 'Subscription cancellation requested' })
+  async cancelSubscription(@Res() res: Response, @Param('id') agent_id: string) {
+    try {
+      const subscribe = await this.subscriptionService.cancelSubscription(BigInt(agent_id));
+      let result = JSON.stringify(subscribe, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription cancelled"));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error) {
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to cancel subscription.");
+    }
+  }
+
+
   @Patch('plan/:id')
   @ApiOperation({ summary: 'Update subscription plan (Admin)' })
   @ApiParam({ name: 'id', example: 1 })

@@ -3,6 +3,12 @@ export enum Account {
     INACTIVE = 'INACTIVE',
 }
 
+export enum Approve {
+    PENDING = "PENDING",
+    APPROVED = "APPROVED",
+    REJECTED = "REJECTED"
+}
+
 export enum Onboarding {
     INCOMPLETED = "INCOMPLETED",
     ONGOING = "ONGOING",

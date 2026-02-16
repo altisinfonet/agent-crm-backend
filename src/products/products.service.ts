@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { CommonDto } from 'src/auth/dto/common.dto';
 import { decryptData } from '@/common/helper/common.helper';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { R2Service } from '@/common/helper/r2.helper';
 
 
 @Injectable()
@@ -14,11 +15,30 @@ export class ProductsService {
         select: {
           id: true,
           name: true,
+          slug: true,
           status: true,
-          created_at: true
-        }
-      })
-      return products;
+          desc: true,
+          image: true,
+          created_at: true,
+        },
+      });
+
+      const updatedProducts = await Promise.all(
+        products.map(async (product) => {
+          let image = product.image;
+
+          if (image) {
+            image = await R2Service.getSignedUrl(image);
+          }
+
+          return {
+            ...product,
+            image,
+          };
+        }),
+      );
+
+      return updatedProducts;
     } catch (error) {
       throw error;
     }
@@ -63,30 +83,55 @@ export class ProductsService {
               select: {
                 id: true,
                 name: true,
+                desc: true,
+                image: true,
               },
             },
           },
         }),
         this.prisma.productEntity.count({ where }),
       ]);
-      const { products } = entities[0];
 
       if (!entities.length) {
         return {
           Product: {
-            id: products.id,
-            name: products.name,
+            id: product_id,
+            name: null,
+            desc: null,
+            image: null,
             entities: [],
           },
           Total: 0,
         };
       }
 
+      const { products } = entities[0];
+      let productImage = products.image;
+      if (productImage) {
+        productImage = await R2Service.getSignedUrl(productImage);
+      }
+      const updatedEntities = await Promise.all(
+        entities.map(async ({ products, ...entity }) => {
+          let image = entity.image;
+
+          if (image) {
+            image = await R2Service.getSignedUrl(image);
+          }
+
+          return {
+            ...entity,
+            image,
+          };
+        }),
+      );
+
       return {
         Product: {
           id: products.id,
           name: products.name,
-          entities: entities.map(({ products, ...entity }) => entity),
+          desc: products.desc,
+          image: productImage,
+          entities: updatedEntities,
         },
         Total: total,
       };

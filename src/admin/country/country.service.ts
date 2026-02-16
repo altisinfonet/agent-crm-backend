@@ -27,7 +27,7 @@ export class CountryService {
           region: decryptedPayload.region,
           phoneLength: decryptedPayload.phoneLength,
           timezone: decryptedPayload.timezone,
-          utc_offset_min: decryptedPayload.offset_min,
+          utc_offset_min: decryptedPayload.utc_offset_min,
           image: decryptedPayload.image
         }
       })
@@ -141,6 +141,10 @@ export class CountryService {
           ...(payload.phone_code !== undefined && {
             phone_code: payload.phone_code,
           }),
+          ...(payload.phoneLength && { phoneLength: payload.phoneLength }),
+          ...(payload.timezone && { timezone: payload.timezone }),
+          ...(payload.utc_offset_min && { utc_offset_min: payload.utc_offset_min }),
+          ...(payload.image && { image: payload.image }),
           ...(payload.status && { status: payload.status }),
         },
       });

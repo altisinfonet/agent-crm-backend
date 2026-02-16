@@ -18,13 +18,18 @@ export class SettingsService {
           title: setting,
         }
       })
+
       const {
         razorpayid,
-        razorpaysecretkey
+        razorpaysecretkey,
+        razorpayWebhookSecret,
+        trialDuration
       } = admin_settings?.metadata as Record<string, any> || {};
       const payment_settings = {
         RAZORPAY_KEY_ID: razorpayid,
-        RAZORPAY_KEY_SECRET: razorpaysecretkey
+        RAZORPAY_KEY_SECRET: razorpaysecretkey,
+        RAZORPAY_WEBHOOK_SECRET: razorpayWebhookSecret,
+        TRIAL_DURATION: trialDuration,
       }
 
       return payment_settings;

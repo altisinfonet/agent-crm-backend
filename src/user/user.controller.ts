@@ -4,13 +4,15 @@ import { GetCurrentUserId } from 'src/common/decorators/current-user-id.decorato
 import type { Request, Response } from 'express';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { CommonDto } from 'src/auth/dto/common.dto';
-import { AnyFilesInterceptor } from '@nestjs/platform-express';
+import { AnyFilesInterceptor, FileFieldsInterceptor } from '@nestjs/platform-express';
 import { ImageUploadService } from '@/common/services/image-upload.service';
 import { ApiResponse } from '@/common/helper/response.helper';
 import { buildUserRootFolder, decryptData, encryptData } from '@/common/helper/common.helper';
 import { Account, Onboarding } from '@/common/enum/account.enum';
 import { AccountStatus, OnboardingStatus } from '@/common/decorators/status.decorator';
 import { AccountStatusGuard, OnboardingStatusGuard } from '@/common/guards/status.guard';
+import { upload } from '@/common/config/multer.config';
+import { R2Service } from '@/common/helper/r2.helper';
 
 @Controller({ path: 'user', version: '1' })
 export class UserController {
@@ -88,7 +90,8 @@ export class UserController {
 
       const rootFolder = buildUserRootFolder(
         `${findUser.first_name} ${findUser.last_name}`,
-        panNumber ?? "admin"
+        panNumber ?? "admin",
+        userId.toString()
       );
 
       const uploadResult = await ImageUploadService.uploadBase64ImageToR2(
@@ -122,9 +125,20 @@ export class UserController {
   @UseGuards(JwtAuthGuard, AccountStatusGuard)
   @AccountStatus(Account.ACTIVE)
   @Post("kyc")
-  @UseInterceptors(AnyFilesInterceptor())
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: "pan_image", maxCount: 1 },
+        { name: "aadhar_front", maxCount: 1 },
+        { name: "aadhar_back", maxCount: 1 },
+        { name: "qr_code", maxCount: 1 },
+      ],
+      upload
+    )
+  )
   async submitKyc(
     @GetCurrentUserId() userId: bigint,
+    @UploadedFiles() files: any,
     @Body() kycDto: CommonDto,
     @Res() res: Response
   ) {
@@ -134,34 +148,52 @@ export class UserController {
 
       const rootFolder = buildUserRootFolder(
         kycData.username,
-        kycData.pan_number
+        kycData.pan_number,
+        userId.toString()
       );
 
-      if (kycData?.pan_image) {
-        const { key } = await ImageUploadService.uploadBase64ImageToR2(
-          kycData.pan_image,
-          rootFolder,
-          "pan"
+      if (files.pan_image?.[0]) {
+        const ext = files.pan_image[0].mimetype.split("/")[1];
+        uploads.pan_image = `${rootFolder}/pan.${ext}`;
+
+        await R2Service.upload(
+          files.pan_image[0].buffer,
+          uploads.pan_image,
+          files.pan_image[0].mimetype
         );
-        uploads.pan_image = key;
       }
 
-      if (kycData?.aadhar_image) {
-        const { key } = await ImageUploadService.uploadBase64ImageToR2(
-          kycData.aadhar_image,
-          rootFolder,
-          "aadhar"
+      if (files.aadhar_front?.[0]) {
+        const ext = files.aadhar_front[0].mimetype.split("/")[1];
+        uploads.aadhar_front = `${rootFolder}/aadhar_front.${ext}`;
+
+        await R2Service.upload(
+          files.aadhar_front[0].buffer,
+          uploads.aadhar_front,
+          files.aadhar_front[0].mimetype
         );
-        uploads.aadhar_image = key;
       }
 
-      if (kycData?.qr_code) {
-        const { key } = await ImageUploadService.uploadBase64ImageToR2(
-          kycData.qr_code,
-          rootFolder,
-          "qr"
+      if (files.aadhar_back?.[0]) {
+        const ext = files.aadhar_back[0].mimetype.split("/")[1];
+        uploads.aadhar_back = `${rootFolder}/aadhar_back.${ext}`;
+
+        await R2Service.upload(
+          files.aadhar_back[0].buffer,
+          uploads.aadhar_back,
+          files.aadhar_back[0].mimetype
         );
-        uploads.qr_code = key;
+      }
+
+      if (files.qr_code?.[0]) {
+        const ext = files.qr_code[0].mimetype.split("/")[1];
+        uploads.qr_code = `${rootFolder}/qr.${ext}`;
+
+        await R2Service.upload(
+          files.qr_code[0].buffer,
+          uploads.qr_code,
+          files.qr_code[0].mimetype
+        );
       }
 
       const saved = await this.userService.saveKyc(userId, kycData, uploads);

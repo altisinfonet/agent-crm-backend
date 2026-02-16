@@ -19,6 +19,9 @@ import {
     ApiResponse as SwaggerApiResponse,
     ApiExcludeEndpoint,
 } from '@nestjs/swagger';
+import { AccountStatusGuard } from '@/common/guards/status.guard';
+import { Account } from '@/common/enum/account.enum';
+import { AccountStatus } from '@/common/decorators/status.decorator';
 
 
 @ApiTags('Authentication')
@@ -73,6 +76,7 @@ export class AuthController {
             const resData = encryptData(new ApiResponse((JSON.parse(result)), "Login successful."));
             return res.status(HttpStatus.OK).json({ data: resData });
         } catch (error: any) {
+            console.log("error", error);
             if (error.status && error.response) {
                 return res.status(error.status).json(error.response);
             }

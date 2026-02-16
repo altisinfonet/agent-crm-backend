@@ -6,9 +6,9 @@ import { ApiResponse } from '@/common/helper/response.helper';
 import type { Request, Response } from 'express';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { GetCurrentUserId } from 'src/common/decorators/current-user-id.decorator';
-import { AccountStatusGuard } from '@/common/guards/status.guard';
-import { Account } from '@/common/enum/account.enum';
-import { AccountStatus } from '@/common/decorators/status.decorator';
+import { AccountStatusGuard, ApprovalStatusGuard } from '@/common/guards/status.guard';
+import { Account, Approve } from '@/common/enum/account.enum';
+import { AccountStatus, ApprovalStatus } from '@/common/decorators/status.decorator';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -70,6 +70,36 @@ export class SubscriptionController {
     }
   }
 
+  @UseGuards(JwtAuthGuard, AccountStatusGuard)
+  @AccountStatus(Account.ACTIVE)
+  @Post("payment")
+  @ApiExcludeEndpoint()
+  async subscriptionPayment(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Body() dto: CommonDto,
+  ) {
+    try {
+      const payment = await this.subscriptionService.subscriptionPayment(dto);
+      let result = JSON.stringify(payment, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+
+      console.log("payment", payment);
+      console.log("result", result);
+
+
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription payment initiated"));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error) {
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to process payment.");
+    }
+  }
+
+
   @Post("webhook")
   @ApiExcludeEndpoint()
   async razorpayWebhook(
@@ -88,6 +118,30 @@ export class SubscriptionController {
         return res.status(error.status).json(error.response);
       }
       throw new BadRequestException("Failed to process webhook.");
+    }
+  }
+
+
+  @UseGuards(JwtAuthGuard, AccountStatusGuard)
+  @AccountStatus(Account.ACTIVE)
+  @Get()
+  @ApiOperation({ summary: 'Get current subscription details' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Subscription retrieved successfully' })
+  async getSubscription(@Res() res: Response, @GetCurrentUserId() userId: bigint,) {
+    try {
+      const subscribe = await this.subscriptionService.getSubscriptionDetails(userId);
+      let result = JSON.stringify(subscribe, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription retrieved"));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error) {
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to retrieve subscription.");
     }
   }
 

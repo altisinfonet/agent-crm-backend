@@ -6,13 +6,33 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 @Injectable()
 export class R2Service {
-    static async upload(buffer: Buffer, key: string, mime: string) {
+    // static async upload(buffer: Buffer, key: string, mime: string) {
+    //     return r2Client.send(
+    //         new PutObjectCommand({
+    //             Bucket: process.env.R2_BUCKET_NAME!,
+    //             Key: key,
+    //             Body: buffer,
+    //             ContentType: mime || 'application/octet-stream',
+    //             CacheControl: 'public, max-age=31536000',
+    //         })
+    //     );
+    // }
+
+    static async upload(
+        buffer: Buffer,
+        key: string,
+        mime: string
+    ) {
+        const mimeType =
+            mime === 'image/jpg' ? 'image/jpeg' : mime;
         return r2Client.send(
             new PutObjectCommand({
                 Bucket: process.env.R2_BUCKET_NAME!,
                 Key: key,
                 Body: buffer,
-                ContentType: mime,
+                ContentType: mimeType || 'application/octet-stream',
+                CacheControl: 'public, max-age=31536000',
+                ContentDisposition: 'inline',
             })
         );
     }
@@ -27,6 +47,7 @@ export class R2Service {
     }
 
     static async getSignedUrl(key: string, expiresIn = 3600) {
+        if (!key) return null;
         const command = new GetObjectCommand({
             Bucket: process.env.R2_BUCKET_NAME!,
             Key: key,

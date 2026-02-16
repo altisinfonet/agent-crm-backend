@@ -43,12 +43,16 @@ export const generateSlug = async (
 
 export function buildUserRootFolder(
     username: string,
-    panNumber: string
+    panNumber: string,
+    user_id?: string
 ) {
     const safeName = slugify(username, { lower: true });
     const safePan = panNumber.toUpperCase().replace(/\s+/g, "");
-
-    return `${process.env.IMAGE_PATH}/${safeName}_${safePan}`;
+    let path = '';
+    if (user_id) {
+        path = `_${user_id}`
+    }
+    return `${process.env.ROOT_FOLDER}/${process.env.IMAGE_PATH}/${safeName}_${safePan}${path}`;
 }
 
 

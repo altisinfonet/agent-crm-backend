@@ -21,7 +21,7 @@ import {
 @ApiBearerAuth('access-token')
 @Controller({ path: '', version: '1' })
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN)
+@Roles(Role.ADMIN, Role.AGENT)
 export class AdminSettingsController {
 
   constructor(
