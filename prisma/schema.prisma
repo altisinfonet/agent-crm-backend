@@ -185,7 +185,8 @@ model Country {
     created_at     DateTime @default(now())
     updated_at     DateTime @updatedAt
 
-    user User[]
+    user      User[]
+    customers Customer[]
 
     @@index([name, iso_code, phone_code, status])
     @@map("tbl_country")
@@ -495,9 +496,14 @@ model Customer {
     last_name       String?
     email           String?
     phone           String?
+    country_id      BigInt?
+    country         Country?                @relation(fields: [country_id], references: [id])
     image           String?
     aadhaar_number  String?
     pan_number      String?
+    panImage        String?
+    aadharFront     String?
+    aadharBack      String?
     address         String?
     status          CustomerStatus          @default(NEW_LEAD)
     created_at      DateTime                @default(now())

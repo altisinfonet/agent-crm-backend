@@ -22,7 +22,7 @@ export class CustomerService {
     return `${name}${extname(filename).toLowerCase()}`;
   }
 
-  async create(agent_id: bigint, file: any, createCustomerDto: CommonDto) {
+  async create(agent_id: bigint, files: any, createCustomerDto: CommonDto) {
     try {
       const payload = decryptData(createCustomerDto.data);
       const {
@@ -33,7 +33,8 @@ export class CustomerService {
         aadhaarNumber,
         panNumber,
         address,
-        status
+        status,
+        country_id
       } = payload;
 
       const org = await this.prisma.organization.findUnique({
@@ -69,24 +70,103 @@ export class CustomerService {
         throw new BadRequestException("Customer already exists");
       }
 
-      let imageKey: string | null = null;
-      const baseimgkey = org?.createdByUser?.agentKYC?.base_img_path || "";
+      // let imageKey: string | null = null;
+      // const baseimgkey = org?.createdByUser?.agentKYC?.base_img_path || "";
 
-      if (file?.buffer) {
-        const isValid = await isValidImageBuffer(file.buffer);
+      // if (file?.buffer) {
+      //   const isValid = await isValidImageBuffer(file.buffer);
+      //   if (!isValid) {
+      //     throw new BadRequestException('Invalid image file');
+      //   }
+      //   const rootFolder = buildUserRootFolder(
+      //     `${firstName}_${lastName}`,
+      //     panNumber,
+      //     undefined,
+      //     baseimgkey,
+      //     true,
+      //   );
+      //   const sanitizedFileName = await this.sanitizeFileName(file.originalname);
+      //   imageKey = `${rootFolder}/${sanitizedFileName}`;
+      //   await R2Service.upload(file.buffer, imageKey, file.mimetype);
+      // }
+
+      let image_key: string | null = null;
+      let pan_image_key: string | null = null;
+      let aadhar_front_key: string | null = null;
+      let aadhar_back_key: string | null = null;
+
+      const baseimgkey = org?.createdByUser?.agentKYC?.base_img_path || "";
+      const rootFolder = buildUserRootFolder(
+        `${firstName}_${lastName}`,
+        panNumber,
+        undefined,
+        baseimgkey,
+        true,
+      );
+
+      const imageFile = files.image?.[0]
+      const panImageFile = files.pan_image?.[0]
+      const aadharFrontImageFile = files.aadhar_front?.[0]
+      const aadharBackImageFile = files.aadhar_back?.[0]
+
+      if (imageFile) {
+        const isValid = await isValidImageBuffer(imageFile.buffer);
         if (!isValid) {
           throw new BadRequestException('Invalid image file');
         }
-        const rootFolder = buildUserRootFolder(
-          `${firstName}_${lastName}`,
-          panNumber,
-          undefined,
-          baseimgkey,
-          true,
+        const ext = imageFile.mimetype.split("/")[1];
+        image_key = `${rootFolder}/iamge.${ext}`;
+
+        await R2Service.upload(
+          imageFile.buffer,
+          image_key,
+          imageFile.mimetype
         );
-        const sanitizedFileName = await this.sanitizeFileName(file.originalname);
-        imageKey = `${rootFolder}/${sanitizedFileName}`;
-        await R2Service.upload(file.buffer, imageKey, file.mimetype);
+      }
+
+      if (panImageFile) {
+        const isValid = await isValidImageBuffer(panImageFile.buffer);
+        if (!isValid) {
+          throw new BadRequestException('Invalid pan image file');
+        }
+        const ext = panImageFile.mimetype.split("/")[1];
+        pan_image_key = `${rootFolder}/pan.${ext}`;
+
+        await R2Service.upload(
+          panImageFile.buffer,
+          pan_image_key,
+          panImageFile.mimetype
+        );
+      }
+
+      if (aadharFrontImageFile) {
+        const isValid = await isValidImageBuffer(aadharFrontImageFile.buffer);
+        if (!isValid) {
+          throw new BadRequestException('Invalid aadhaar front image file');
+        }
+        const ext = aadharFrontImageFile.mimetype.split("/")[1];
+        aadhar_front_key = `${rootFolder}/aadhar_front.${ext}`;
+
+        await R2Service.upload(
+          aadharFrontImageFile.buffer,
+          aadhar_front_key,
+          aadharFrontImageFile.mimetype
+        );
+      }
+
+      if (aadharBackImageFile) {
+        const isValid = await isValidImageBuffer(aadharBackImageFile.buffer);
+        if (!isValid) {
+          throw new BadRequestException('Invalid aadhaar back image file');
+        }
+        const ext = aadharBackImageFile.mimetype.split("/")[1];
+        aadhar_back_key = `${rootFolder}/aadhar_back.${ext}`;
+
+        await R2Service.upload(
+          aadharBackImageFile.buffer,
+          aadhar_back_key,
+          aadharBackImageFile.mimetype
+        );
       }
 
       const customer = await this.prisma.customer.create({
@@ -97,10 +177,14 @@ export class CustomerService {
           last_name: lastName,
           email,
           phone,
+          country_id,
           aadhaar_number: aadhaarNumber,
           pan_number: panNumber,
           address,
-          image: imageKey,
+          image: image_key,
+          panImage: pan_image_key,
+          aadharFront: aadhar_front_key,
+          aadharBack: aadhar_back_key,
           status
         },
       });
@@ -114,7 +198,7 @@ export class CustomerService {
   async updateCustomer(
     agent_id: bigint,
     customer_id: bigint,
-    file: any,
+    files: any,
     createCustomerDto: CommonDto,
   ) {
     try {
@@ -127,14 +211,27 @@ export class CustomerService {
         aadhaarNumber,
         panNumber,
         address,
-        remove,
+        country_id,
         status: newStatus,
         reason,
+        removeImage,
+        removePanImage,
+        removeAadharFront,
+        removeAadharBack,
       } = payload;
 
       const org = await this.prisma.organization.findUnique({
         where: { created_by: agent_id },
-        select: { id: true },
+        select: {
+          id: true,
+          createdByUser: {
+            select: {
+              agentKYC: {
+                select: { base_img_path: true },
+              },
+            },
+          },
+        },
       });
 
       if (!org?.id) {
@@ -142,7 +239,10 @@ export class CustomerService {
       }
 
       const customer = await this.prisma.customer.findFirst({
-        where: { id: customer_id, org_id: org.id },
+        where: {
+          id: customer_id,
+          org_id: org.id,
+        },
       });
 
       if (!customer) {
@@ -150,24 +250,105 @@ export class CustomerService {
       }
       const oldStatus = customer.status;
 
-      let imageKey: string | null = customer.image;
-      if (remove === true && customer.image) {
+      let image_key: string | null = customer.image;
+      let pan_image_key: string | null = customer.panImage;
+      let aadhar_front_key: string | null = customer.aadharFront;
+      let aadhar_back_key: string | null = customer.aadharBack;
+
+      const baseimgkey = org.createdByUser?.agentKYC?.base_img_path || '';
+      const rootFolder = buildUserRootFolder(
+        `${firstName ?? customer.first_name}_${lastName ?? customer.last_name}`,
+        panNumber ?? customer.pan_number,
+        undefined,
+        baseimgkey,
+        true,
+      );
+
+      if (removeImage && customer.image) {
         await R2Service.remove(customer.image);
-        imageKey = null;
+        image_key = null;
       }
 
-      if (file?.buffer) {
-        const isValid = await isValidImageBuffer(file.buffer);
-        if (!isValid) {
-          throw new BadRequestException('Invalid image file');
-        }
+      if (removePanImage && customer.panImage) {
+        await R2Service.remove(customer.panImage);
+        pan_image_key = null;
+      }
 
-        if (customer.image) {
-          await R2Service.remove(customer.image);
-        }
+      if (removeAadharFront && customer.aadharFront) {
+        await R2Service.remove(customer.aadharFront);
+        aadhar_front_key = null;
+      }
 
-        imageKey = `customers/${customer_id}/${file.originalname}`;
-        await R2Service.upload(file.buffer, imageKey, file.mimetype);
+      if (removeAadharBack && customer.aadharBack) {
+        await R2Service.remove(customer.aadharBack);
+        aadhar_back_key = null;
+      }
+
+      const imageFile = files?.image?.[0];
+      const panImageFile = files?.pan_image?.[0];
+      const aadharFrontFile = files?.aadhar_front?.[0];
+      const aadharBackFile = files?.aadhar_back?.[0];
+
+      if (imageFile) {
+        const isValid = await isValidImageBuffer(imageFile.buffer);
+        if (!isValid) throw new BadRequestException('Invalid image file');
+
+        if (customer.image) await R2Service.remove(customer.image);
+
+        const ext = imageFile.mimetype.split('/')[1];
+        image_key = `${rootFolder}/image.${ext}`;
+
+        await R2Service.upload(imageFile.buffer, image_key, imageFile.mimetype);
+      }
+
+      if (panImageFile) {
+        const isValid = await isValidImageBuffer(panImageFile.buffer);
+        if (!isValid) throw new BadRequestException('Invalid pan image file');
+
+        if (customer.panImage) await R2Service.remove(customer.panImage);
+
+        const ext = panImageFile.mimetype.split('/')[1];
+        pan_image_key = `${rootFolder}/pan.${ext}`;
+
+        await R2Service.upload(
+          panImageFile.buffer,
+          pan_image_key,
+          panImageFile.mimetype,
+        );
+      }
+
+      if (aadharFrontFile) {
+        const isValid = await isValidImageBuffer(aadharFrontFile.buffer);
+        if (!isValid)
+          throw new BadRequestException('Invalid aadhaar front image');
+
+        if (customer.aadharFront) await R2Service.remove(customer.aadharFront);
+
+        const ext = aadharFrontFile.mimetype.split('/')[1];
+        aadhar_front_key = `${rootFolder}/aadhar_front.${ext}`;
+
+        await R2Service.upload(
+          aadharFrontFile.buffer,
+          aadhar_front_key,
+          aadharFrontFile.mimetype,
+        );
+      }
+
+      if (aadharBackFile) {
+        const isValid = await isValidImageBuffer(aadharBackFile.buffer);
+        if (!isValid)
+          throw new BadRequestException('Invalid aadhaar back image');
+
+        if (customer.aadharBack) await R2Service.remove(customer.aadharBack);
+
+        const ext = aadharBackFile.mimetype.split('/')[1];
+        aadhar_back_key = `${rootFolder}/aadhar_back.${ext}`;
+
+        await R2Service.upload(
+          aadharBackFile.buffer,
+          aadhar_back_key,
+          aadharBackFile.mimetype,
+        );
       }
 
       const updatedCustomer = await this.prisma.$transaction(async (tx) => {
@@ -181,7 +362,11 @@ export class CustomerService {
             aadhaar_number: aadhaarNumber,
             pan_number: panNumber,
             address,
-            image: imageKey,
+            country_id,
+            image: image_key,
+            panImage: pan_image_key,
+            aadharFront: aadhar_front_key,
+            aadharBack: aadhar_back_key,
             status: newStatus ?? customer.status,
           },
         });
@@ -444,6 +629,7 @@ export class CustomerService {
             address: true,
             image: true,
             status: true,
+            country: true,
             created_at: true,
           },
         }),
@@ -496,6 +682,10 @@ export class CustomerService {
           pan_number: true,
           address: true,
           image: true,
+          panImage: true,
+          aadharFront: true,
+          aadharBack: true,
+          country: true,
           status: true,
           statusHistories: {
             select: {
@@ -504,7 +694,7 @@ export class CustomerService {
               new_status: true,
               reason: true,
               created_at: true,
-            }
+            },
           },
           created_at: true,
           agentSales: {
@@ -553,14 +743,26 @@ export class CustomerService {
         throw new NotFoundException('Customer not found.');
       }
 
-      const imageUrl = customer.image
-        ? await R2Service.getSignedUrl(customer.image)
-        : null;
+      const [
+        imageUrl,
+        panImageUrl,
+        aadharFrontUrl,
+        aadharBackUrl,
+      ] = await Promise.all([
+        customer.image ? R2Service.getSignedUrl(customer.image) : null,
+        customer.panImage ? R2Service.getSignedUrl(customer.panImage) : null,
+        customer.aadharFront ? R2Service.getSignedUrl(customer.aadharFront) : null,
+        customer.aadharBack ? R2Service.getSignedUrl(customer.aadharBack) : null,
+      ]);
 
       const formatCustomerResponse = (customer: any) => {
         return {
           ...customer,
           image: imageUrl,
+          panImage: panImageUrl,
+          aadharFront: aadharFrontUrl,
+          aadharBack: aadharBackUrl,
+
           agentSales: customer.agentSales.map((sale: any) => {
             const formattedSale: any = {
               id: sale.id,

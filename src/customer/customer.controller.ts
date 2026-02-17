@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpStatus, BadRequestException, Res, UseGuards, Put, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpStatus, BadRequestException, Res, UseGuards, Put, UseInterceptors, UploadedFile, UploadedFiles } from '@nestjs/common';
 import { CustomerService } from './customer.service';
 import { CommonDto } from '@/auth/dto/common.dto';
 import { buildUserRootFolder, decryptData, encryptData } from '@/common/helper/common.helper';
@@ -18,7 +18,7 @@ import {
   ApiResponse as SwaggerApiResponse,
 } from '@nestjs/swagger';
 import { upload } from '@/common/config/multer.config';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('Agent - Customers')
 @ApiBearerAuth('access-token')
@@ -32,11 +32,21 @@ export class CustomerController {
   @ApiOperation({ summary: 'Create a new customer' })
   @ApiBody({ type: CommonDto })
   @SwaggerApiResponse({ status: 200, description: 'Customer created successfully' })
-  @UseInterceptors(FileInterceptor('image', upload))
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: "image", maxCount: 1 },
+        { name: "pan_image", maxCount: 1 },
+        { name: "aadhar_front", maxCount: 1 },
+        { name: "aadhar_back", maxCount: 1 },
+      ],
+      upload
+    )
+  )
   async create(@Res() res: Response, @GetCurrentUserId() userId: bigint,
-    @Body() createCustomerDto: CommonDto, @UploadedFile() file?: any) {
+    @Body() createCustomerDto: CommonDto, @UploadedFiles() files: any,) {
     try {
-      const customer = await this.customerService.create(userId, file, createCustomerDto);
+      const customer = await this.customerService.create(userId, files, createCustomerDto);
       let result = JSON.stringify(customer, (key, value) =>
         typeof value === 'bigint' ? value.toString() : value,
       );
@@ -55,12 +65,22 @@ export class CustomerController {
   @ApiOperation({ summary: 'Update customer details' })
   @ApiParam({ name: 'id', description: 'Customer ID', example: 1 })
   @ApiBody({ type: CommonDto })
-  @UseInterceptors(FileInterceptor('image', upload))
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: "image", maxCount: 1 },
+        { name: "pan_image", maxCount: 1 },
+        { name: "aadhar_front", maxCount: 1 },
+        { name: "aadhar_back", maxCount: 1 },
+      ],
+      upload
+    )
+  )
   @SwaggerApiResponse({ status: 200, description: 'Customer details updated successfully' })
   async updateCustomer(@Res() res: Response, @GetCurrentUserId() userId: bigint,
-    @Param('id') customer_id: string, @Body() updateCustomerDto: CommonDto, @UploadedFile() file?: any) {
+    @Param('id') customer_id: string, @Body() updateCustomerDto: CommonDto, @UploadedFiles() files: any) {
     try {
-      const customer = await this.customerService.updateCustomer(userId, BigInt(customer_id), file, updateCustomerDto);
+      const customer = await this.customerService.updateCustomer(userId, BigInt(customer_id), files, updateCustomerDto);
       let result = JSON.stringify(customer, (key, value) =>
         typeof value === 'bigint' ? value.toString() : value,
       );

@@ -118,6 +118,7 @@ export class AuthService {
                     email: true,
                     phone_no: true,
                     provider_id: true,
+                    auth_method: true,
                     role: {
                         select: {
                             id: true,
@@ -135,6 +136,13 @@ export class AuthService {
             if (auth_method === 'GOOGLE' || auth_method === 'APPLE') {
                 if (!provider_id) {
                     throw new BadRequestException('Provider ID required');
+                }
+
+                if (user.auth_method === "EMAIL_OTP") {
+                    throw new BadRequestException('Invalid login method. Please log in using Email & OTP.');
+                }
+                if (user.auth_method === "EMAIL_PW") {
+                    throw new BadRequestException('Invalid login method. Please log in using Email & Password.');
                 }
 
                 if (user) {
