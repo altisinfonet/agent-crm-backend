@@ -116,6 +116,8 @@ export class SubscriptionService {
 
       const paymentSettings =
         await this.settingsService.paymentSettings("payment-settings");
+      console.log("paymentSettings", paymentSettings);
+
       const DEFAULT_TRIAL_DAYS =
         parseInt(paymentSettings.TRIAL_DURATION) || 0;
 
@@ -462,6 +464,7 @@ export class SubscriptionService {
             where: { rzp_subscription_id: subId },
             data: {
               status: "EXPIRED",
+              end_at: new Date(),
               cancelled_at: new Date()
             }
           });
@@ -478,7 +481,7 @@ export class SubscriptionService {
 
             const effectiveEndAt = subscription.current_end
               ? new Date(subscription.current_end * 1000)
-              : null;
+              : new Date();
 
             await this.prisma.organizationSubscription.update({
               where: { rzp_subscription_id: subId },
@@ -516,10 +519,14 @@ export class SubscriptionService {
         select: {
           id: true,
           rzp_subscription_id: true,
+          rzp_payment_id: true,
+          auto_renew: true,
           source: true,
           status: true,
           start_at: true,
           end_at: true,
+          created_at: true,
+          cancelled_at: true,
           plan: {
             select: {
               id: true,
@@ -696,11 +703,26 @@ export class SubscriptionService {
           await this.razorpay.subscriptions.pause(
             orgSubscription.rzp_subscription_id
           );
+          await this.prisma.organizationSubscription.update({
+            where: { id: orgSubscription.id },
+            data: {
+              auto_renew: false,
+              cancelled_at: new Date(),
+              end_at: new Date()
+            },
+          });
         } else {
           await this.razorpay.subscriptions.cancel(
             orgSubscription.rzp_subscription_id,
             true
           );
+          await this.prisma.organizationSubscription.update({
+            where: { id: orgSubscription.id },
+            data: {
+              auto_renew: false,
+              cancelled_at: new Date()
+            },
+          });
         }
       } catch (error: any) {
         console.error(
@@ -708,14 +730,6 @@ export class SubscriptionService {
           error?.error || error
         );
       }
-
-      await this.prisma.organizationSubscription.update({
-        where: { id: orgSubscription.id },
-        data: {
-          auto_renew: false,
-        },
-      });
-
       return true;
     } catch (error) {
       throw error;

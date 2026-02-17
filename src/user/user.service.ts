@@ -414,7 +414,7 @@ export class UserService {
   }
 
 
-  async saveKyc(userId: bigint, kycData: any, files: any) {
+  async saveKyc(userId: bigint, kycData: any, files: any, path: string) {
     try {
       const data = {
         pan_number: kycData?.pan_number,
@@ -444,6 +444,7 @@ export class UserService {
             aadhar_front: files?.aadhar_front,
             aadhar_back: files?.aadhar_back,
             qr_code: files?.qr_code,
+            base_img_path: path
           },
           create: {
             agent_id: userId,
@@ -452,6 +453,7 @@ export class UserService {
             aadhar_front: files?.aadhar_front,
             aadhar_back: files?.aadhar_back,
             qr_code: files?.qr_code,
+            base_img_path: path
           },
         });
 

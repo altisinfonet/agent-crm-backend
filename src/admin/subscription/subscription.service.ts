@@ -388,11 +388,26 @@ export class SubscriptionService {
           await this.razorpay.subscriptions.pause(
             orgSubscription.rzp_subscription_id
           );
+          await this.prisma.organizationSubscription.update({
+            where: { id: orgSubscription.id },
+            data: {
+              auto_renew: false,
+              cancelled_at: new Date(),
+              end_at: new Date()
+            },
+          });
         } else {
           await this.razorpay.subscriptions.cancel(
             orgSubscription.rzp_subscription_id,
             true
           );
+          await this.prisma.organizationSubscription.update({
+            where: { id: orgSubscription.id },
+            data: {
+              auto_renew: false,
+              cancelled_at: new Date()
+            },
+          });
         }
       } catch (error: any) {
         console.error(
@@ -400,13 +415,6 @@ export class SubscriptionService {
           error?.error || error
         );
       }
-
-      await this.prisma.organizationSubscription.update({
-        where: { id: orgSubscription.id },
-        data: {
-          auto_renew: false,
-        },
-      });
 
       return true;
     } catch (error) {
@@ -500,13 +508,15 @@ export class SubscriptionService {
           orderBy,
           select: {
             id: true,
-            start_at: true,
-            end_at: true,
+            rzp_subscription_id: true,
+            rzp_payment_id: true,
             auto_renew: true,
             source: true,
             status: true,
+            start_at: true,
+            end_at: true,
             created_at: true,
-
+            cancelled_at: true,
             organization: {
               select: {
                 id: true,
@@ -514,6 +524,7 @@ export class SubscriptionService {
                 contact_email: true,
                 createdByUser: {
                   select: {
+                    id: true,
                     first_name: true,
                     last_name: true,
                     email: true,
@@ -523,7 +534,6 @@ export class SubscriptionService {
                 },
               },
             },
-
             plan: {
               select: {
                 id: true,
@@ -544,7 +554,6 @@ export class SubscriptionService {
             },
           },
         }),
-
         this.prisma.organizationSubscription.count({ where }),
       ]);
 

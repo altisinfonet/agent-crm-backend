@@ -52,6 +52,33 @@ export class CountryController {
     }
   }
 
+  @Post("bulk")
+  @ApiOperation({ summary: 'Create country in bulk (Admin)' })
+  @ApiBody({ type: CommonDto })
+  @SwaggerApiResponse({ status: 200, description: 'Countries created successfully' })
+  async bulkCreate(
+    @Res() res: Response,
+    @Body() createCountryDto: CommonDto,
+    @Req() req: Request,
+  ) {
+    try {
+      const settings = await this.countryService.bulkCreate(createCountryDto);
+      let result = JSON.stringify(settings, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Countries created successfully."));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error: any) {
+      console.log("error", error);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to create country settings.");
+    }
+  }
+
+
   @Put('list')
   @ApiOperation({ summary: 'Get list of countries (Admin)' })
   @ApiBody({ type: CommonDto })

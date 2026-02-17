@@ -196,7 +196,7 @@ export class UserController {
         );
       }
 
-      const saved = await this.userService.saveKyc(userId, kycData, uploads);
+      const saved = await this.userService.saveKyc(userId, kycData, uploads, rootFolder);
 
       return res.status(HttpStatus.OK).json({
         data: encryptData(

@@ -214,6 +214,7 @@ export class TaskService {
         return cycleEnd;
     }
 
+    @Cron(CronExpression.EVERY_HOUR)
     async finalizeCancelledSubscriptions() {
         const now = new Date();
         const subscriptions =

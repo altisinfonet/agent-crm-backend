@@ -1,14 +1,28 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CommonDto } from '@/auth/dto/common.dto';
-import { decryptData } from '@/common/helper/common.helper';
+import { buildUserRootFolder, createNotification, decryptData } from '@/common/helper/common.helper';
 import { PrismaService } from '@/prisma/prisma.service';
+import { isValidImageBuffer } from '@/common/config/multer.config';
+import { extname, basename } from 'path';
+import { R2Service } from '@/common/helper/r2.helper';
+import { CustomerStatus } from '@generated/prisma';
 
 @Injectable()
 export class CustomerService {
   constructor(
     private prisma: PrismaService,
   ) { }
-  async create(agent_id: bigint, createCustomerDto: CommonDto) {
+
+  async sanitizeFileName(filename: string) {
+    const name = basename(filename, extname(filename))
+      .replace(/\s+/g, '-')
+      .replace(/[^a-zA-Z0-9-_]/g, '')
+      .toLowerCase();
+
+    return `${name}${extname(filename).toLowerCase()}`;
+  }
+
+  async create(agent_id: bigint, file: any, createCustomerDto: CommonDto) {
     try {
       const payload = decryptData(createCustomerDto.data);
       const {
@@ -19,12 +33,22 @@ export class CustomerService {
         aadhaarNumber,
         panNumber,
         address,
+        status
       } = payload;
 
       const org = await this.prisma.organization.findUnique({
         where: { created_by: agent_id },
         select: {
           id: true,
+          createdByUser: {
+            select: {
+              agentKYC: {
+                select: {
+                  base_img_path: true,
+                }
+              }
+            }
+          }
         },
       });
 
@@ -36,7 +60,6 @@ export class CustomerService {
         where: {
           org_id: org?.id,
           email,
-          phone,
           pan_number: panNumber,
           aadhaar_number: aadhaarNumber
         },
@@ -45,7 +68,26 @@ export class CustomerService {
       if (existingCustomer) {
         throw new BadRequestException("Customer already exists");
       }
-      console.log(existingCustomer, "existingCustomer");
+
+      let imageKey: string | null = null;
+      const baseimgkey = org?.createdByUser?.agentKYC?.base_img_path || "";
+
+      if (file?.buffer) {
+        const isValid = await isValidImageBuffer(file.buffer);
+        if (!isValid) {
+          throw new BadRequestException('Invalid image file');
+        }
+        const rootFolder = buildUserRootFolder(
+          `${firstName}_${lastName}`,
+          panNumber,
+          undefined,
+          baseimgkey,
+          true,
+        );
+        const sanitizedFileName = await this.sanitizeFileName(file.originalname);
+        imageKey = `${rootFolder}/${sanitizedFileName}`;
+        await R2Service.upload(file.buffer, imageKey, file.mimetype);
+      }
 
       const customer = await this.prisma.customer.create({
         data: {
@@ -58,6 +100,8 @@ export class CustomerService {
           aadhaar_number: aadhaarNumber,
           pan_number: panNumber,
           address,
+          image: imageKey,
+          status
         },
       });
 
@@ -67,7 +111,12 @@ export class CustomerService {
     }
   }
 
-  async updateCustomer(agent_id: bigint, customer_id: bigint, createCustomerDto: CommonDto) {
+  async updateCustomer(
+    agent_id: bigint,
+    customer_id: bigint,
+    file: any,
+    createCustomerDto: CommonDto,
+  ) {
     try {
       const payload = decryptData(createCustomerDto.data);
       const {
@@ -78,23 +127,154 @@ export class CustomerService {
         aadhaarNumber,
         panNumber,
         address,
+        remove,
+        status: newStatus,
+        reason,
       } = payload;
 
       const org = await this.prisma.organization.findUnique({
         where: { created_by: agent_id },
-        select: {
-          id: true,
-        },
+        select: { id: true },
       });
 
       if (!org?.id) {
-        throw new BadRequestException("Agent organization not found");
+        throw new BadRequestException('Agent organization not found');
       }
 
+      const customer = await this.prisma.customer.findFirst({
+        where: { id: customer_id, org_id: org.id },
+      });
+
+      if (!customer) {
+        throw new BadRequestException('Customer not found');
+      }
+      const oldStatus = customer.status;
+
+      let imageKey: string | null = customer.image;
+      if (remove === true && customer.image) {
+        await R2Service.remove(customer.image);
+        imageKey = null;
+      }
+
+      if (file?.buffer) {
+        const isValid = await isValidImageBuffer(file.buffer);
+        if (!isValid) {
+          throw new BadRequestException('Invalid image file');
+        }
+
+        if (customer.image) {
+          await R2Service.remove(customer.image);
+        }
+
+        imageKey = `customers/${customer_id}/${file.originalname}`;
+        await R2Service.upload(file.buffer, imageKey, file.mimetype);
+      }
+
+      const updatedCustomer = await this.prisma.$transaction(async (tx) => {
+        const updated = await tx.customer.update({
+          where: { id: customer_id },
+          data: {
+            first_name: firstName ?? customer.first_name,
+            last_name: lastName ?? customer.last_name,
+            email,
+            phone,
+            aadhaar_number: aadhaarNumber,
+            pan_number: panNumber,
+            address,
+            image: imageKey,
+            status: newStatus ?? customer.status,
+          },
+        });
+
+        if (newStatus && newStatus !== oldStatus) {
+          await tx.customerStatusHistory.create({
+            data: {
+              customer_id,
+              old_status: oldStatus,
+              new_status: newStatus,
+              changed_by: agent_id,
+              reason,
+            },
+          });
+
+          await createNotification(
+            agent_id,
+            'CUSTOMER_STATUS',
+            'Customer status updated',
+            `Status changed from ${oldStatus} → ${newStatus}`,
+            {
+              customer_id,
+              old_status: oldStatus,
+              new_status: newStatus,
+              action: 'status_update',
+            },
+          );
+        }
+
+        return updated;
+      });
+
+      return updatedCustomer;
     } catch (error) {
       throw error;
     }
   }
+
+
+  async updateCustomerStatus(
+    agent_id: bigint,
+    customer_id: bigint,
+    newStatus: CustomerStatus,
+    reason?: string
+  ) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customer_id },
+      select: { status: true },
+    });
+
+    if (!customer) {
+      throw new NotFoundException('Customer not found');
+    }
+
+    if (customer.status === newStatus) {
+      return { message: 'Status unchanged' };
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      // 1. Update customer
+      await tx.customer.update({
+        where: { id: customer_id },
+        data: { status: newStatus },
+      });
+
+      // 2. Insert history
+      await tx.customerStatusHistory.create({
+        data: {
+          customer_id,
+          old_status: customer.status,
+          new_status: newStatus,
+          changed_by: agent_id,
+          reason,
+        },
+      });
+
+      await createNotification(
+        agent_id,
+        'CUSTOMER_STATUS',
+        'Customer status updated',
+        `Status changed from ${customer.status} → ${newStatus}`,
+        {
+          customer_id,
+          old_status: customer.status,
+          new_status: newStatus,
+          action: 'update',
+        }
+      );
+    });
+
+    return true;
+  }
+
 
   async sellProduct(
     agent_id: bigint,
@@ -229,21 +409,21 @@ export class CustomerService {
       });
 
       if (!org?.id) {
-        throw new BadRequestException("Agent organization not found");
+        throw new BadRequestException('Agent organization not found');
       }
 
       const where: any = {
-        org_id: org?.id,
+        org_id: org.id,
         created_by: agent_id,
         ...(payload.status && { status: payload.status }),
         ...(payload.search && {
           OR: [
-            { first_name: { contains: payload.search, mode: "insensitive" } },
-            { last_name: { contains: payload.search, mode: "insensitive" } },
-            { email: { contains: payload.search, mode: "insensitive" } },
-            { phone: { contains: payload.search, mode: "insensitive" } },
-            { aadhaar_number: { contains: payload.search, mode: "insensitive" } },
-            { pan_number: { contains: payload.search, mode: "insensitive" } },
+            { first_name: { contains: payload.search, mode: 'insensitive' } },
+            { last_name: { contains: payload.search, mode: 'insensitive' } },
+            { email: { contains: payload.search, mode: 'insensitive' } },
+            { phone: { contains: payload.search, mode: 'insensitive' } },
+            { aadhaar_number: { contains: payload.search, mode: 'insensitive' } },
+            { pan_number: { contains: payload.search, mode: 'insensitive' } },
           ],
         }),
       };
@@ -252,9 +432,7 @@ export class CustomerService {
         this.prisma.customer.findMany({
           where,
           ...(isPaginated && { skip, take }),
-          orderBy: {
-            created_at: "desc",
-          },
+          orderBy: { created_at: 'desc' },
           select: {
             id: true,
             first_name: true,
@@ -265,17 +443,25 @@ export class CustomerService {
             pan_number: true,
             address: true,
             image: true,
+            status: true,
             created_at: true,
-          }
+          },
         }),
-        this.prisma.customer.count({
-          where,
-        }),
+        this.prisma.customer.count({ where }),
       ]);
 
+      const customersWithImageUrl = await Promise.all(
+        customers.map(async (customer) => ({
+          ...customer,
+          image: customer.image
+            ? await R2Service.getSignedUrl(customer.image)
+            : null,
+        })),
+      );
+
       return {
-        Customers: customers,
-        Total: total
+        Customers: customersWithImageUrl,
+        Total: total,
       };
     } catch (error) {
       throw error;
@@ -291,7 +477,7 @@ export class CustomerService {
       });
 
       if (!org?.id) {
-        throw new BadRequestException("Agent organization not found");
+        throw new BadRequestException('Agent organization not found');
       }
 
       const customer = await this.prisma.customer.findFirst({
@@ -310,6 +496,16 @@ export class CustomerService {
           pan_number: true,
           address: true,
           image: true,
+          status: true,
+          statusHistories: {
+            select: {
+              id: true,
+              old_status: true,
+              new_status: true,
+              reason: true,
+              created_at: true,
+            }
+          },
           created_at: true,
           agentSales: {
             select: {
@@ -354,12 +550,17 @@ export class CustomerService {
       });
 
       if (!customer) {
-        throw new NotFoundException("Customer not found.");
+        throw new NotFoundException('Customer not found.');
       }
+
+      const imageUrl = customer.image
+        ? await R2Service.getSignedUrl(customer.image)
+        : null;
 
       const formatCustomerResponse = (customer: any) => {
         return {
           ...customer,
+          image: imageUrl,
           agentSales: customer.agentSales.map((sale: any) => {
             const formattedSale: any = {
               id: sale.id,

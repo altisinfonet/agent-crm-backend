@@ -3662,6 +3662,11 @@ chardet@^2.1.1:
   resolved "https://registry.npmmirror.com/chardet/-/chardet-2.1.1.tgz"
   integrity sha512-PsezH1rqdV9VvyNhxxOW32/d75r01NY7TQCmOqomRo15ZSOKbpTFVsfjghxo6JloQUCGnH4k1LGu0R4yCLlWQQ==
 
+charenc@0.0.2:
+  version "0.0.2"
+  resolved "https://registry.npmjs.org/charenc/-/charenc-0.0.2.tgz"
+  integrity sha512-yrLQ/yVUFXkzg7EDQsPieE/53+0RlaWTs+wBrvW36cyilJ2SaDWfl4Yj7MtLTXleV9uEKefbAGUPv2/iWSooRA==
+
 cheerio-select@^2.1.0:
   version "2.1.0"
   resolved "https://registry.npmmirror.com/cheerio-select/-/cheerio-select-2.1.0.tgz"
@@ -3969,6 +3974,25 @@ cosmiconfig@^8.2.0:
     parse-json "^5.2.0"
     path-type "^4.0.0"
 
+countries-list@^2.3.2:
+  version "2.6.1"
+  resolved "https://registry.npmjs.org/countries-list/-/countries-list-2.6.1.tgz"
+  integrity sha512-jXM1Nv3U56dPQ1DsUSsEaGmLHburo4fnB7m+1yhWDUVvx5gXCd1ok/y3gXCjXzhqyawG+igcPYcAl4qjkvopaQ==
+
+country-state-city@0.0.5:
+  version "0.0.5"
+  resolved "https://registry.npmjs.org/country-state-city/-/country-state-city-0.0.5.tgz"
+  integrity sha512-5zFs+RiYNYzl0AVp89ofucZ6NVFvg5cSrPvP9LlDEqa40uh+0SLEp7pJXL4493X4rs3qG3leC0zQxUBWwzQp/Q==
+
+countrycitystatejson@^25.8.101:
+  version "25.8.101"
+  resolved "https://registry.npmjs.org/countrycitystatejson/-/countrycitystatejson-25.8.101.tgz"
+  integrity sha512-wWlAYY8+d3saAoKxGzVsqYHU7av8gN04lj4j6ekBmH82Wnj4QhHITbAo1FePohg4xl3UGhiq+RQQ0k9XNMHlHg==
+  dependencies:
+    countries-list "^2.3.2"
+    country-state-city "0.0.5"
+    trie-search "^2.2.0"
+
 create-require@^1.1.0:
   version "1.1.1"
   resolved "https://registry.npmmirror.com/create-require/-/create-require-1.1.1.tgz"
@@ -4001,6 +4025,11 @@ cross-spawn@^7.0.3, cross-spawn@^7.0.6:
     path-key "^3.1.0"
     shebang-command "^2.0.0"
     which "^2.0.1"
+
+crypt@0.0.2:
+  version "0.0.2"
+  resolved "https://registry.npmjs.org/crypt/-/crypt-0.0.2.tgz"
+  integrity sha512-mCxBlsHFYh9C+HVpiEacem8FEBnMXgU9gy4zmNC+SXAZNB/1idgp/aulFJ4FgCi7GPEVbfyng092GqL2k2rmow==
 
 crypto-js@^4.2.0:
   version "4.2.0"
@@ -5188,6 +5217,13 @@ has-tostringtag@^1.0.2:
   dependencies:
     has-symbols "^1.0.3"
 
+hasharray@^1.1.1:
+  version "1.1.2"
+  resolved "https://registry.npmjs.org/hasharray/-/hasharray-1.1.2.tgz"
+  integrity sha512-7w3idwaVXX9gL9LiTCBSNKRGTBcp2WI/kf13UYeZ9+trOGBHVYHei6qtMY6DVnwGOouVUSRg0+L2xf4Q2/CmzA==
+  dependencies:
+    jclass "^1.0.1"
+
 hasown@^2.0.2:
   version "2.0.2"
   resolved "https://registry.npmmirror.com/hasown/-/hasown-2.0.2.tgz"
@@ -5417,6 +5453,11 @@ is-binary-path@~2.1.0:
   dependencies:
     binary-extensions "^2.0.0"
 
+is-buffer@~1.1.6:
+  version "1.1.6"
+  resolved "https://registry.npmjs.org/is-buffer/-/is-buffer-1.1.6.tgz"
+  integrity sha512-NcdALwpXkTm5Zvvbk7owOUSvVvBKDgKP5/ewfXEznmQFfs4ZRmanOeKBTjRVjka3QFoN6XJ+9F3USqfHqTaU5w==
+
 is-core-module@^2.16.1:
   version "2.16.1"
   resolved "https://registry.npmmirror.com/is-core-module/-/is-core-module-2.16.1.tgz"
@@ -5589,6 +5630,11 @@ jake@^10.8.5:
     async "^3.2.6"
     filelist "^1.0.4"
     picocolors "^1.1.1"
+
+jclass@^1.0.1:
+  version "1.2.1"
+  resolved "https://registry.npmjs.org/jclass/-/jclass-1.2.1.tgz"
+  integrity sha512-mRx8uv1qJLOtxbRf3IWOQIH2ro7VIPn6ZkhbTcUJvJEslLzYA7BSATXDi/GR1yKYV9DASsjTZL+0YJPdqSMznw==
 
 jest-changed-files@30.2.0:
   version "30.2.0"
@@ -6394,6 +6440,15 @@ math-intrinsics@^1.1.0:
   version "1.1.0"
   resolved "https://registry.npmmirror.com/math-intrinsics/-/math-intrinsics-1.1.0.tgz"
   integrity sha512-/IXtbwEk5HTPyEwyKX6hGkYXxM9nbj64B+ilVJnC/R6B0pH5G4V3b0pVbL7DBj4tkhBAppbQUlf6F6Xl9LHu1g==
+
+md5@^2.3.0:
+  version "2.3.0"
+  resolved "https://registry.npmjs.org/md5/-/md5-2.3.0.tgz"
+  integrity sha512-T1GITYmFaKuO91vxyoQMFETst+O71VUPEU3ze5GNzDm0OWdP8v1ziTaAEPUr/3kLsY3Sftgz242A1SetQiDL7g==
+  dependencies:
+    charenc "0.0.2"
+    crypt "0.0.2"
+    is-buffer "~1.1.6"
 
 media-typer@^1.1.0:
   version "1.1.0"
@@ -8439,6 +8494,14 @@ tr46@~0.0.3:
   version "0.0.3"
   resolved "https://registry.npmmirror.com/tr46/-/tr46-0.0.3.tgz"
   integrity sha512-N3WMsuqV66lT30CrXNbEjx4GEwlow3v6rr4mCcv6prnfwhS01rkgyFdjPNBYd9br7LpXV1+Emh01fHnq2Gdgrw==
+
+trie-search@^2.2.0:
+  version "2.2.1"
+  resolved "https://registry.npmjs.org/trie-search/-/trie-search-2.2.1.tgz"
+  integrity sha512-JsHrc02RM4loPkL4ibKM3uGNSr1RWARb9oqyJAR87ZxRmW9xpU4INtuYVKBWwieFK8D0h0D+CGy5BkYXQNrvjw==
+  dependencies:
+    hasharray "^1.1.1"
+    md5 "^2.3.0"
 
 ts-api-utils@^2.4.0:
   version "2.4.0"

@@ -1,7 +1,7 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpStatus, BadRequestException, Res, UseGuards, Put } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpStatus, BadRequestException, Res, UseGuards, Put, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { CustomerService } from './customer.service';
 import { CommonDto } from '@/auth/dto/common.dto';
-import { encryptData } from '@/common/helper/common.helper';
+import { buildUserRootFolder, decryptData, encryptData } from '@/common/helper/common.helper';
 import { ApiResponse } from '@/common/helper/response.helper';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
@@ -17,6 +17,8 @@ import {
   ApiBody,
   ApiResponse as SwaggerApiResponse,
 } from '@nestjs/swagger';
+import { upload } from '@/common/config/multer.config';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('Agent - Customers')
 @ApiBearerAuth('access-token')
@@ -30,9 +32,11 @@ export class CustomerController {
   @ApiOperation({ summary: 'Create a new customer' })
   @ApiBody({ type: CommonDto })
   @SwaggerApiResponse({ status: 200, description: 'Customer created successfully' })
-  async create(@Res() res: Response, @GetCurrentUserId() userId: bigint, @Body() createCustomerDto: CommonDto) {
+  @UseInterceptors(FileInterceptor('image', upload))
+  async create(@Res() res: Response, @GetCurrentUserId() userId: bigint,
+    @Body() createCustomerDto: CommonDto, @UploadedFile() file?: any) {
     try {
-      const customer = await this.customerService.create(userId, createCustomerDto);
+      const customer = await this.customerService.create(userId, file, createCustomerDto);
       let result = JSON.stringify(customer, (key, value) =>
         typeof value === 'bigint' ? value.toString() : value,
       );
@@ -51,10 +55,12 @@ export class CustomerController {
   @ApiOperation({ summary: 'Update customer details' })
   @ApiParam({ name: 'id', description: 'Customer ID', example: 1 })
   @ApiBody({ type: CommonDto })
+  @UseInterceptors(FileInterceptor('image', upload))
   @SwaggerApiResponse({ status: 200, description: 'Customer details updated successfully' })
-  async updateCustomer(@Res() res: Response, @GetCurrentUserId() userId: bigint, @Param('id') customer_id: string, @Body() updateCustomerDto: CommonDto) {
+  async updateCustomer(@Res() res: Response, @GetCurrentUserId() userId: bigint,
+    @Param('id') customer_id: string, @Body() updateCustomerDto: CommonDto, @UploadedFile() file?: any) {
     try {
-      const customer = await this.customerService.updateCustomer(userId, BigInt(customer_id), updateCustomerDto);
+      const customer = await this.customerService.updateCustomer(userId, BigInt(customer_id), file, updateCustomerDto);
       let result = JSON.stringify(customer, (key, value) =>
         typeof value === 'bigint' ? value.toString() : value,
       );

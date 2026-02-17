@@ -52,6 +52,17 @@ enum OnboardingStatus {
     COMPLETED
 }
 
+enum CustomerStatus {
+    NEW_LEAD
+    CONTACTED
+    QUALIFIED
+    PROPOSAL_SENT
+    CONVERTED
+    UNQUALIFIED
+    FOLLOW_UP
+    LOST
+}
+
 enum SubscriptionStatus {
     PENDING
     ACTIVE
@@ -282,43 +293,44 @@ model MetaData {
 }
 
 model User {
-    id                   BigInt               @id @default(autoincrement())
-    first_name           String?
-    last_name            String?
-    email                String?              @unique
-    password             String?              @db.Text()
-    role_id              BigInt
-    role                 Role                 @relation(fields: [role_id], references: [id])
-    phone_no             String?
-    image                String?
-    dob                  DateTime?
-    auth_method          AuthType
-    provider_id          String?              @unique
-    status               Status               @default(ACTIVE)
-    refresh_token        String?
-    reset_token          String?              @unique
-    reset_token_exp      DateTime?
-    country_id           BigInt
-    country              Country              @relation(fields: [country_id], references: [id])
-    currency_id          BigInt
-    currency             Currency             @relation(fields: [currency_id], references: [id])
-    is_temporary         Boolean              @default(false)
-    is_deleted           Boolean              @default(false)
-    created_at           DateTime             @default(now())
-    updated_at           DateTime             @updatedAt
-    onboardingStatus     OnboardingStatus     @default(INCOMPLETED)
-    invalidatedTokens    InvalidatedToken[]
-    userFCMTokens        UserFCMToken[]
-    organizations        Organization[]       @relation("OrgCreatedBy")
-    orgUsers             OrganizationUser[]
-    customers            Customer[]           @relation("CustomerCreatedBy")
-    agentProductEntities AgentProductEntity[]
-    sessions             UserSession[]
-    agentKYC             AgentKYC?
-    agentSales           AgentSale[]
-    meetings             Meeting[]
-    inAppNotifications   InAppNotifications[]
-    toDos                ToDo[]
+    id                      BigInt                  @id @default(autoincrement())
+    first_name              String?
+    last_name               String?
+    email                   String?                 @unique
+    password                String?                 @db.Text()
+    role_id                 BigInt
+    role                    Role                    @relation(fields: [role_id], references: [id])
+    phone_no                String?
+    image                   String?
+    dob                     DateTime?
+    auth_method             AuthType
+    provider_id             String?                 @unique
+    status                  Status                  @default(ACTIVE)
+    refresh_token           String?
+    reset_token             String?                 @unique
+    reset_token_exp         DateTime?
+    country_id              BigInt
+    country                 Country                 @relation(fields: [country_id], references: [id])
+    currency_id             BigInt
+    currency                Currency                @relation(fields: [currency_id], references: [id])
+    is_temporary            Boolean                 @default(false)
+    is_deleted              Boolean                 @default(false)
+    created_at              DateTime                @default(now())
+    updated_at              DateTime                @updatedAt
+    onboardingStatus        OnboardingStatus        @default(INCOMPLETED)
+    invalidatedTokens       InvalidatedToken[]
+    userFCMTokens           UserFCMToken[]
+    organizations           Organization[]          @relation("OrgCreatedBy")
+    orgUsers                OrganizationUser[]
+    customers               Customer[]              @relation("CustomerCreatedBy")
+    customerStatusHistories CustomerStatusHistory[] @relation("changedByAgent")
+    agentProductEntities    AgentProductEntity[]
+    sessions                UserSession[]
+    agentKYC                AgentKYC?
+    agentSales              AgentSale[]
+    meetings                Meeting[]
+    inAppNotifications      InAppNotifications[]
+    toDos                   ToDo[]
 
     @@index([first_name, last_name, email, phone_no, auth_method, country_id, currency_id])
     @@map("tbl_user")
@@ -340,6 +352,7 @@ model AgentKYC {
     ifsc_code      String
     upi_id         String?
     qr_code        String?
+    base_img_path  String?
     created_at     DateTime       @default(now())
     updated_at     DateTime       @updatedAt
 
@@ -473,26 +486,42 @@ model OrganizationUser {
  */
 
 model Customer {
-    id             BigInt       @id @default(autoincrement())
-    org_id         BigInt
-    organization   Organization @relation(fields: [org_id], references: [id])
-    created_by     BigInt
-    createdByUser  User         @relation("CustomerCreatedBy", fields: [created_by], references: [id])
-    first_name     String?
-    last_name      String?
-    email          String?
-    phone          String?
-    image          String?
-    aadhaar_number String?
-    pan_number     String?
-    address        String?
-    created_at     DateTime     @default(now())
-    updated_at     DateTime     @updatedAt
-    agentSales     AgentSale[]
-    meetings       Meeting[]
+    id              BigInt                  @id @default(autoincrement())
+    org_id          BigInt
+    organization    Organization            @relation(fields: [org_id], references: [id])
+    created_by      BigInt
+    createdByUser   User                    @relation("CustomerCreatedBy", fields: [created_by], references: [id])
+    first_name      String?
+    last_name       String?
+    email           String?
+    phone           String?
+    image           String?
+    aadhaar_number  String?
+    pan_number      String?
+    address         String?
+    status          CustomerStatus          @default(NEW_LEAD)
+    created_at      DateTime                @default(now())
+    updated_at      DateTime                @updatedAt
+    agentSales      AgentSale[]
+    meetings        Meeting[]
+    statusHistories CustomerStatusHistory[]
 
     @@index([first_name, last_name, email, phone, aadhaar_number, pan_number])
     @@map("tbl_customer")
+}
+
+model CustomerStatusHistory {
+    id             BigInt         @id @default(autoincrement())
+    customer_id    BigInt
+    customer       Customer       @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+    old_status     CustomerStatus
+    new_status     CustomerStatus
+    changed_by     BigInt
+    changedByAgent User           @relation("changedByAgent", fields: [changed_by], references: [id])
+    reason         String?
+    created_at     DateTime       @default(now())
+
+    @@map("tbl_customer_status_history")
 }
 
 /**

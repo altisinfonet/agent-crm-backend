@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as multer from 'multer';
-import sharp from 'sharp';
+import * as sharp from 'sharp';
 import { BadRequestException } from '@nestjs/common';
 
 
@@ -75,9 +75,11 @@ const upload = multer({
 
 export async function isValidImageBuffer(buffer: Buffer): Promise<boolean> {
     try {
-        await sharp(buffer).metadata();
+        const data = await sharp(buffer).metadata();
+        console.log("data", data);
         return true;
-    } catch {
+    } catch (error: any) {
+        console.log("erorr", error);
         return false;
     }
 }
