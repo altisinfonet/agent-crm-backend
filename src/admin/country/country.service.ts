@@ -64,12 +64,15 @@ export class CountryService {
       }
       const mappedCountries = payload.map((item) => {
         const { timezone, utc_offset_min } = this.parseTimezone(item.timezones);
+        const phoneLength = Array.isArray(item.phoneLength)
+          ? item.phoneLength[0]
+          : item.phoneLength ?? null;
         return {
           name: item.name,
           iso_code: item.iso?.['alpha-2'],
           phone_code: item.phone?.[0] ?? null,
           region: item.region,
-          phoneLength: item.phoneLength,
+          phoneLength,
           timezone,
           utc_offset_min,
           image: item.emoji,
