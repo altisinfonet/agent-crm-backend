@@ -8,39 +8,38 @@ import { CommonDto } from '@/auth/dto/common.dto';
 import type { Response } from 'express';
 import { ApiResponse } from '@/common/helper/response.helper';
 import { encryptData } from '@/common/helper/common.helper';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiBody,
+  ApiResponse as SwaggerApiResponse,
+} from '@nestjs/swagger';
 
 @Controller({ path: '', version: '1' })
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN)
+// @UseGuards(JwtAuthGuard, RolesGuard)
+// @Roles(Role.ADMIN)
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) { }
 
-  @Post()
-  async create(@Res() res: Response, @Body() createDashboardDto: CommonDto) {
+  @Get("agents")
+  @ApiOperation({ summary: 'Get agents data for admin' })
+  @SwaggerApiResponse({ status: 200, description: 'Agents dashboard data fetched successfully' })
+  async agentsData(@Res() res: Response) {
     try {
-      const faq = await this.dashboardService.create(createDashboardDto);
-      let result = JSON.stringify(faq, (key, value) =>
-        typeof value === 'bigint' ? value.toString() : value,
-      );
-      return res.status(HttpStatus.OK).json(new ApiResponse(JSON.parse(result), "Faqs."));
-    } catch (error: any) {
-      console.log('error: ', error);
-      throw new BadRequestException(error.response);
-    }
-  }
-
-  @Get("total")
-  async findTotal(@Res() res: Response) {
-    try {
-      const dashboard = await this.dashboardService.findTotal();
+      const dashboard = await this.dashboardService.agentsData();
 
       let result = JSON.stringify(dashboard, (key, value) =>
         typeof value === 'bigint' ? value.toString() : value,
       );
-      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Total Dashboard."));
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "All agent dashboard data."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error) {
-      throw new BadRequestException(error?.response);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to fetch agent data.");
     }
   }
 

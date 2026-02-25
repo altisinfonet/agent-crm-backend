@@ -21,6 +21,8 @@ import { TodoModule } from './todo/todo.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { OrganizationModule } from './organization/organization.module';
 import { LocationModule } from './location/location.module';
+import { AgentModule } from './agent/agent.module';
+import { DashboardModule } from './dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -44,7 +46,9 @@ import { LocationModule } from './location/location.module';
     CustomerModule,
     TodoModule,
     WhatsappModule,
-    LocationModule
+    LocationModule,
+    DashboardModule,
+    AgentModule,
   ],
   controllers: [AppController],
   providers: [AppService, MailService],

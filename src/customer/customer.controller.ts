@@ -1,7 +1,7 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpStatus, BadRequestException, Res, UseGuards, Put, UseInterceptors, UploadedFile, UploadedFiles } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpStatus, BadRequestException, Res, UseGuards, Put, UseInterceptors, UploadedFile, UploadedFiles, Query } from '@nestjs/common';
 import { CustomerService } from './customer.service';
 import { CommonDto } from '@/auth/dto/common.dto';
-import { buildUserRootFolder, decryptData, encryptData } from '@/common/helper/common.helper';
+import { decryptData, encryptData } from '@/common/helper/common.helper';
 import { ApiResponse } from '@/common/helper/response.helper';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
@@ -9,6 +9,7 @@ import { GetCurrentUserId } from '@/common/decorators/current-user-id.decorator'
 import { AccountStatus } from '@/common/decorators/status.decorator';
 import { AccountStatusGuard } from '@/common/guards/status.guard';
 import { Account } from '@/common/enum/account.enum';
+import * as multer from 'multer';
 import {
   ApiTags,
   ApiBearerAuth,
@@ -17,7 +18,7 @@ import {
   ApiBody,
   ApiResponse as SwaggerApiResponse,
 } from '@nestjs/swagger';
-import { upload } from '@/common/config/multer.config';
+import { documentFileFilter, imageFileFilter, upload } from '@/common/config/multer.config';
 import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
 
 @ApiTags('Agent - Customers')
@@ -101,9 +102,11 @@ export class CustomerController {
   @ApiParam({ name: 'id', description: 'Customer ID', example: 1 })
   @ApiBody({ type: CommonDto })
   @SwaggerApiResponse({ status: 200, description: 'Product sold successfully' })
-  async sellProduct(@Res() res: Response, @GetCurrentUserId() userId: bigint, @Param('id') customer_id: string, @Body() sellProductDto: CommonDto) {
+  async sellProduct(
+    @Res() res: Response, @GetCurrentUserId() userId: bigint, @Query('slug') slug: string,
+    @Param('id') customer_id: string, @Body() sellProductDto: CommonDto) {
     try {
-      const customer = await this.customerService.sellProduct(userId, BigInt(customer_id), sellProductDto);
+      const customer = await this.customerService.sellProduct(userId, BigInt(customer_id), slug, sellProductDto);
       let result = JSON.stringify(customer, (key, value) =>
         typeof value === 'bigint' ? value.toString() : value,
       );
@@ -111,6 +114,7 @@ export class CustomerController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Product sell to customer."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
+      console.log("Error", error);
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }
@@ -182,11 +186,84 @@ export class CustomerController {
     }
   }
 
-  @Delete(':id')
-  @ApiOperation({ summary: 'Delete customer by ID' })
+  // @Post('sale/upload/:id')
+  // @ApiOperation({ summary: 'Document uploaded' })
+  // @ApiParam({ name: 'id', description: 'Sale ID', example: 10 })
+  // @UseInterceptors(
+  //   FileFieldsInterceptor(
+  //     [
+  //       { name: "documents", maxCount: 10 }
+  //     ],
+  //     upload
+  //   )
+  // )
+
+  @Post('sale/upload/:id')
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'images', maxCount: 10 },
+        { name: 'documents', maxCount: 10 },
+      ],
+      {
+        storage: multer.memoryStorage(),
+        limits: { fileSize: 10 * 1024 * 1024 },
+        fileFilter: (req, file, cb) => {
+          if (file.fieldname === 'images') {
+            return imageFileFilter(req, file, cb);
+          }
+          if (file.fieldname === 'documents') {
+            return documentFileFilter(req, file, cb);
+          }
+          cb(new BadRequestException('Invalid upload field'), false);
+        },
+      }
+    )
+  )
+  async uploadDocument(
+    @Res() res: Response,
+    @GetCurrentUserId() userId: bigint,
+    @Param('id') sale_id: string,
+    @UploadedFiles() files: {
+      images?: any[];
+      documents?: any[];
+    }
+  ) {
+    try {
+      // const customer = await this.customerService.uploadDocumentOld(userId, BigInt(sale_id), files);
+      const sale = await this.customerService.uploadDocumentNew(userId, BigInt(sale_id), files);
+      let result = JSON.stringify(sale, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Document uploaded"));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error: any) {
+      console.log("Error", error);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to upload documents");
+    }
+  }
+
+  @Delete('sale/docs/:id')
+  @ApiOperation({ summary: 'Delete docs file' })
   @ApiParam({ name: 'id', example: 1 })
-  @SwaggerApiResponse({ status: 200, description: 'Customer deleted successfully' })
-  remove(@Param('id') id: string) {
-    return this.customerService.remove(+id);
+  @SwaggerApiResponse({ status: 200, description: 'Delete docs file successfully' })
+  async remove(@Res() res: Response, @GetCurrentUserId() userId: bigint, @Param('id') docs_id: string) {
+    try {
+      const sale = await this.customerService.removeFile(userId, BigInt(docs_id));
+      let result = JSON.stringify(sale, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Document deleted"));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error) {
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to delete documents");
+    }
   }
 }

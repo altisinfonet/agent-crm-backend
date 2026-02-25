@@ -5,6 +5,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { SettingsService } from 'src/settings/settings.service';
 import Razorpay = require("razorpay");
 import * as crypto from "crypto";
+import { SubscriptionCycle } from '@generated/prisma';
 
 @Injectable()
 export class SubscriptionService {
@@ -85,6 +86,37 @@ export class SubscriptionService {
     }
   }
 
+  private getEndAtByBillingCycle(
+    startAt: number,
+    billingCycle: SubscriptionCycle
+  ): number {
+    const endAt = new Date(startAt * 1000);
+
+    switch (billingCycle) {
+      case 'YEARLY':
+        endAt.setFullYear(endAt.getFullYear() + 1);
+        break;
+
+      case 'QUARTERLY':
+        endAt.setMonth(endAt.getMonth() + 3);
+        break;
+
+      case 'MONTHLY':
+        endAt.setMonth(endAt.getMonth() + 1);
+        break;
+
+      case 'WEEKLY':
+        endAt.setDate(endAt.getDate() + 7);
+        break;
+
+      default:
+        throw new Error(`Unsupported billing cycle: ${billingCycle}`);
+    }
+    console.log("endAt+++++++", endAt);
+
+    return Math.floor(endAt.getTime() / 1000);
+  }
+
   async subscribe(user_id: bigint, plan_id: bigint) {
     try {
       const org = await this.prisma.organization.findUnique({
@@ -116,30 +148,30 @@ export class SubscriptionService {
 
       const paymentSettings =
         await this.settingsService.paymentSettings("payment-settings");
-      console.log("paymentSettings", paymentSettings);
 
       const DEFAULT_TRIAL_DAYS =
         parseInt(paymentSettings.TRIAL_DURATION) || 0;
 
       const hasSubscribedBefore = await this.prisma.organizationSubscription.findFirst({
-        where: { org_id: org.id },
+        where: {
+          org_id: org.id,
+          status: {
+            notIn: ["INCOMPLETE"]
+          },
+        },
         select: { id: true },
       });
 
       const TRIAL_DAYS = hasSubscribedBefore ? 0 : DEFAULT_TRIAL_DAYS;
-      const TEN_YEARS = 10;
 
-      // const startAt = addDays(TRIAL_DAYS, 5);
-      // const endAt = addYearsFrom(startAt, TEN_YEARS);
+      const billing_cycle = plan.billing_cycle;
 
-      function addMinutes(minutes: number): number {
-        return Math.floor(
-          (Date.now() + minutes * 60 * 1000) / 1000
-        );
-      }
       const startAt =
-        TRIAL_DAYS > 0 ? addDays(TRIAL_DAYS, 5) : addMinutes(3);
-      const endAt = addYearsFrom(startAt, TEN_YEARS);
+        TRIAL_DAYS > 0 ? addDays(TRIAL_DAYS, 5) : this.addMinutes(2);
+      const endAt = this.getEndAtByBillingCycle(
+        startAt,
+        billing_cycle
+      );
 
       const rzpPayload: any = {
         plan_id: plan.rzp_plan_id,
@@ -198,11 +230,20 @@ export class SubscriptionService {
     }
   }
 
+  private addMinutes(minutes: number): number {
+    return Math.floor(
+      (Date.now() + minutes * 60 * 1000) / 1000
+    );
+  }
 
   async upgradeSubscription(agent_id: bigint, dto: CommonDto) {
     try {
       const payload = decryptData(dto.data);
       const { new_plan_id } = payload;
+
+      if (!new_plan_id) {
+        throw new BadRequestException("New plan Id required");
+      }
 
       const org = await this.prisma.organization.findUnique({
         where: {
@@ -210,22 +251,19 @@ export class SubscriptionService {
         }
       })
       if (!org) {
-        throw new BadRequestException("User do not have any organization")
+        throw new BadRequestException("User does not have any organization");
       }
 
-      if (!new_plan_id) {
-        throw new BadRequestException("New plan Id required")
-      }
       const currentSub =
         await this.prisma.organizationSubscription.findFirst({
           where: {
-            org_id: org?.id,
-            status: "ACTIVE"
+            org_id: org.id,
+            status: "ACTIVE",
           },
-          include: { plan: true }
+          include: { plan: true },
         });
 
-      if (!currentSub || !currentSub?.rzp_subscription_id) {
+      if (!currentSub || !currentSub.rzp_subscription_id) {
         throw new BadRequestException("No active subscription found");
       }
 
@@ -233,67 +271,88 @@ export class SubscriptionService {
         await this.prisma.subscriptionPlan.findFirst({
           where: {
             id: new_plan_id,
-            is_active: true
-          }
+            is_active: true,
+          },
         });
 
-
-      if (!newPlan || !newPlan?.rzp_plan_id) {
+      if (!newPlan || !newPlan.rzp_plan_id) {
         throw new BadRequestException("Invalid plan");
       }
-      try {
-        const fetchrzpSub = await this.razorpay.subscriptions.fetch(currentSub.rzp_subscription_id);
 
-        const cancel = await this.razorpay.subscriptions.cancel(
-          currentSub.rzp_subscription_id,
-          false
-          // { cancel_at_cycle_end: 1 }
-        );
+      // const startAt = addDays(0, 2);
+      // const endAt = addYearsFrom(startAt, 10);
 
-        const startAt = addDays(0, 2);
-        const endAt = addYearsFrom(startAt, 10);
+      const paymentSettings =
+        await this.settingsService.paymentSettings("payment-settings");
 
-        const rzpPayload: any = {
-          plan_id: newPlan.rzp_plan_id,
-          start_at: startAt,
-          end_at: endAt,
-          customer_notify: 1,
-          notes: {
-            org_id: org.id.toString(),
-            upgraded_from: currentSub.plan.code,
-            upgraded_to: newPlan.code
-          }
-        };
+      const DEFAULT_TRIAL_DAYS =
+        parseInt(paymentSettings.TRIAL_DURATION) || 0;
+
+      const hasSubscribedBefore = await this.prisma.organizationSubscription.findFirst({
+        where: {
+          org_id: org.id,
+          status: {
+            notIn: ["INCOMPLETE"]
+          },
+        },
+        select: { id: true },
+      });
+
+      const TRIAL_DAYS = hasSubscribedBefore ? 0 : DEFAULT_TRIAL_DAYS;
+      // const TEN_YEARS = 10;
+
+      // const startAt =
+      //   TRIAL_DAYS > 0 ? addDays(TRIAL_DAYS, 5) : this.addMinutes(3);
+      // const endAt = addYearsFrom(startAt, TEN_YEARS);
+
+      const billing_cycle = newPlan.billing_cycle;
+      const startAt =
+        TRIAL_DAYS > 0 ? addDays(TRIAL_DAYS, 5) : this.addMinutes(2);
+      const endAt = this.getEndAtByBillingCycle(
+        startAt,
+        billing_cycle
+      );
+      console.log("startAt++++++", startAt);
+      console.log("endAt++++++", endAt);
 
 
-        const rzpSub = await this.razorpay.subscriptions.create(rzpPayload);
+      const rzpPayload: any = {
+        plan_id: newPlan.rzp_plan_id,
+        start_at: startAt,
+        end_at: endAt,
+        customer_notify: 1,
+        notes: {
+          org_id: org.id.toString(),
+          upgraded_from: currentSub.plan.code,
+          upgraded_to: newPlan.code,
+        },
+      };
 
-        const newOrgSub =
-          await this.prisma.organizationSubscription.create({
-            data: {
-              org_id: org?.id,
-              plan_id: newPlan.id,
-              status: "PENDING",
-              start_at: new Date(),
-              rzp_subscription_id: rzpSub.id
-            }
-          });
-
-        await this.prisma.organizationSubscription.update({
-          where: { id: currentSub.id },
+      const rzpSub = await this.razorpay.subscriptions.create(rzpPayload);
+      const newOrgSub =
+        await this.prisma.organizationSubscription.create({
           data: {
-            status: "UPGRADED"
-          }
+            org_id: org.id,
+            plan_id: newPlan.id,
+            status: "INCOMPLETE",
+            rzp_subscription_id: rzpSub.id,
+            upgraded_from_id: currentSub.id,
+            start_at: new Date(),
+          },
         });
-        return {
-          subscription_id: rzpSub.id
-        };
-      } catch (error: any) {
-        console.error("Razorpay error:", error?.error || error);
-        throw error;
-      }
+
+      await this.prisma.organizationSubscription.update({
+        where: { id: currentSub.id },
+        data: {
+          upgraded_to_id: newOrgSub.id,
+        },
+      });
+
+      return {
+        subscription_id: rzpSub.id,
+      };
     } catch (error) {
-      throw error
+      throw error;
     }
   }
 
@@ -312,6 +371,27 @@ export class SubscriptionService {
     try {
       const payload = decryptData(dto.data);
       const { subscription_id, payment_id, payment_signature } = payload;
+
+      if (subscription_id && !payment_id) {
+        await this.prisma.organizationSubscription.delete({
+          where: {
+            rzp_subscription_id: subscription_id
+          },
+        })
+        const payload = {
+          subscription_id,
+          payment_id,
+          payment_signature
+        }
+        await this.prisma.razorpayEvent.create({
+          data: {
+            razorpay_entity_id: subscription_id,
+            entity_type: "SUBSCRIPTION",
+            event_type: "incomplete.subscription_request.deleted",
+            payload,
+          }
+        })
+      }
 
       if (!subscription_id || !payment_id || !payment_signature) {
         throw new BadRequestException("Missing required payment information");
@@ -399,6 +479,106 @@ export class SubscriptionService {
   }
 
 
+  // async razorpayWebhook(body: Buffer, signature: string) {
+  //   try {
+  //     const paymentSettings = await this.settingsService.paymentSettings("payment-settings");
+  //     const expected = crypto
+  //       .createHmac("sha256", paymentSettings.RAZORPAY_WEBHOOK_SECRET)
+  //       .update(body)
+  //       .digest("hex");
+
+  //     if (expected !== signature) {
+  //       throw new Error("Invalid Razorpay webhook signature");
+  //     }
+
+  //     const event = JSON.parse(body.toString());
+
+  //     const eventType = event.event;
+  //     const subscription = event.payload.subscription?.entity;
+
+  //     if (!subscription) return;
+  //     const subId = subscription.id;
+
+  //     await this.prisma.razorpayEvent.create({
+  //       data: {
+  //         razorpay_entity_id: subId,
+  //         entity_type: "SUBSCRIPTION",
+  //         event_type: eventType,
+  //         payload: event
+  //       }
+  //     });
+
+  //     switch (eventType) {
+  //       case "subscription.authenticated":
+  //       case "subscription.activated": {
+  //         const startAt = subscription.start_at
+  //           ? new Date(subscription.start_at * 1000)
+  //           : new Date();
+
+  //         const endAt = subscription.end_at
+  //           ? new Date(subscription.end_at * 1000)
+  //           : null;
+
+  //         await this.prisma.organizationSubscription.update({
+  //           where: { rzp_subscription_id: subId },
+  //           data: {
+  //             status: "ACTIVE",
+  //             start_at: startAt,
+  //             end_at: endAt,
+  //           },
+  //         });
+  //         break;
+  //       }
+
+  //       case "subscription.charged":
+  //         await this.prisma.razorpaySubscription.update({
+  //           where: { rzp_subscription_id: subId },
+  //           data: {
+  //             current_cycle: { increment: 1 }
+  //           }
+  //         });
+  //         break;
+
+  //       case "subscription.completed":
+  //         await this.prisma.organizationSubscription.update({
+  //           where: { rzp_subscription_id: subId },
+  //           data: {
+  //             status: "EXPIRED",
+  //             end_at: new Date(),
+  //             cancelled_at: new Date()
+  //           }
+  //         });
+  //         break;
+
+  //       case "subscription.cancelled":
+  //       case "subscription.halted":
+  //         {
+  //           const orgSub =
+  //             await this.prisma.organizationSubscription.findUnique({
+  //               where: { rzp_subscription_id: subId },
+  //             });
+  //           if (!orgSub || orgSub.status === "UPGRADED") return;
+
+  //           const effectiveEndAt = subscription.current_end
+  //             ? new Date(subscription.current_end * 1000)
+  //             : new Date();
+
+  //           await this.prisma.organizationSubscription.update({
+  //             where: { rzp_subscription_id: subId },
+  //             data: {
+  //               auto_renew: false,
+  //               end_at: effectiveEndAt,
+  //             },
+  //           });
+  //           break;
+  //         }
+  //     }
+
+  //   } catch (error) {
+  //     throw error;
+  //   }
+  // }
+
   async razorpayWebhook(body: Buffer, signature: string) {
     try {
       const paymentSettings = await this.settingsService.paymentSettings("payment-settings");
@@ -424,13 +604,22 @@ export class SubscriptionService {
           razorpay_entity_id: subId,
           entity_type: "SUBSCRIPTION",
           event_type: eventType,
-          payload: event
-        }
+          payload: event,
+        },
       });
 
       switch (eventType) {
+        /* ---------------- AUTHENTICATED / ACTIVATED ---------------- */
         case "subscription.authenticated":
         case "subscription.activated": {
+          const orgSub =
+            await this.prisma.organizationSubscription.findUnique({
+              where: { rzp_subscription_id: subId },
+              include: { upgraded_from: true },
+            });
+
+          if (!orgSub) return;
+
           const startAt = subscription.start_at
             ? new Date(subscription.start_at * 1000)
             : new Date();
@@ -439,37 +628,57 @@ export class SubscriptionService {
             ? new Date(subscription.end_at * 1000)
             : null;
 
+          /* Activate NEW subscription */
           await this.prisma.organizationSubscription.update({
-            where: { rzp_subscription_id: subId },
+            where: { id: orgSub.id },
             data: {
               status: "ACTIVE",
               start_at: startAt,
               end_at: endAt,
             },
           });
+
+          /* If this was an upgrade → cancel OLD subscription safely */
+          if (orgSub.upgraded_from?.rzp_subscription_id) {
+            await this.razorpay.subscriptions.cancel(
+              orgSub.upgraded_from.rzp_subscription_id,
+              false
+            );
+
+            await this.prisma.organizationSubscription.update({
+              where: { id: orgSub.upgraded_from.id },
+              data: {
+                status: "UPGRADED",
+                auto_renew: false,
+              },
+            });
+          }
           break;
         }
 
+        /* ---------------- CHARGED ---------------- */
         case "subscription.charged":
           await this.prisma.razorpaySubscription.update({
             where: { rzp_subscription_id: subId },
             data: {
-              current_cycle: { increment: 1 }
-            }
+              current_cycle: { increment: 1 },
+            },
           });
           break;
 
+        /* ---------------- COMPLETED ---------------- */
         case "subscription.completed":
           await this.prisma.organizationSubscription.update({
             where: { rzp_subscription_id: subId },
             data: {
               status: "EXPIRED",
               end_at: new Date(),
-              cancelled_at: new Date()
-            }
+              cancelled_at: new Date(),
+            },
           });
           break;
 
+        /* ---------------- CANCELLED / HALTED ---------------- */
         case "subscription.cancelled":
         case "subscription.halted":
           {
@@ -530,10 +739,12 @@ export class SubscriptionService {
           plan: {
             select: {
               id: true,
+              rzp_plan_id: true,
               code: true,
               name: true,
               description: true,
               price: true,
+              billing_cycle: true,
               currency: {
                 select: {
                   code: true,
@@ -561,29 +772,42 @@ export class SubscriptionService {
           activeSubscription?.rzp_subscription_id
         )
         : null;
-      console.log("rzpSubscription", rzpSubscription);
 
-      const formattedSubscriptions = subscriptions.map((sub) => ({
-        id: Number(sub.id),
-        status: sub.status,
-        source: sub.source,
-        startAt: sub.start_at,
-        endAt: sub.end_at,
-        plan: {
-          id: Number(sub.plan.id),
-          code: sub.plan.code,
-          name: sub.plan.name,
-          description: sub.plan.description,
-          price: sub.plan.price,
-          currency: {
-            code: sub.plan.currency.code,
-            symbol: sub.plan.currency.symbol,
+      const formattedSubscriptions = subscriptions.map((sub) => {
+        const trialDays = this.calculateTrialDays(
+          sub.created_at,
+          sub.start_at
+        );
+        return {
+          id: Number(sub.id),
+          status: sub.status,
+          source: sub.source,
+          startAt: sub.start_at,
+          endAt: sub.end_at,
+          rzp_subscription_id: sub.rzp_subscription_id,
+          rzp_payment_id: sub.rzp_payment_id,
+          auto_renew: sub.auto_renew,
+          created_at: sub.created_at,
+          cancelled_at: sub.cancelled_at,
+          trialDays,
+          plan: {
+            id: Number(sub.plan.id),
+            code: sub.plan.code,
+            name: sub.plan.name,
+            description: sub.plan.description,
+            price: sub.plan.price,
+            rzp_plan_id: sub.plan.rzp_plan_id,
+            billing_cycle: sub.plan.billing_cycle,
+            currency: {
+              code: sub.plan.currency.code,
+              symbol: sub.plan.currency.symbol,
+            },
+            features: sub.plan.subscriptionFeatures.map(
+              (f) => f.features
+            ),
           },
-          features: sub.plan.subscriptionFeatures.map(
-            (f) => f.features
-          ),
-        },
-      }));
+        }
+      });
 
       return {
         subscriptions: formattedSubscriptions,
@@ -605,6 +829,7 @@ export class SubscriptionService {
               ? new Date(rzpSubscription.end_at * 1000)
               : null,
             shortUrl: rzpSubscription.short_url,
+            created_at: rzpSubscription.created_at,
           }
           : null,
       };
@@ -624,57 +849,99 @@ export class SubscriptionService {
 
   //     if (!org) {
   //       throw new BadRequestException("User does not own any organization");
-  //     }
+  //     };
 
   //     const orgSubscription =
   //       await this.prisma.organizationSubscription.findFirst({
-  //         orderBy: {
-  //           created_at: "desc"
-  //         },
+  //         orderBy: { created_at: "desc" },
   //         where: {
   //           org_id: org.id,
   //           status: "ACTIVE",
   //         },
   //       });
 
-  //     if (!orgSubscription || !orgSubscription.rzp_subscription_id) {
+  //     if (!orgSubscription) {
+  //       throw new BadRequestException("No subscription found for this organization")
+  //     }
+
+  //     if (orgSubscription.source === "RAZORPAY" && !orgSubscription?.rzp_subscription_id) {
   //       throw new BadRequestException("No active subscription found");
   //     }
 
+  //     let rzpSub: any;
   //     try {
-  //       await this.razorpay.subscriptions.cancel(
-  //         orgSubscription.rzp_subscription_id,
-  //         true
+  //       rzpSub = await this.razorpay.subscriptions.fetch(
+  //         orgSubscription.rzp_subscription_id
   //       );
-  //     } catch (error: any) {
-  //       console.error("Razorpay cancel error:", error?.error || error);
-  //       throw new BadRequestException("Failed to cancel subscription on Razorpay");
+  //     } catch (error) {
+  //       console.error("[RAZORPAY_FETCH_FAILED]", error?.error || error);
+  //       throw error;
   //     }
 
-  //     await this.prisma.organizationSubscription.update({
-  //       where: {
-  //         id: orgSubscription.id,
-  //       },
-  //       data: {
-  //         auto_renew: false,
-  //       },
-  //     });
-
+  //     try {
+  //       if (orgSubscription.source === "RAZORPAY") {
+  //         if (rzprzpSubscription.paid_count === 0) {
+  //           await this.razorpay.subscriptions.pause(
+  //             orgSubscription.rzp_subscription_id
+  //           );
+  //           await this.prisma.organizationSubscription.update({
+  //             where: { id: orgSubscription.id },
+  //             data: {
+  //               auto_renew: false,
+  //               cancelled_at: new Date(),
+  //               end_at: new Date()
+  //             },
+  //           });
+  //         } else {
+  //           await this.razorpay.subscriptions.cancel(
+  //             orgSubscription.rzp_subscription_id,
+  //             true
+  //           );
+  //           await this.prisma.organizationSubscription.update({
+  //             where: { id: orgSubscription.id },
+  //             data: {
+  //               auto_renew: false,
+  //               cancelled_at: new Date()
+  //             },
+  //           });
+  //         }
+  //       }
+  //       else if (orgSubscription.source === "ADMIN") {
+  //         await this.prisma.organizationSubscription.update({
+  //           where: { id: orgSubscription.id },
+  //           data: {
+  //             status: "CANCELLED",
+  //             auto_renew: false,
+  //             cancelled_at: new Date(),
+  //             end_at: new Date()
+  //           },
+  //         });
+  //       } else {
+  //         throw new BadRequestException("Invalid subscription source")
+  //       }
+  //     } catch (error: any) {
+  //       console.error(
+  //         "[RAZORPAY_TERMINATION_FAILED]",
+  //         error?.error || error
+  //       );
+  //     }
   //     return true;
   //   } catch (error) {
+  //     console.log("error", error);
   //     throw error;
   //   }
   // }
 
-
-  async cancelSubscription(user_id: bigint) {
+  async cancelSubscription(user_id: bigint): Promise<boolean> {
     try {
       const org = await this.prisma.organization.findUnique({
         where: { created_by: user_id },
         select: { id: true },
       });
 
-      if (!org) return;
+      if (!org) {
+        throw new BadRequestException("User does not own any organization");
+      }
 
       const orgSubscription =
         await this.prisma.organizationSubscription.findFirst({
@@ -685,18 +952,46 @@ export class SubscriptionService {
           },
         });
 
-      if (!orgSubscription?.rzp_subscription_id) return;
+      if (!orgSubscription) {
+        throw new BadRequestException(
+          "No active subscription found for this organization"
+        );
+      }
 
-      let rzpSub: any;
+      if (orgSubscription.source === "ADMIN") {
+        await this.prisma.organizationSubscription.update({
+          where: { id: orgSubscription.id },
+          data: {
+            status: "CANCELLED",
+            auto_renew: false,
+            cancelled_at: new Date(),
+            end_at: new Date(),
+          },
+        });
+        return true;
+      }
+
+      if (
+        orgSubscription.source !== "RAZORPAY" ||
+        !orgSubscription.rzp_subscription_id
+      ) {
+        throw new BadRequestException("Invalid or missing subscription");
+      }
+
+      let rzpSub: {
+        paid_count: number;
+        start_at: number
+      };
 
       try {
         rzpSub = await this.razorpay.subscriptions.fetch(
           orgSubscription.rzp_subscription_id
         );
-      } catch (error) {
+      } catch (error: any) {
         console.error("[RAZORPAY_FETCH_FAILED]", error?.error || error);
-        return;
+        throw new BadRequestException("Failed to fetch Razorpay subscription");
       }
+      console.log("rzpSub+++++++++", rzpSub);
 
       try {
         if (rzpSub.paid_count === 0) {
@@ -706,9 +1001,10 @@ export class SubscriptionService {
           await this.prisma.organizationSubscription.update({
             where: { id: orgSubscription.id },
             data: {
+              status: "PAUSED",
               auto_renew: false,
               cancelled_at: new Date(),
-              end_at: new Date()
+              end_at: new Date(rzpSub.start_at * 1000),
             },
           });
         } else {
@@ -720,20 +1016,30 @@ export class SubscriptionService {
             where: { id: orgSubscription.id },
             data: {
               auto_renew: false,
-              cancelled_at: new Date()
+              cancelled_at: new Date(),
             },
           });
         }
       } catch (error: any) {
-        console.error(
-          "[RAZORPAY_TERMINATION_FAILED]",
-          error?.error || error
-        );
+        console.error("[RAZORPAY_TERMINATION_FAILED]", error?.error || error);
+        throw new BadRequestException("Failed to cancel subscription");
       }
       return true;
     } catch (error) {
+      console.error("[CANCEL_SUBSCRIPTION_ERROR]", error);
       throw error;
     }
+  }
+
+  private calculateTrialDays(
+    createdAt: Date,
+    startAt: Date | null
+  ): number {
+    if (!startAt) return 0;
+    const diffMs = startAt.getTime() - createdAt.getTime();
+    if (diffMs <= 0) return 0;
+
+    return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
   }
 
 

@@ -487,30 +487,31 @@ model OrganizationUser {
  */
 
 model Customer {
-    id              BigInt                  @id @default(autoincrement())
-    org_id          BigInt
-    organization    Organization            @relation(fields: [org_id], references: [id])
-    created_by      BigInt
-    createdByUser   User                    @relation("CustomerCreatedBy", fields: [created_by], references: [id])
-    first_name      String?
-    last_name       String?
-    email           String?
-    phone           String?
-    country_id      BigInt?
-    country         Country?                @relation(fields: [country_id], references: [id])
-    image           String?
-    aadhaar_number  String?
-    pan_number      String?
-    panImage        String?
-    aadharFront     String?
-    aadharBack      String?
-    address         String?
-    status          CustomerStatus          @default(NEW_LEAD)
-    created_at      DateTime                @default(now())
-    updated_at      DateTime                @updatedAt
-    agentSales      AgentSale[]
-    meetings        Meeting[]
-    statusHistories CustomerStatusHistory[]
+    id               BigInt                  @id @default(autoincrement())
+    org_id           BigInt
+    organization     Organization            @relation(fields: [org_id], references: [id])
+    created_by       BigInt
+    createdByUser    User                    @relation("CustomerCreatedBy", fields: [created_by], references: [id])
+    first_name       String?
+    last_name        String?
+    email            String?
+    phone            String?
+    country_id       BigInt?
+    country          Country?                @relation(fields: [country_id], references: [id])
+    image            String?
+    aadhaar_number   String?
+    pan_number       String?
+    panImage         String?
+    aadharFront      String?
+    aadharBack       String?
+    address          String?
+    status           CustomerStatus          @default(NEW_LEAD)
+    base_folder_path String?
+    created_at       DateTime                @default(now())
+    updated_at       DateTime                @updatedAt
+    agentSales       AgentSale[]
+    meetings         Meeting[]
+    statusHistories  CustomerStatusHistory[]
 
     @@index([first_name, last_name, email, phone, aadhaar_number, pan_number])
     @@map("tbl_customer")
@@ -539,7 +540,7 @@ model CustomerStatusHistory {
 model Products {
     id         BigInt          @id @default(autoincrement())
     name       String          @unique
-    slug       String
+    slug       String          @unique
     desc       String?
     image      String?
     status     Status          @default(ACTIVE)
@@ -602,121 +603,186 @@ model AgentProductEntity {
  */
 
 model AgentSale {
-    id                BigInt                   @id @default(autoincrement())
+    id                BigInt               @id @default(autoincrement())
     org_id            BigInt?
-    organization      Organization?            @relation(fields: [org_id], references: [id])
+    organization      Organization?        @relation(fields: [org_id], references: [id])
     agent_id          BigInt
-    agent             User                     @relation(fields: [agent_id], references: [id])
+    agent             User                 @relation(fields: [agent_id], references: [id])
     customer_id       BigInt
-    customer          Customer                 @relation(fields: [customer_id], references: [id])
+    customer          Customer             @relation(fields: [customer_id], references: [id])
     product_entity_id BigInt
-    productEntity     ProductEntity            @relation(fields: [product_entity_id], references: [id])
-    sale_date         DateTime                 @default(now())
-    status            Status                   @default(ACTIVE)
-    created_at        DateTime                 @default(now())
-    updated_at        DateTime                 @updatedAt
-    lifeInsurance     ProductLifeInsurance?
-    medicalInsurance  ProductMedicalInsurance?
+    productEntity     ProductEntity        @relation(fields: [product_entity_id], references: [id])
+    sale_date         DateTime             @default(now())
+    status            Status               @default(ACTIVE)
+    created_at        DateTime             @default(now())
+    updated_at        DateTime             @updatedAt
+    fixedDeposit      ProductFixedDeposit?
+    insurance         ProductInsurance?
     mutualFund        ProductMutualFund?
     realEstate        ProductRealEstate?
+    saleDocuments     SaleDocument[]
 
     @@index([agent_id, customer_id, product_entity_id, sale_date, status])
     @@map("tbl_agent_sale")
 }
 
-model ProductLifeInsurance {
-    id                BigInt             @id @default(autoincrement())
-    sale_id           BigInt             @unique
-    sale              AgentSale          @relation(fields: [sale_id], references: [id])
-    policy_number     String?
-    plan_name         String?
-    policy_type       String?
-    sum_assured       Float?
-    premium_amount    Float?
-    premium_frequency SubscriptionCycle? @default(MONTHLY)
-    policy_term       Int? // years
-    payment_term      Int?
-    issue_date        DateTime?
-    start_date        DateTime?
-    end_date          DateTime?
-    nominee_name      String?
-    nominee_relation  String?
-    policy_status     Status             @default(ACTIVE)
-    notes             String?
-    created_at        DateTime           @default(now())
-    updated_at        DateTime           @updatedAt
+model ProductFixedDeposit {
+    id                    BigInt    @id @default(autoincrement())
+    sale_id               BigInt    @unique
+    sale                  AgentSale @relation(fields: [sale_id], references: [id])
+    product_type          String
+    scheme_name           String
+    account_number        BigInt?
+    ifsc_code             String?
+    bank_name             String?
+    branch_name           String?
+    deposit_amount        String?
+    interest_rate         String?
+    tenure_months         Int?
+    start_date            DateTime?
+    maturity_date         DateTime?
+    maturity_amount       String?
+    payout_type           String?
+    nominee_name          String?
+    nominee_relationship  String?
+    commission_percentage String?
+    kyc_status            String?
+    application_status    String?
+    remarks               String?
+    documents             String[]
+    created_at            DateTime  @default(now())
+    updated_at            DateTime  @updatedAt
 
-    @@index([policy_number, plan_name, policy_type, policy_status])
-    @@map("tbl_product_life_insurance")
+    @@index([product_type, bank_name])
+    @@map("tbl_product_fixed_deposit")
 }
 
-model ProductMedicalInsurance {
-    id                   BigInt    @id @default(autoincrement())
-    sale_id              BigInt    @unique
-    sale                 AgentSale @relation(fields: [sale_id], references: [id])
-    policy_number        String?
-    plan_name            String?
-    coverage_amount      Float?
-    premium_amount       Float?
-    policy_type          String? // Individual / Family Floater
-    insured_members      Json? // [{name, age, relation}]
-    pre_existing_disease String?
-    waiting_period       Int? // months
-    issue_date           DateTime?
-    start_date           DateTime?
-    end_date             DateTime?
-    policy_status        Status    @default(ACTIVE)
-    notes                String?
-    created_at           DateTime  @default(now())
-    updated_at           DateTime  @updatedAt
+model ProductInsurance {
+    id                          BigInt    @id @default(autoincrement())
+    sale_id                     BigInt    @unique
+    sale                        AgentSale @relation(fields: [sale_id], references: [id])
+    insurance_type              String
+    insurance_company_name      String
+    policy_number               String?
+    sum_assured                 String?
+    premium_amount              String?
+    premium_payment_frequency   String?
+    policy_term_years           Int?
+    policy_start_date           DateTime?
+    policy_end_date             DateTime?
+    pre_existing_diseases       String?
+    smoking_status              String?
+    height                      String?
+    weight                      String?
+    vehicle_type                String?
+    vehicle_registration_number String?
+    vehicle_make                String?
+    vehicle_model               String?
+    manufacturing_year          Int?
+    engine_number               String?
+    chassis_number              String?
+    fuel_type                   String?
+    cubic_capacity_cc           Int?
+    insured_declared_value      String?
+    no_claim_bonus              String?
+    nominee_name                String?
+    nominee_relationship        String?
+    commission_percentage       String?
+    kyc_status                  String?
+    proposal_status             String?
+    documents                   String[]
+    created_at                  DateTime  @default(now())
+    updated_at                  DateTime  @updatedAt
 
-    @@index([policy_number, plan_name, policy_type, policy_status])
-    @@map("tbl_product_medical_insurance")
+    @@index([insurance_type, policy_number])
+    @@map("tbl_product_insurance")
 }
 
 model ProductMutualFund {
-    id                BigInt    @id @default(autoincrement())
-    sale_id           BigInt    @unique
-    sale              AgentSale @relation(fields: [sale_id], references: [id])
-    folio_number      String?
-    scheme_name       String?
-    fund_house        String?
-    investment_type   String? // SIP / LUMPSUM
-    investment_amount Float?
-    nav               Float?
-    units             Float?
-    sip_start_date    DateTime?
-    sip_end_date      DateTime?
-    risk_profile      String?
-    notes             String?
-    created_at        DateTime  @default(now())
-    updated_at        DateTime  @updatedAt
+    id                    BigInt    @id @default(autoincrement())
+    sale_id               BigInt    @unique
+    sale                  AgentSale @relation(fields: [sale_id], references: [id])
+    fund_type             String
+    fund_sub_type         String?
+    amc_name              String?
+    scheme_name           String?
+    folio_number          String?
+    investment_mode       String?
+    investment_amount     String?
+    sip_amount            String?
+    sip_frequency         String?
+    start_date            DateTime?
+    units_allocated       String?
+    nav_at_purchase       String?
+    current_value         String?
+    commission_percentage String?
+    commission_amount     String?
+    kyc_status            String?
+    fatca_status          String?
+    nominee_name          String?
+    nominee_relationship  String?
+    documents             String[]
+    created_at            DateTime  @default(now())
+    updated_at            DateTime  @updatedAt
 
-    @@index([folio_number, scheme_name, investment_type])
+    @@index([fund_type, scheme_name])
     @@map("tbl_product_mutual_fund")
 }
 
 model ProductRealEstate {
-    id BigInt @id @default(autoincrement())
+    id                       BigInt    @id @default(autoincrement())
+    sale_id                  BigInt    @unique
+    sale                     AgentSale @relation(fields: [sale_id], references: [id])
+    property_type            String
+    transaction_type         String
+    property_title           String
+    property_address         String
+    city                     String
+    state                    String
+    pincode                  String
+    super_build_up_area_sqft String?
+    build_up_area_sqft       String?
+    carpet_area_sqft         String?
+    land_area                String?
+    bhk                      String?
+    price                    String?
+    booking_amount           String?
+    builder_name             String?
+    rera_number              String?
+    ownership_type           String?
+    loan_required            Boolean?  @default(false)
+    commission_percentage    String?
+    commission_amount        String?
+    documents                String[]
+    created_at               DateTime  @default(now())
+    updated_at               DateTime  @updatedAt
 
-    sale_id         BigInt    @unique
-    sale            AgentSale @relation(fields: [sale_id], references: [id])
-    property_type   String? // Flat / Land / Commercial
-    property_name   String?
-    location        String?
-    area_sqft       Float?
-    property_value  Float?
-    booking_amount  Float?
-    builder_name    String?
-    agreement_date  DateTime?
-    possession_date DateTime?
-    ownership_type  String?
-    notes           String?
-    created_at      DateTime  @default(now())
-    updated_at      DateTime  @updatedAt
-
-    @@index([property_type, location, property_name, builder_name, ownership_type])
+    @@index([property_type, city])
     @@map("tbl_product_real_estate")
+}
+
+model SaleDocument {
+    id           BigInt          @id @default(autoincrement())
+    sale_id      BigInt
+    sale         AgentSale       @relation(fields: [sale_id], references: [id], onDelete: Cascade)
+    product_type SaleProductType
+    file_path    String
+    file_name    String?
+    mime_type    String?
+    uploaded_by  BigInt?
+    uploaded_at  DateTime        @default(now())
+    deleted_at   DateTime?
+    deleted_by   BigInt?
+
+    @@index([sale_id])
+    @@map("tbl_sale_documents")
+}
+
+enum SaleProductType {
+    FIXED_DEPOSIT
+    INSURANCE
+    MUTUAL_FUND
+    REAL_ESTATE
 }
 
 /**
@@ -747,26 +813,32 @@ model SubscriptionPlan {
 }
 
 model OrganizationSubscription {
-    id                        BigInt                 @id @unique @default(autoincrement())
+    id                        BigInt                     @id @unique @default(autoincrement())
     org_id                    BigInt
-    organization              Organization           @relation(fields: [org_id], references: [id])
+    organization              Organization               @relation(fields: [org_id], references: [id])
     plan_id                   BigInt
-    plan                      SubscriptionPlan       @relation(fields: [plan_id], references: [id])
+    plan                      SubscriptionPlan           @relation(fields: [plan_id], references: [id])
     status                    SubscriptionStatus
-    source                    SubscriptionSource     @default(RAZORPAY)
+    source                    SubscriptionSource         @default(RAZORPAY)
     start_at                  DateTime
     end_at                    DateTime?
-    auto_renew                Boolean                @default(true)
+    auto_renew                Boolean                    @default(true)
     cancelled_at              DateTime?
-    rzp_subscription_id       String?                @unique
-    reconciliation_attempts   Int                    @default(0)
+    rzp_subscription_id       String?                    @unique
+    upgraded_from_id          BigInt?
+    upgraded_to_id            BigInt?
+    upgraded_from             OrganizationSubscription?  @relation("UpgradeFrom", fields: [upgraded_from_id], references: [id])
+    upgraded_to               OrganizationSubscription?  @relation("UpgradeTo", fields: [upgraded_to_id], references: [id])
+    reconciliation_attempts   Int                        @default(0)
     last_reconciled_at        DateTime?
-    expiry_reminder_days_sent Int[]                  @default([])
-    rzp_payment_id            String?                @unique
-    signature                 String?                @unique
-    created_at                DateTime               @default(now())
-    updated_at                DateTime               @updatedAt
+    expiry_reminder_days_sent Int[]                      @default([])
+    rzp_payment_id            String?                    @unique
+    signature                 String?                    @unique
+    created_at                DateTime                   @default(now())
+    updated_at                DateTime                   @updatedAt
     razorpaySubscriptions     RazorpaySubscription[]
+    upgraded_from_children    OrganizationSubscription[] @relation("UpgradeTo")
+    upgraded_to_children      OrganizationSubscription[] @relation("UpgradeFrom")
 
     @@unique([org_id, rzp_subscription_id])
     @@index([org_id, plan_id, status])

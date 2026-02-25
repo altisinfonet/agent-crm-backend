@@ -20,9 +20,12 @@ export class MeetingService {
         customer_id,
         start_time,
         end_time,
+        mom,
         meetingType,
         reminderBefore,
       } = payload;
+      console.log("payload++++++++", payload);
+
       if (!title || !start_time) {
         throw new BadRequestException("Title and start time are required");
       }
@@ -48,12 +51,12 @@ export class MeetingService {
               },
             },
           }),
-
           title,
           description: desc,
           meeting_type: meetingType || "REMINDER",
           start_time: startTime,
           end_time: endTime,
+          mom,
           reminder_before: reminderBefore ?? null,
           status: "SCHEDULED",
           is_completed: false,
@@ -101,7 +104,7 @@ export class MeetingService {
       case 'COMPLETED':
         return {
           title: 'Meeting completed',
-          desc: `You’ve successfully completed your meeting on “${meeting.title}”.`,
+          desc: `You've successfully completed your meeting on “${meeting.title}”.`,
         };
 
       case 'CANCELLED':
@@ -265,17 +268,6 @@ export class MeetingService {
         throw new NotFoundException("Meeting not found");
       }
 
-      const isTimeUpdated =
-        payload.start_time || payload.end_time || payload.reminder_before;
-
-      const statusFromPayload = payload.status;
-      let finalStatus: any = undefined;
-      if (statusFromPayload) {
-        finalStatus = statusFromPayload;
-      } else if (isTimeUpdated) {
-        finalStatus = "POSTPONED";
-      }
-
       const updatedMeeting = await this.prisma.meeting.update({
         where: { id: meeting_id },
         data: {
@@ -297,16 +289,17 @@ export class MeetingService {
             end_time: new Date(payload.end_time),
           }),
 
+          ...(payload.mom && {
+            mom: payload.mom,
+          }),
+
           ...(payload.reminderBefore !== undefined && {
             reminder_before: payload.reminderBefore,
           }),
 
-          ...(finalStatus && { status: finalStatus }),
-          ...(isTimeUpdated && finalStatus !== "COMPLETED" && {
-            reminder_sent: false,
-          }),
+          ...(payload.status && { status: payload.status }),
 
-          ...(finalStatus === "COMPLETED" && {
+          ...(payload.status === "COMPLETED" && {
             is_completed: true,
             completed_at: new Date(),
           }),
@@ -314,20 +307,22 @@ export class MeetingService {
       });
       setImmediate(async () => {
         try {
-          await this.mailService.sendMeetingEmail(updatedMeeting, 'updated');
-          const notification: any = await this.getMeetingNotificationPayload(updatedMeeting, 'updated');
+          if (payload.status !== meeting?.status) {
+            await this.mailService.sendMeetingEmail(updatedMeeting, 'updated');
+            const notification: any = await this.getMeetingNotificationPayload(updatedMeeting, 'updated');
 
-          await createNotification(
-            agent_id,
-            'MEETING',
-            notification.title,
-            notification.desc,
-            {
-              meeting_id: updatedMeeting.id,
-              status: updatedMeeting.status,
-              action: 'updated',
-            }
-          );
+            await createNotification(
+              agent_id,
+              'MEETING',
+              notification.title,
+              notification.desc,
+              {
+                meeting_id: updatedMeeting.id,
+                status: updatedMeeting.status,
+                action: 'updated',
+              }
+            );
+          }
         } catch (error) {
           console.error("Error sending metting email", error);
         }
@@ -352,11 +347,8 @@ export class MeetingService {
         throw new NotFoundException("Meeting not found");
       }
 
-      await this.prisma.meeting.update({
+      await this.prisma.meeting.delete({
         where: { id: meeting_id },
-        data: {
-          status: "CANCELLED",
-        },
       });
 
       return true;

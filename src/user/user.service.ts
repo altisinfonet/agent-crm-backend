@@ -4,6 +4,7 @@ import { CommonDto } from 'src/auth/dto/common.dto';
 import * as bcrypt from 'bcrypt';
 import { decryptData, hashPassword } from '@/common/helper/common.helper';
 import { R2Service } from '@/common/helper/r2.helper';
+import { SubscriptionStatus } from '@generated/prisma';
 
 @Injectable()
 export class UserService {
@@ -236,30 +237,138 @@ export class UserService {
             organizations: {
               select: {
                 subscription: {
-                  orderBy: {
-                    created_at: 'desc', // get latest subscription
+                  where: {
+                    status: {
+                      in: [
+                        'ACTIVE',
+                        'PAUSED',
+                        'CANCELLED',
+                        'UPGRADED',
+                        'PENDING',
+                        'INCOMPLETE',
+                      ],
+                    },
                   },
                   select: {
                     status: true,
+                    end_at: true,
+                    source: true,
                   },
-                  take: 1,
                 },
               },
             },
           },
         });
 
-        const subscriptionStatus =
-          agentData?.organizations?.[0]?.subscription?.[0]?.status ?? null;
+        // console.log("agentData++++", agentData?.organizations?.[0]?.subscription?.[0]);
 
-        const isSubscribed =
-          subscriptionStatus === 'ACTIVE' ||
-          subscriptionStatus === 'UPGRADED';
+        // const subscriptionStatus =
+        //   agentData?.organizations?.[0]?.subscription?.[0]?.status ?? null;
+
+        // const isSubscribed =
+        //   (subscriptionStatus === 'ACTIVE' ||
+        //     subscriptionStatus === 'UPGRADED') && agentData?.organizations?.[0]?.subscription?.[0].end_at ;
+
+        // agentExtras = {
+        //   subscriptionStatus,
+        //   isSubscribed,
+        // };
+
+        const subs = agentData?.organizations?.[0]?.subscription ?? [];
+        const now = new Date();
+
+        let subscriptionStatus: SubscriptionStatus | null = null;
+        let isSubscribed = false;
+
+        /**
+         * Helper: check validity by end date
+         */
+        const isValidByDate = (endAt?: Date | null) =>
+          !endAt || endAt > now;
+
+        /**
+         * 1️⃣ ACTIVE
+         */
+        const active = subs.find(s => s.status === 'ACTIVE');
+        if (active && isValidByDate(active.end_at)) {
+          subscriptionStatus = 'ACTIVE';
+          isSubscribed = true;
+        }
+
+        /**
+         * 2️⃣ PAUSED (trial access)
+         */
+        if (!isSubscribed) {
+          const paused = subs.find(
+            s => s.status === 'PAUSED' && isValidByDate(s.end_at)
+          );
+          if (paused) {
+            subscriptionStatus = 'PAUSED';
+            isSubscribed = true;
+          }
+        }
+
+        /**
+         * 3️⃣ CANCELLED but still valid till cycle end
+         */
+        if (!isSubscribed) {
+          const cancelled = subs.find(
+            s => s.status === 'CANCELLED' && isValidByDate(s.end_at)
+          );
+          if (cancelled) {
+            subscriptionStatus = 'CANCELLED';
+            isSubscribed = true;
+          }
+        }
+
+        /**
+         * 4️⃣ ADMIN-upgraded (always valid)
+         */
+        if (!isSubscribed) {
+          const adminUpgraded = subs.find(
+            s => s.status === 'UPGRADED' && s.source === 'ADMIN'
+          );
+          if (adminUpgraded) {
+            subscriptionStatus = 'UPGRADED';
+            isSubscribed = true;
+          }
+        }
+
+        /**
+         * 5️⃣ EXPIRED STATES (no access)
+         */
+        if (!subscriptionStatus) {
+          const expired = subs.find(
+            s =>
+              (s.status === 'ACTIVE' ||
+                s.status === 'PAUSED' ||
+                s.status === 'CANCELLED') &&
+              s.end_at &&
+              s.end_at <= now
+          );
+          if (expired) {
+            subscriptionStatus = 'EXPIRED';
+          }
+        }
+
+        /**
+         * 6️⃣ Pending / Incomplete (fallback)
+         */
+        if (!subscriptionStatus) {
+          const pending = subs.find(s => s.status === 'PENDING');
+          if (pending) subscriptionStatus = 'PENDING';
+        }
+
+        if (!subscriptionStatus) {
+          const incomplete = subs.find(s => s.status === 'INCOMPLETE');
+          if (incomplete) subscriptionStatus = 'INCOMPLETE';
+        }
 
         agentExtras = {
           subscriptionStatus,
           isSubscribed,
         };
+
       }
 
       let image = user.image;

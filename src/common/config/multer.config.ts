@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as multer from 'multer';
 import * as sharp from 'sharp';
 import { BadRequestException } from '@nestjs/common';
+import { execSync } from 'child_process';
 
 
 const storage = multer.diskStorage({
@@ -98,6 +99,108 @@ export const isValidImage = async (filePath: string): Promise<boolean> => {
 }
 
 
+export function validateSafePdf(
+    filePath: string,
+    mimeType?: string,
+    maxSizeMB = 5,
+): void {
+    const MIN_SANITIZED_SIZE_BYTES = 5 * 1024;
+    if (!fs.existsSync(filePath)) {
+        throw new BadRequestException('PDF file not found');
+    }
+    if (mimeType && mimeType !== 'application/pdf') {
+        throw new BadRequestException('Only PDF files are allowed');
+    }
+
+    const buffer = fs.readFileSync(filePath);
+
+    const maxBytes = maxSizeMB * 1024 * 1024;
+    if (buffer.length > maxBytes) {
+        throw new BadRequestException(`PDF size must be <= ${maxSizeMB}MB`);
+    }
+
+    const header = buffer.subarray(0, 5).toString('ascii');
+    if (header !== '%PDF-') {
+        throw new BadRequestException('Invalid PDF format');
+    }
+
+    const tail = buffer
+        .subarray(Math.max(0, buffer.length - 1024))
+        .toString('latin1');
+
+    if (!tail.includes('%%EOF')) {
+        throw new BadRequestException('Corrupted or incomplete PDF file');
+    }
+
+    const tempSafePath = `${filePath}.sanitized.pdf`;
+    try {
+        execSync(
+            `gs -sDEVICE=pdfwrite -dSAFER -dNOPAUSE -dBATCH -dQUIET -sOutputFile="${tempSafePath}" "${filePath}"`,
+            { stdio: 'ignore' },
+        );
+    } catch {
+        throw new BadRequestException('Please upload a valid document');
+    }
+
+    if (!fs.existsSync(tempSafePath)) {
+        throw new BadRequestException('Invalid PDF file');
+    }
+
+    const sanitizedSize = fs.statSync(tempSafePath).size;
+    if (sanitizedSize < MIN_SANITIZED_SIZE_BYTES) {
+        fs.unlinkSync(tempSafePath);
+        throw new BadRequestException('Invalid or unsafe document');
+    }
+    fs.renameSync(tempSafePath, filePath);
+}
+
+
+export function imageFileFilter(
+    req: any,
+    file: any,
+    cb: multer.FileFilterCallback
+) {
+    const allowedImageMimes = [
+        'image/jpeg',
+        'image/jpg',
+        'image/png',
+        'image/webp',
+        'image/gif',
+        'image/heic',
+    ];
+
+    if (allowedImageMimes.includes(file.mimetype)) {
+        cb(null, true);
+    } else {
+        cb(new BadRequestException('Only image files are allowed'));
+    }
+}
+
+/* ----------------------------------
+ * DOCUMENT FILTER
+ * ---------------------------------- */
+export function documentFileFilter(
+    req: any,
+    file: any,
+    cb: multer.FileFilterCallback
+) {
+    const allowedDocMimes = [
+        'application/pdf',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-powerpoint',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'text/plain',
+    ];
+
+    if (allowedDocMimes.includes(file.mimetype)) {
+        cb(null, true);
+    } else {
+        cb(new BadRequestException('Invalid document file type'));
+    }
+}
 
 // function checkExcelFileType(file: any, cb: any) {
 //     try {

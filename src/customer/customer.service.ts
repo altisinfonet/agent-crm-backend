@@ -1,11 +1,15 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CommonDto } from '@/auth/dto/common.dto';
-import { buildUserRootFolder, createNotification, decryptData } from '@/common/helper/common.helper';
+import { createNotification, decryptData } from '@/common/helper/common.helper';
 import { PrismaService } from '@/prisma/prisma.service';
-import { isValidImageBuffer } from '@/common/config/multer.config';
+import { isValidImageBuffer, validateSafePdf } from '@/common/config/multer.config';
 import { extname, basename } from 'path';
 import { R2Service } from '@/common/helper/r2.helper';
-import { CustomerStatus } from '@generated/prisma';
+import { CustomerStatus, Prisma } from '@generated/prisma';
+import slugify from 'slugify';
+import * as fs from 'fs';
+import * as path from 'path';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class CustomerService {
@@ -95,14 +99,25 @@ export class CustomerService {
       let aadhar_front_key: string | null = null;
       let aadhar_back_key: string | null = null;
 
+      const safeName = slugify(`${firstName}_${lastName}`, { lower: true });
+
       const baseimgkey = org?.createdByUser?.agentKYC?.base_img_path || "";
-      const rootFolder = buildUserRootFolder(
-        `${firstName}_${lastName}`,
-        panNumber,
-        undefined,
-        baseimgkey,
-        true,
-      );
+      const rootFolder =
+        `${process.env.ROOT_FOLDER}
+      /${process.env.IMAGE_PATH}/
+      ${process.env.USER_IMAGE_PATH}/
+      ${baseimgkey}/${process.env.CUSTOMER_IMAGE_PATH}/
+      ${safeName}_${phone}/${process.env.KYC_IMAGE_PATH}`;
+
+      const baseFolderPath = `${baseimgkey}/${process.env.CUSTOMER_IMAGE_PATH}/${safeName}_${phone}`
+
+      // const rootFolder = buildUserRootFolder(
+      //   `${firstName}_${lastName}`,
+      //   panNumber,
+      //   undefined,
+      //   baseimgkey,
+      //   true,
+      // );
 
       const imageFile = files.image?.[0]
       const panImageFile = files.pan_image?.[0]
@@ -115,7 +130,7 @@ export class CustomerService {
           throw new BadRequestException('Invalid image file');
         }
         const ext = imageFile.mimetype.split("/")[1];
-        image_key = `${rootFolder}/iamge.${ext}`;
+        image_key = `${rootFolder}/image.${ext}`;
 
         await R2Service.upload(
           imageFile.buffer,
@@ -145,7 +160,7 @@ export class CustomerService {
           throw new BadRequestException('Invalid aadhaar front image file');
         }
         const ext = aadharFrontImageFile.mimetype.split("/")[1];
-        aadhar_front_key = `${rootFolder}/aadhar_front.${ext}`;
+        aadhar_front_key = `${rootFolder}/aadhaar_front.${ext}`;
 
         await R2Service.upload(
           aadharFrontImageFile.buffer,
@@ -160,7 +175,7 @@ export class CustomerService {
           throw new BadRequestException('Invalid aadhaar back image file');
         }
         const ext = aadharBackImageFile.mimetype.split("/")[1];
-        aadhar_back_key = `${rootFolder}/aadhar_back.${ext}`;
+        aadhar_back_key = `${rootFolder}/aadhaar_back.${ext}`;
 
         await R2Service.upload(
           aadharBackImageFile.buffer,
@@ -185,6 +200,7 @@ export class CustomerService {
           panImage: pan_image_key,
           aadharFront: aadhar_front_key,
           aadharBack: aadhar_back_key,
+          base_folder_path: baseFolderPath,
           status
         },
       });
@@ -255,14 +271,12 @@ export class CustomerService {
       let aadhar_front_key: string | null = customer.aadharFront;
       let aadhar_back_key: string | null = customer.aadharBack;
 
-      const baseimgkey = org.createdByUser?.agentKYC?.base_img_path || '';
-      const rootFolder = buildUserRootFolder(
-        `${firstName ?? customer.first_name}_${lastName ?? customer.last_name}`,
-        panNumber ?? customer.pan_number,
-        undefined,
-        baseimgkey,
-        true,
-      );
+      const baseimgkey = customer?.base_folder_path || "";
+      const rootFolder =
+        `${process.env.ROOT_FOLDER}
+      /${process.env.IMAGE_PATH}/
+      ${process.env.USER_IMAGE_PATH}/
+      ${baseimgkey}/${process.env.KYC_IMAGE_PATH}`;
 
       if (removeImage && customer.image) {
         await R2Service.remove(customer.image);
@@ -325,7 +339,7 @@ export class CustomerService {
         if (customer.aadharFront) await R2Service.remove(customer.aadharFront);
 
         const ext = aadharFrontFile.mimetype.split('/')[1];
-        aadhar_front_key = `${rootFolder}/aadhar_front.${ext}`;
+        aadhar_front_key = `${rootFolder}/aadhaar_front.${ext}`;
 
         await R2Service.upload(
           aadharFrontFile.buffer,
@@ -342,7 +356,7 @@ export class CustomerService {
         if (customer.aadharBack) await R2Service.remove(customer.aadharBack);
 
         const ext = aadharBackFile.mimetype.split('/')[1];
-        aadhar_back_key = `${rootFolder}/aadhar_back.${ext}`;
+        aadhar_back_key = `${rootFolder}/aadhaar_back.${ext}`;
 
         await R2Service.upload(
           aadharBackFile.buffer,
@@ -460,113 +474,272 @@ export class CustomerService {
     return true;
   }
 
+  private async resolveProductEntityBySlug(slug: string) {
+    try {
+      const entity = await this.prisma.productEntity.findUnique({
+        where: { slug },
+        include: {
+          products: {
+            select: { slug: true, status: true },
+          },
+        },
+      });
+
+      if (!entity) {
+        throw new BadRequestException("Invalid product entity slug");
+      }
+
+      if (entity.products.status !== "ACTIVE" || entity.status !== "ACTIVE") {
+        throw new BadRequestException("Product is inactive");
+      }
+
+      return entity;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  private async createAgentSale(
+    tx: Prisma.TransactionClient,
+    agent_id: bigint,
+    customer_id: bigint,
+    org_id: bigint,
+    product_entity_id: bigint
+  ) {
+    return tx.agentSale.create({
+      data: {
+        org_id,
+        agent_id,
+        customer_id,
+        product_entity_id,
+      },
+    });
+  }
+
+
+  private async createFixedDepositSale(tx: Prisma.TransactionClient, saleId: bigint, data: any) {
+    try {
+      if (!data.product_type) {
+        throw new BadRequestException("Product type is required for Fixed Deposit");
+      }
+
+      return tx.productFixedDeposit.create({
+        data: {
+          sale_id: saleId,
+          product_type: data.product_type,
+          scheme_name: data.scheme_name,
+          account_number: data.account_number,
+          ifsc_code: data.ifsc_code,
+          bank_name: data.bank_name,
+          branch_name: data.branch_name,
+          deposit_amount: data.deposit_amount,
+          interest_rate: data.interest_rate,
+          tenure_months: data.tenure_months,
+          start_date: data.start_date,
+          maturity_date: data.maturity_date,
+          maturity_amount: data.maturity_amount,
+          payout_type: data.payout_type,
+          nominee_name: data.nominee_name,
+          nominee_relationship: data.nominee_relationship,
+          commission_percentage: data.commission_percentage,
+          kyc_status: data.kyc_status,
+          application_status: data.application_status,
+          remarks: data.remarks,
+        },
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+
+  private async createInsuranceSale(tx: Prisma.TransactionClient, saleId: bigint, data: any) {
+    try {
+      if (!data.insurance_type || !data.policy_type) {
+        throw new BadRequestException("Insurance type is required");
+      }
+
+      return tx.productInsurance.create({
+        data: {
+          sale_id: saleId,
+          insurance_type: data.insurance_type,
+          insurance_company_name: data.insurance_company_name,
+          policy_number: data.policy_number,
+          sum_assured: data.sum_assured,
+          premium_amount: data.premium_amount,
+          premium_payment_frequency: data.premium_payment_frequency,
+          policy_term_years: data.policy_term_years,
+          policy_start_date: data.policy_start_date,
+          policy_end_date: data.policy_end_date,
+          pre_existing_diseases: data.pre_existing_diseases,
+          smoking_status: data.smoking_status,
+          height: data.height,
+          weight: data.weight,
+          vehicle_type: data.vehicle_type,
+          vehicle_registration_number: data.vehicle_registration_number,
+          vehicle_make: data.vehicle_make,
+          vehicle_model: data.vehicle_model,
+          manufacturing_year: data.manufacturing_year,
+          engine_number: data.engine_number,
+          chassis_number: data.chassis_number,
+          fuel_type: data.fuel_type,
+          cubic_capacity_cc: data.cubic_capacity_cc,
+          insured_declared_value: data.insured_declared_value,
+          no_claim_bonus: data.no_claim_bonus,
+          nominee_name: data.nominee_name,
+          nominee_relationship: data.nominee_relationship,
+          commission_percentage: data.commission_percentage,
+          kyc_status: data.kyc_status,
+          proposal_status: data.proposal_status,
+        },
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+
+  private async createMutualFundSale(tx: Prisma.TransactionClient, saleId: bigint, data: any) {
+    try {
+      if (!data.fund_type) {
+        throw new BadRequestException("Fund type is required");
+      }
+
+      return tx.productMutualFund.create({
+        data: {
+          sale_id: saleId,
+          fund_type: data.fund_type,
+          fund_sub_type: data.fund_sub_type,
+          amc_name: data.amc_name,
+          scheme_name: data.scheme_name,
+          folio_number: data.folio_number,
+          investment_mode: data.investment_mode,
+          investment_amount: data.investment_amount,
+          sip_amount: data.sip_amount,
+          sip_frequency: data.sip_frequency,
+          start_date: data.start_date,
+          units_allocated: data.units_allocated,
+          nav_at_purchase: data.nav_at_purchase,
+          current_value: data.current_value,
+          commission_percentage: data.commission_percentage,
+          commission_amount: data.commission_amount,
+          kyc_status: data.kyc_status,
+          fatca_status: data.fatca_status,
+          nominee_name: data.nominee_name,
+          nominee_relationship: data.nominee_relationship,
+        },
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  private async createRealEstateSale(tx: Prisma.TransactionClient, saleId: bigint, data: any) {
+    try {
+      if (!data.property_type) {
+        throw new BadRequestException("Property type is required");
+      }
+
+      if (!data.transaction_type) {
+        throw new BadRequestException("Transaction type is required");
+      }
+
+      if (!data.property_title) {
+        throw new BadRequestException("Property title is required");
+      }
+
+      if (!data.property_address) {
+        throw new BadRequestException("Property address is required");
+      }
+
+      if (!data.city || !data.state || !data.pincode) {
+        throw new BadRequestException("city, state and pincode are required");
+      }
+
+      return tx.productRealEstate.create({
+        data: {
+          sale_id: saleId,
+          property_type: data.property_type,
+          transaction_type: data.transaction_type,
+          property_title: data.property_title,
+          property_address: data.property_address,
+          city: data.city,
+          state: data.state,
+          pincode: data.pincode,
+          super_build_up_area_sqft: data.super_build_up_area_sqft,
+          build_up_area_sqft: data.build_up_area_sqft,
+          carpet_area_sqft: data.carpet_area_sqft,
+          land_area: data.land_area,
+          bhk: data.bhk,
+          price: data.price,
+          booking_amount: data.booking_amount,
+          builder_name: data.builder_name,
+          rera_number: data.rera_number,
+          ownership_type: data.ownership_type,
+          loan_required: data.loan_required,
+          commission_percentage: data.commission_percentage,
+          commission_amount: data.commission_amount,
+        },
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
 
   async sellProduct(
     agent_id: bigint,
     customer_id: bigint,
+    product_slug: string,
     sellProductDto: CommonDto
   ) {
     try {
       const payload = decryptData(sellProductDto.data);
-      const {
-        product_entity_id,
-        product_data,
-      } = payload;
+      console.log("agent_id", agent_id);
 
-
-      if (!product_entity_id) {
-        throw new BadRequestException("Product entity Id is required");
-      }
+      const { product_data } = payload;
+      console.log("product_data", product_data);
 
       const org = await this.prisma.organization.findUnique({
         where: { created_by: agent_id },
-        select: {
-          id: true,
-        },
+        select: { id: true },
       });
 
-      if (!org?.id) {
-        throw new BadRequestException("Agent organization not found");
-      }
+      if (!org) throw new BadRequestException("Agent organization not found");
 
       const customer = await this.prisma.customer.findFirst({
-        where: {
-          id: customer_id,
-          org_id: org?.id,
-        },
+        where: { id: customer_id, org_id: org.id },
       });
 
-      if (!customer) {
-        throw new BadRequestException("Customer not found");
-      }
-
-      const productEntity = await this.prisma.productEntity.findUnique({
-        where: { id: product_entity_id },
-        include: {
-          products: {
-            select: {
-              id: true,
-              slug: true,
-              status: true,
-            },
-          },
-        },
-      });
-
-      if (!productEntity || productEntity.products.status !== "ACTIVE") {
-        throw new BadRequestException("Invalid or inactive product");
-      }
-      const productSlug = productEntity.products.slug;
-
-      return await this.prisma.$transaction(async (tx) => {
-        const sale = await tx.agentSale.create({
-          data: {
-            org_id: org?.id,
-            agent_id,
-            customer_id,
-            product_entity_id,
-          },
-        });
-
-        switch (productSlug) {
-          case "life-insurance":
-            await tx.productLifeInsurance.create({
-              data: {
-                sale_id: sale.id,
-                ...product_data,
-              },
-            });
+      if (!customer) throw new BadRequestException("Customer not found");
+      const productEntity = await this.resolveProductEntityBySlug(product_slug);
+      return this.prisma.$transaction(async (tx) => {
+        const sale = await this.createAgentSale(
+          tx,
+          agent_id,
+          customer_id,
+          org.id,
+          productEntity.id
+        );
+        switch (productEntity.products.slug) {
+          case "fixed-deposit":
+            await this.createFixedDepositSale(tx, sale.id, product_data);
             break;
 
-          case "medical-insurance":
-            await tx.productMedicalInsurance.create({
-              data: {
-                sale_id: sale.id,
-                ...product_data,
-              },
-            });
+          case "insurance":
+            await this.createInsuranceSale(tx, sale.id, product_data);
+            break;
+
+          case "mutual-funds":
+            await this.createMutualFundSale(tx, sale.id, product_data);
             break;
 
           case "real-estate":
-            await tx.productRealEstate.create({
-              data: {
-                sale_id: sale.id,
-                ...product_data,
-              },
-            });
-            break;
-
-          case "mutual-fund":
-            await tx.productMutualFund.create({
-              data: {
-                sale_id: sale.id,
-                ...product_data,
-              },
-            });
+            await this.createRealEstateSale(tx, sale.id, product_data);
             break;
 
           default:
-            throw new BadRequestException("Invalid product type");
+            throw new BadRequestException("Unsupported product type");
         }
         return sale;
       });
@@ -655,8 +828,181 @@ export class CustomerService {
   }
 
 
+  // async findOne(agent_id: bigint, customer_id: bigint) {
+  //   try {
+  //     const org = await this.prisma.organization.findUnique({
+  //       where: { created_by: agent_id },
+  //       select: { id: true },
+  //     });
+
+  //     if (!org?.id) {
+  //       throw new BadRequestException('Agent organization not found');
+  //     }
+
+  //     const customer = await this.prisma.customer.findFirst({
+  //       where: {
+  //         id: customer_id,
+  //         created_by: agent_id,
+  //         org_id: org.id,
+  //       },
+  //       select: {
+  //         id: true,
+  //         first_name: true,
+  //         last_name: true,
+  //         email: true,
+  //         phone: true,
+  //         aadhaar_number: true,
+  //         pan_number: true,
+  //         address: true,
+  //         image: true,
+  //         panImage: true,
+  //         aadharFront: true,
+  //         aadharBack: true,
+  //         country: true,
+  //         status: true,
+  //         statusHistories: {
+  //           select: {
+  //             id: true,
+  //             old_status: true,
+  //             new_status: true,
+  //             reason: true,
+  //             created_at: true,
+  //           },
+  //         },
+  //         created_at: true,
+  //         agentSales: {
+  //           orderBy: {
+  //             created_at: "desc"
+  //           },
+  //           select: {
+  //             id: true,
+  //             status: true,
+  //             sale_date: true,
+  //             productEntity: {
+  //               select: {
+  //                 id: true,
+  //                 name: true,
+  //                 slug: true,
+  //                 products: {
+  //                   select: {
+  //                     id: true,
+  //                     name: true,
+  //                     slug: true,
+  //                   },
+  //                 },
+  //               },
+  //             },
+  //             fixedDeposit: true,
+  //             insurance: true,
+  //             mutualFund: true,
+  //             realEstate: true,
+  //           },
+  //         },
+  //         meetings: {
+  //           select: {
+  //             id: true,
+  //             title: true,
+  //             description: true,
+  //             is_completed: true,
+  //             start_time: true,
+  //             end_time: true,
+  //             meeting_type: true,
+  //             completed_at: true,
+  //             mom: true,
+  //             status: true,
+  //           },
+  //         },
+  //       },
+  //     });
+
+  //     if (!customer) {
+  //       throw new NotFoundException('Customer not found.');
+  //     }
+
+  //     const [
+  //       imageUrl,
+  //       panImageUrl,
+  //       aadharFrontUrl,
+  //       aadharBackUrl,
+  //     ] = await Promise.all([
+  //       customer.image ? R2Service.getSignedUrl(customer.image) : null,
+  //       customer.panImage ? R2Service.getSignedUrl(customer.panImage) : null,
+  //       customer.aadharFront ? R2Service.getSignedUrl(customer.aadharFront) : null,
+  //       customer.aadharBack ? R2Service.getSignedUrl(customer.aadharBack) : null,
+  //     ]);
+
+  //     const formatCustomerResponse = async (customer: any) => {
+  //       return {
+  //         ...customer,
+  //         image: imageUrl,
+  //         panImage: panImageUrl,
+  //         aadharFront: aadharFrontUrl,
+  //         aadharBack: aadharBackUrl,
+
+  //         agentSales: await Promise.all(
+  //           customer.agentSales.map(async (sale: any) => {
+  //             const formattedSale: any = {
+  //               id: sale.id,
+  //               status: sale.status,
+  //               sale_date: sale.sale_date,
+  //               product: {
+  //                 id: sale.productEntity.products.id,
+  //                 name: sale.productEntity.products.name,
+  //                 slug: sale.productEntity.products.slug,
+  //                 entity: {
+  //                   id: sale.productEntity.id,
+  //                   name: sale.productEntity.name,
+  //                   slug: sale.productEntity.slug,
+  //                 },
+  //               },
+  //             };
+
+  //             if (sale.fixedDeposit) {
+  //               formattedSale.fixedDeposit = {
+  //                 ...sale.fixedDeposit,
+  //                 documents: await this.resolveDocuments(sale.fixedDeposit.documents),
+  //               };
+  //             }
+
+  //             if (sale.insurance) {
+  //               formattedSale.insurance = {
+  //                 ...sale.insurance,
+  //                 documents: await this.resolveDocuments(sale.insurance.documents),
+  //               };
+  //             }
+
+  //             if (sale.mutualFund) {
+  //               formattedSale.mutualFund = {
+  //                 ...sale.mutualFund,
+  //                 documents: await this.resolveDocuments(sale.mutualFund.documents),
+  //               };
+  //             }
+
+  //             if (sale.realEstate) {
+  //               formattedSale.realEstate = {
+  //                 ...sale.realEstate,
+  //                 documents: await this.resolveDocuments(sale.realEstate.documents),
+  //               };
+  //             }
+
+  //             return formattedSale;
+  //           })
+  //         ),
+  //       };
+  //     };
+
+  //     return await formatCustomerResponse(customer);
+  //   } catch (error) {
+  //     throw error;
+  //   }
+  // }
+
+
   async findOne(agent_id: bigint, customer_id: bigint) {
     try {
+      /* -----------------------------
+       * 1️⃣ ORG VALIDATION
+       * ----------------------------- */
       const org = await this.prisma.organization.findUnique({
         where: { created_by: agent_id },
         select: { id: true },
@@ -666,6 +1012,9 @@ export class CustomerService {
         throw new BadRequestException('Agent organization not found');
       }
 
+      /* -----------------------------
+       * 2️⃣ CUSTOMER FETCH
+       * ----------------------------- */
       const customer = await this.prisma.customer.findFirst({
         where: {
           id: customer_id,
@@ -698,6 +1047,7 @@ export class CustomerService {
           },
           created_at: true,
           agentSales: {
+            orderBy: { created_at: 'desc' },
             select: {
               id: true,
               status: true,
@@ -716,8 +1066,8 @@ export class CustomerService {
                   },
                 },
               },
-              lifeInsurance: true,
-              medicalInsurance: true,
+              fixedDeposit: true,
+              insurance: true,
               mutualFund: true,
               realEstate: true,
             },
@@ -743,6 +1093,9 @@ export class CustomerService {
         throw new NotFoundException('Customer not found.');
       }
 
+      /* -----------------------------
+       * 3️⃣ SIGNED CUSTOMER IMAGES
+       * ----------------------------- */
       const [
         imageUrl,
         panImageUrl,
@@ -755,15 +1108,62 @@ export class CustomerService {
         customer.aadharBack ? R2Service.getSignedUrl(customer.aadharBack) : null,
       ]);
 
-      const formatCustomerResponse = (customer: any) => {
-        return {
-          ...customer,
-          image: imageUrl,
-          panImage: panImageUrl,
-          aadharFront: aadharFrontUrl,
-          aadharBack: aadharBackUrl,
+      /* -----------------------------
+       * 4️⃣ FETCH ALL SALE DOCUMENTS (ONCE)
+       * ----------------------------- */
+      const saleIds = customer.agentSales.map(s => s.id);
 
-          agentSales: customer.agentSales.map((sale: any) => {
+      const documents = await this.prisma.saleDocument.findMany({
+        where: {
+          sale_id: { in: saleIds },
+          deleted_at: null,
+        },
+        select: {
+          id: true,
+          sale_id: true,
+          file_path: true,
+          file_name: true,
+          mime_type: true,
+          uploaded_at: true,
+        },
+        orderBy: { uploaded_at: 'desc' },
+      });
+
+      /* -----------------------------
+       * 5️⃣ GROUP DOCUMENTS BY SALE
+       * ----------------------------- */
+      const documentMap = new Map<string, any[]>();
+
+      for (const doc of documents) {
+        const key = doc.sale_id.toString();
+        if (!documentMap.has(key)) documentMap.set(key, []);
+        documentMap.get(key)!.push(doc);
+      }
+
+      /* -----------------------------
+       * 6️⃣ FORMAT RESPONSE (UNCHANGED SHAPE)
+       * ----------------------------- */
+      return {
+        ...customer,
+        image: imageUrl,
+        panImage: panImageUrl,
+        aadharFront: aadharFrontUrl,
+        aadharBack: aadharBackUrl,
+
+        agentSales: await Promise.all(
+          customer.agentSales.map(async (sale: any) => {
+            const saleDocs = documentMap.get(sale.id.toString()) || [];
+
+            const resolvedDocuments = await Promise.all(
+              saleDocs.map(async doc => ({
+                id: doc.id.toString(),
+                file_name: doc.file_name,
+                mime_type: doc.mime_type,
+                uploaded_at: doc.uploaded_at,
+                url: await R2Service.getSignedUrl(doc.file_path),
+              }))
+            );
+
             const formattedSale: any = {
               id: sale.id,
               status: sale.status,
@@ -779,22 +1179,39 @@ export class CustomerService {
                 },
               },
             };
-            if (sale.lifeInsurance) {
-              formattedSale.lifeInsurance = sale.lifeInsurance;
-            } else if (sale.medicalInsurance) {
-              formattedSale.medicalInsurance = sale.medicalInsurance;
-            } else if (sale.mutualFund) {
-              formattedSale.mutualFund = sale.mutualFund;
-            } else if (sale.realEstate) {
-              formattedSale.realEstate = sale.realEstate;
+
+            if (sale.fixedDeposit) {
+              formattedSale.fixedDeposit = {
+                ...sale.fixedDeposit,
+                documents: resolvedDocuments,
+              };
+            }
+
+            if (sale.insurance) {
+              formattedSale.insurance = {
+                ...sale.insurance,
+                documents: resolvedDocuments,
+              };
+            }
+
+            if (sale.mutualFund) {
+              formattedSale.mutualFund = {
+                ...sale.mutualFund,
+                documents: resolvedDocuments,
+              };
+            }
+
+            if (sale.realEstate) {
+              formattedSale.realEstate = {
+                ...sale.realEstate,
+                documents: resolvedDocuments,
+              };
             }
 
             return formattedSale;
-          }),
-        };
+          })
+        ),
       };
-
-      return formatCustomerResponse(customer);
     } catch (error) {
       throw error;
     }
@@ -808,11 +1225,666 @@ export class CustomerService {
   ) {
     try {
       const payload = decryptData(updateSaleDto.data);
-      const { sale_data, product_data } = payload;
+      const { product_data } = payload;
+      return this.prisma.$transaction(async (tx) => {
+        // 1️⃣ Fetch sale + product info
+        const sale = await tx.agentSale.findUnique({
+          where: { id: sale_id },
+          include: {
+            productEntity: {
+              include: {
+                products: { select: { slug: true } },
+              },
+            },
+          },
+        });
 
-      /* ------------------------------------
-         1️⃣ Fetch agent organization
-      -------------------------------------*/
+        if (!sale) {
+          throw new BadRequestException("Sale not found");
+        }
+
+        if (sale.agent_id !== agent_id) {
+          throw new BadRequestException("Unauthorized sale update");
+        }
+
+        const productSlug = sale.productEntity.products.slug;
+        switch (productSlug) {
+          case "fixed-deposit":
+            await this.updateFixedDepositSale(tx, sale_id, product_data);
+            break;
+
+          case "insurance":
+            await this.updateInsuranceSale(tx, sale_id, product_data);
+            break;
+
+          case "mutual-funds":
+            await this.updateMutualFundSale(tx, sale_id, product_data);
+            break;
+
+          case "real-estate":
+            await this.updateRealEstateSale(tx, sale_id, product_data);
+            break;
+
+          default:
+            throw new BadRequestException("Unsupported product type");
+        }
+
+        return sale;
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  private async updateFixedDepositSale(
+    tx: Prisma.TransactionClient,
+    sale_id: bigint,
+    data: any
+  ) {
+    try {
+      return tx.productFixedDeposit.update({
+        where: { sale_id },
+        data: {
+          product_type: data?.product_type,
+          scheme_name: data?.scheme_name,
+          account_number: data?.account_number,
+          ifsc_code: data?.ifsc_code,
+          bank_name: data?.bank_name,
+          branch_name: data?.branch_name,
+          deposit_amount: data?.deposit_amount,
+          interest_rate: data?.interest_rate,
+          tenure_months: data?.tenure_months,
+          start_date: data?.start_date,
+          maturity_date: data?.maturity_date,
+          maturity_amount: data?.maturity_amount,
+          payout_type: data?.payout_type,
+          nominee_name: data?.nominee_name,
+          nominee_relationship: data?.nominee_relationship,
+          commission_percentage: data?.commission_percentage,
+          kyc_status: data?.kyc_status,
+          application_status: data?.application_status,
+          remarks: data?.remarks,
+        },
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  private async updateInsuranceSale(
+    tx: Prisma.TransactionClient,
+    sale_id: bigint,
+    data: any
+  ) {
+    try {
+      return tx.productInsurance.update({
+        where: { sale_id },
+        data: {
+          insurance_type: data?.insurance_type,
+          insurance_company_name: data?.insurance_company_name,
+          policy_number: data?.policy_number,
+          sum_assured: data?.sum_assured,
+          premium_amount: data?.premium_amount,
+          premium_payment_frequency: data?.premium_payment_frequency,
+          policy_term_years: data?.policy_term_years,
+          policy_start_date: data?.policy_start_date,
+          policy_end_date: data?.policy_end_date,
+          pre_existing_diseases: data?.pre_existing_diseases,
+          smoking_status: data?.smoking_status,
+          height: data?.height,
+          weight: data?.weight,
+          vehicle_type: data?.vehicle_type,
+          vehicle_registration_number: data?.vehicle_registration_number,
+          vehicle_make: data?.vehicle_make,
+          vehicle_model: data?.vehicle_model,
+          manufacturing_year: data?.manufacturing_year,
+          engine_number: data?.engine_number,
+          chassis_number: data?.chassis_number,
+          fuel_type: data?.fuel_type,
+          cubic_capacity_cc: data?.cubic_capacity_cc,
+          insured_declared_value: data?.insured_declared_value,
+          no_claim_bonus: data?.no_claim_bonus,
+          nominee_name: data?.nominee_name,
+          nominee_relationship: data?.nominee_relationship,
+          commission_percentage: data?.commission_percentage,
+          kyc_status: data?.kyc_status,
+          proposal_status: data?.proposal_status,
+        },
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+
+  private async updateMutualFundSale(
+    tx: Prisma.TransactionClient,
+    sale_id: bigint,
+    data: any
+  ) {
+    try {
+      return tx.productMutualFund.update({
+        where: { sale_id },
+        data: {
+          fund_type: data?.fund_type,
+          fund_sub_type: data?.fund_sub_type,
+          amc_name: data?.amc_name,
+          scheme_name: data?.scheme_name,
+          folio_number: data?.folio_number,
+          investment_mode: data?.investment_mode,
+          investment_amount: data?.investment_amount,
+          sip_amount: data?.sip_amount,
+          sip_frequency: data?.sip_frequency,
+          start_date: data?.start_date,
+          units_allocated: data?.units_allocated,
+          nav_at_purchase: data?.nav_at_purchase,
+          current_value: data?.current_value,
+          commission_percentage: data?.commission_percentage,
+          commission_amount: data?.commission_amount,
+          kyc_status: data?.kyc_status,
+          fatca_status: data?.fatca_status,
+          nominee_name: data?.nominee_name,
+          nominee_relationship: data?.nominee_relationship,
+        },
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+
+  private async updateRealEstateSale(
+    tx: Prisma.TransactionClient,
+    sale_id: bigint,
+    data: any
+  ) {
+    try {
+      return tx.productRealEstate.update({
+        where: { sale_id },
+        data: {
+          property_type: data?.property_type,
+          transaction_type: data?.transaction_type,
+          property_title: data?.property_title,
+          property_address: data?.property_address,
+          city: data?.city,
+          state: data?.state,
+          pincode: data?.pincode,
+          super_build_up_area_sqft: data?.super_build_up_area_sqft,
+          build_up_area_sqft: data?.build_up_area_sqft,
+          carpet_area_sqft: data?.carpet_area_sqft,
+          land_area: data?.land_area,
+          bhk: data?.bhk,
+          price: data?.price,
+          booking_amount: data?.booking_amount,
+          builder_name: data?.builder_name,
+          rera_number: data?.rera_number,
+          ownership_type: data?.ownership_type,
+          loan_required: data?.loan_required,
+          commission_percentage: data?.commission_percentage,
+          commission_amount: data?.commission_amount,
+        },
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // async uploadDocument(
+  //   agent_id: bigint,
+  //   sale_id: bigint,
+  //   files: any
+  // ) {
+  //   console.log("files++++++", files);
+
+  //   const org = await this.prisma.organization.findUnique({
+  //     where: { created_by: agent_id },
+  //     select: { id: true },
+  //   });
+
+  //   if (!org?.id) {
+  //     throw new BadRequestException("Agent organization not found");
+  //   }
+
+  //   const sale = await this.prisma.agentSale.findFirst({
+  //     where: {
+  //       id: sale_id,
+  //       org_id: org.id,
+  //     },
+  //     include: {
+  //       productEntity: {
+  //         select: {
+  //           products: {
+  //             select: { slug: true },
+  //           },
+  //         },
+  //       },
+  //       customer: {
+  //         select: {
+  //           base_folder_path: true,
+  //         },
+  //       },
+  //     },
+  //   });
+
+  //   if (!sale) {
+  //     throw new BadRequestException("Customer sale not found");
+  //   }
+
+  //   const product_slug = sale.productEntity.products.slug;
+  //   const baseimgkey = sale.customer.base_folder_path || "";
+
+  //   const uploadedFiles = files?.documents || [];
+  //   if (!uploadedFiles.length) {
+  //     throw new BadRequestException("No documents provided");
+  //   }
+
+  //   const rootFolder =
+  //     `${process.env.ROOT_FOLDER}` +
+  //     `/${process.env.IMAGE_PATH}` +
+  //     `/${process.env.USER_IMAGE_PATH}` +
+  //     `${baseimgkey}/${product_slug}/`;
+
+  //   const documentKeys: string[] = [];
+  //   for (const file of uploadedFiles) {
+  //     console.log("file++++++", file);
+
+  //     const safeName = file.originalname;
+
+  //     const key = `${rootFolder}${safeName}`;
+
+  //     await R2Service.upload(
+  //       file.buffer,
+  //       key,
+  //       file.mimetype
+  //     );
+
+  //     documentKeys.push(key);
+  //   }
+
+  //   switch (product_slug) {
+  //     case "fixed-deposit":
+  //       await this.prisma.productFixedDeposit.update({
+  //         where: { sale_id },
+  //         data: {
+  //           documents: { push: documentKeys },
+  //         },
+  //       });
+  //       break;
+
+  //     case "insurance":
+  //       await this.prisma.productInsurance.update({
+  //         where: { sale_id },
+  //         data: {
+  //           documents: { push: documentKeys },
+  //         },
+  //       });
+  //       break;
+
+  //     case "mutual-funds":
+  //       await this.prisma.productMutualFund.update({
+  //         where: { sale_id },
+  //         data: {
+  //           documents: { push: documentKeys },
+  //         },
+  //       });
+  //       break;
+
+  //     case "real-estate":
+  //       await this.prisma.productRealEstate.update({
+  //         where: { sale_id },
+  //         data: {
+  //           documents: { push: documentKeys },
+  //         },
+  //       });
+  //       break;
+
+  //     default:
+  //       throw new BadRequestException("Unsupported product type");
+  //   }
+  //   return {
+  //     sale_id: sale_id.toString(),
+  //     product: product_slug,
+  //     uploaded_documents: documentKeys,
+  //   };
+  // }
+
+
+  private writeTempFile(buffer: Buffer, ext = '.pdf'): string {
+    const tempDir = path.join(process.cwd(), `${process.env.IMAGE_PATH}/${process.env.IMAGE_TEMP_PATH}`);
+
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+
+    const tempPath = path.join(tempDir, `${randomUUID()}${ext}`);
+    fs.writeFileSync(tempPath, buffer);
+    return tempPath;
+  }
+
+  async uploadDocumentOld(
+    agent_id: bigint,
+    sale_id: bigint,
+    files: any
+  ) {
+    /* -----------------------------
+     * 1️⃣ ORG VALIDATION
+     * ----------------------------- */
+    const org = await this.prisma.organization.findUnique({
+      where: { created_by: agent_id },
+      select: { id: true },
+    });
+
+    if (!org?.id) {
+      throw new BadRequestException("Agent organization not found");
+    }
+
+    /* -----------------------------
+     * 2️⃣ SALE + PRODUCT FETCH
+     * ----------------------------- */
+    const sale = await this.prisma.agentSale.findFirst({
+      where: {
+        id: sale_id,
+        org_id: org.id,
+      },
+      include: {
+        productEntity: {
+          select: {
+            products: { select: { slug: true } },
+          },
+        },
+        customer: {
+          select: {
+            base_folder_path: true,
+          },
+        },
+      },
+    });
+
+    if (!sale) {
+      throw new BadRequestException("Customer sale not found");
+    }
+
+    const product_slug = sale.productEntity.products.slug;
+    const baseimgkey = sale.customer.base_folder_path || "";
+
+    /* -----------------------------
+     * 3️⃣ FILE PRESENCE CHECK
+     * ----------------------------- */
+    const images = files?.images || [];
+    const documents = files?.documents || [];
+
+    if (!images.length && !documents.length) {
+      throw new BadRequestException("No files provided");
+    }
+
+    /* -----------------------------
+     * 4️⃣ YOUR EXACT ROOT FOLDER
+     * ----------------------------- */
+    const rootFolder =
+      `${process.env.ROOT_FOLDER}` +
+      `/${process.env.IMAGE_PATH}` +
+      `/${process.env.USER_IMAGE_PATH}` +
+      `${baseimgkey}/${product_slug}/`;
+
+    const documentKeys: string[] = [];
+
+    /* -----------------------------
+     * 5️⃣ IMAGE VALIDATION + UPLOAD
+     * ----------------------------- */
+    for (const image of images) {
+      const isValid = await isValidImageBuffer(image.buffer);
+      if (!isValid) {
+        throw new BadRequestException(
+          `Invalid or corrupted image: ${image.originalname}`
+        );
+      }
+
+      const safeName = image.originalname.replace(/\s+/g, "_");
+      const key = `${rootFolder}${Date.now()}_${safeName}`;
+
+      await R2Service.upload(image.buffer, key, image.mimetype);
+      documentKeys.push(key);
+    }
+
+    /* -----------------------------
+     * 6️⃣ DOCUMENT (PDF) VALIDATION + UPLOAD
+     * ----------------------------- */
+    for (const doc of documents) {
+      if (doc.mimetype !== 'application/pdf') {
+        throw new BadRequestException(
+          `Only PDF documents are allowed: ${doc.originalname}`
+        );
+      }
+
+      const tempPath = this.writeTempFile(doc.buffer, '.pdf');
+
+      try {
+        // validateSafePdf(tempPath, doc.mimetype, 5);
+      } finally {
+        if (fs.existsSync(tempPath)) {
+          fs.unlinkSync(tempPath);
+        }
+      }
+
+      const safeName = doc.originalname.replace(/\s+/g, "_");
+      const key = `${rootFolder}${Date.now()}_${safeName}`;
+
+      await R2Service.upload(doc.buffer, key, doc.mimetype);
+      documentKeys.push(key);
+    }
+
+    /* -----------------------------
+     * 7️⃣ SAVE KEYS TO CORRECT TABLE
+     * ----------------------------- */
+    switch (product_slug) {
+      case "fixed-deposit":
+        await this.prisma.productFixedDeposit.update({
+          where: { sale_id },
+          data: { documents: { push: documentKeys } },
+        });
+        break;
+
+      case "insurance":
+        await this.prisma.productInsurance.update({
+          where: { sale_id },
+          data: { documents: { push: documentKeys } },
+        });
+        break;
+
+      case "mutual-funds":
+        await this.prisma.productMutualFund.update({
+          where: { sale_id },
+          data: { documents: { push: documentKeys } },
+        });
+        break;
+
+      case "real-estate":
+        await this.prisma.productRealEstate.update({
+          where: { sale_id },
+          data: { documents: { push: documentKeys } },
+        });
+        break;
+
+      default:
+        throw new BadRequestException("Unsupported product type");
+    }
+
+    /* -----------------------------
+     * 8️⃣ RESPONSE
+     * ----------------------------- */
+    return {
+      sale_id: sale_id.toString(),
+      product: product_slug,
+      uploaded_documents: documentKeys,
+    };
+  }
+
+
+  async uploadDocumentNew(
+    agent_id: bigint,
+    sale_id: bigint,
+    files: any
+  ) {
+    /* -----------------------------
+     * 1️⃣ ORG VALIDATION
+     * ----------------------------- */
+    const org = await this.prisma.organization.findUnique({
+      where: { created_by: agent_id },
+      select: { id: true },
+    });
+
+    if (!org?.id) {
+      throw new BadRequestException("Agent organization not found");
+    }
+
+    /* -----------------------------
+     * 2️⃣ SALE + PRODUCT FETCH
+     * ----------------------------- */
+    const sale = await this.prisma.agentSale.findFirst({
+      where: {
+        id: sale_id,
+        org_id: org.id,
+      },
+      include: {
+        productEntity: {
+          select: {
+            products: { select: { slug: true } },
+          },
+        },
+        customer: {
+          select: {
+            base_folder_path: true,
+          },
+        },
+      },
+    });
+
+    if (!sale) {
+      throw new BadRequestException("Customer sale not found");
+    }
+
+    const product_slug = sale.productEntity.products.slug;
+    const baseimgkey = sale.customer.base_folder_path || "";
+
+    /* -----------------------------
+     * 3️⃣ PRODUCT TYPE MAPPING
+     * ----------------------------- */
+    const productTypeMap: Record<string, any> = {
+      "fixed-deposit": "FIXED_DEPOSIT",
+      "insurance": "INSURANCE",
+      "mutual-funds": "MUTUAL_FUND",
+      "real-estate": "REAL_ESTATE",
+    };
+
+    const product_type = productTypeMap[product_slug];
+
+    if (!product_type) {
+      throw new BadRequestException("Unsupported product type");
+    }
+
+    /* -----------------------------
+     * 4️⃣ FILE PRESENCE CHECK
+     * ----------------------------- */
+    const images = files?.images || [];
+    const documents = files?.documents || [];
+
+    if (!images.length && !documents.length) {
+      throw new BadRequestException("No files provided");
+    }
+
+    /* -----------------------------
+     * 5️⃣ ROOT FOLDER
+     * ----------------------------- */
+    const rootFolder =
+      `${process.env.ROOT_FOLDER}` +
+      `/${process.env.IMAGE_PATH}` +
+      `/${process.env.USER_IMAGE_PATH}` +
+      `${baseimgkey}/${product_slug}/`;
+
+    const uploadedDocs: {
+      file_path: string;
+      file_name: string;
+      mime_type: string;
+    }[] = [];
+
+    /* -----------------------------
+     * 6️⃣ IMAGE UPLOAD
+     * ----------------------------- */
+    for (const image of images) {
+      const isValid = await isValidImageBuffer(image.buffer);
+      if (!isValid) {
+        throw new BadRequestException(
+          `Invalid image: ${image.originalname}`
+        );
+      }
+
+      const safeName = image.originalname.replace(/\s+/g, "_");
+      const key = `${rootFolder}${Date.now()}_${safeName}`;
+
+      await R2Service.upload(image.buffer, key, image.mimetype);
+
+      uploadedDocs.push({
+        file_path: key,
+        file_name: safeName,
+        mime_type: image.mimetype,
+      });
+    }
+
+    /* -----------------------------
+     * 7️⃣ DOCUMENT (PDF) UPLOAD
+     * ----------------------------- */
+    for (const doc of documents) {
+
+      const tempPath = this.writeTempFile(doc.buffer, '.pdf');
+      try {
+        // validateSafePdf(tempPath, doc.mimetype, 5);
+      } finally {
+        if (fs.existsSync(tempPath)) {
+          fs.unlinkSync(tempPath);
+        }
+      }
+
+      const safeName = doc.originalname.replace(/\s+/g, "_");
+      const key = `${rootFolder}${Date.now()}_${safeName}`;
+
+      await R2Service.upload(doc.buffer, key, doc.mimetype);
+
+      uploadedDocs.push({
+        file_path: key,
+        file_name: safeName,
+        mime_type: doc.mimetype,
+      });
+    }
+
+    /* -----------------------------
+     * 8️⃣ SAVE DOCUMENT RECORDS
+     * ----------------------------- */
+    await this.prisma.saleDocument.createMany({
+      data: uploadedDocs.map(doc => ({
+        sale_id,
+        product_type,
+        file_path: doc.file_path,
+        file_name: doc.file_name,
+        mime_type: doc.mime_type,
+        uploaded_by: agent_id,
+      })),
+    });
+
+    /* -----------------------------
+     * 9️⃣ RESPONSE
+     * ----------------------------- */
+    return {
+      sale_id: sale_id.toString(),
+      product: product_slug,
+      uploaded_documents: uploadedDocs.map(d => d.file_path),
+    };
+  }
+
+  async removeFile(
+    agent_id: bigint,
+    docs_id: bigint
+  ) {
+    try {
       const org = await this.prisma.organization.findUnique({
         where: { created_by: agent_id },
         select: { id: true },
@@ -822,107 +1894,34 @@ export class CustomerService {
         throw new BadRequestException("Agent organization not found");
       }
 
-      /* ------------------------------------
-         2️⃣ Fetch sale with product relations
-      -------------------------------------*/
-      const sale = await this.prisma.agentSale.findFirst({
+      const document = await this.prisma.saleDocument.findFirst({
         where: {
-          id: sale_id,
-          agent_id,
-          org_id: org.id,
+          id: docs_id,
+          deleted_at: null,
+          sale: {
+            org_id: org.id,
+          },
         },
-        include: {
-          lifeInsurance: true,
-          medicalInsurance: true,
-          mutualFund: true,
-          realEstate: true,
+        select: {
+          id: true,
+          file_path: true,
+          sale_id: true,
         },
       });
 
-      if (!sale) {
-        throw new BadRequestException("Sale not found");
+      if (!document) {
+        throw new NotFoundException("Document not found or already deleted");
       }
 
-      /* ------------------------------------
-         3️⃣ Detect which product table exists
-      -------------------------------------*/
-      let productKey:
-        | "lifeInsurance"
-        | "medicalInsurance"
-        | "mutualFund"
-        | "realEstate"
-        | null = null;
+      await R2Service.remove(document.file_path);
 
-      let productId: bigint | null = null;
-
-      if (sale.lifeInsurance) {
-        productKey = "lifeInsurance";
-        productId = sale.lifeInsurance.id;
-      } else if (sale.medicalInsurance) {
-        productKey = "medicalInsurance";
-        productId = sale.medicalInsurance.id;
-      } else if (sale.mutualFund) {
-        productKey = "mutualFund";
-        productId = sale.mutualFund.id;
-      } else if (sale.realEstate) {
-        productKey = "realEstate";
-        productId = sale.realEstate.id;
-      }
-
-      if (!productKey || !productId) {
-        throw new BadRequestException("No product data found for this sale");
-      }
-
-      /* ------------------------------------
-         4️⃣ Product update dispatcher (TS-safe)
-      -------------------------------------*/
-      const productUpdateMap = {
-        lifeInsurance: (tx: any) =>
-          tx.productLifeInsurance.update({
-            where: { id: productId! },
-            data: product_data,
-          }),
-
-        medicalInsurance: (tx: any) =>
-          tx.productMedicalInsurance.update({
-            where: { id: productId! },
-            data: product_data,
-          }),
-
-        mutualFund: (tx: any) =>
-          tx.productMutualFund.update({
-            where: { id: productId! },
-            data: product_data,
-          }),
-
-        realEstate: (tx: any) =>
-          tx.productRealEstate.update({
-            where: { id: productId! },
-            data: product_data,
-          }),
-      };
-
-      return await this.prisma.$transaction(async (tx) => {
-        if (sale_data && Object.keys(sale_data).length > 0) {
-          await tx.agentSale.update({
-            where: { id: sale_id },
-            data: sale_data,
-          });
-        }
-
-        if (product_data && Object.keys(product_data).length > 0) {
-          await productUpdateMap[productKey!](tx);
-        }
-
-        return true;
+      await this.prisma.saleDocument.delete({
+        where: { id: docs_id },
       });
+
+      return true;
     } catch (error) {
       throw error;
     }
-  }
-
-
-  remove(id: number) {
-    return `This action removes a #${id} customer`;
   }
 }

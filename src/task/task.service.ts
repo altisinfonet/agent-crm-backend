@@ -62,11 +62,30 @@ export class TaskService {
                     rzpSub.status === "authenticated" ||
                     rzpSub.status === "active"
                 ) {
+
+                    const orgSub =
+                        await this.prisma.organizationSubscription.findUnique({
+                            where: { rzp_subscription_id: sub.rzp_subscription_id },
+                            include: { upgraded_from: true },
+                        });
+
+                    if (!orgSub) return;
+
+                    const startAt = rzpSub.start_at
+                        ? new Date(rzpSub.start_at * 1000)
+                        : new Date();
+
+                    const endAt = rzpSub.end_at
+                        ? new Date(rzpSub.end_at * 1000)
+                        : null;
+
+
                     await this.prisma.organizationSubscription.update({
                         where: { id: sub.id },
                         data: {
                             status: "ACTIVE",
-                            start_at: new Date(rzpSub.start_at * 1000),
+                            start_at: startAt,
+                            end_at: endAt,
                             last_reconciled_at: new Date()
                         }
                     });
@@ -78,6 +97,21 @@ export class TaskService {
                             current_cycle: rzpSub.paid_count ?? 0
                         }
                     });
+                    console.log("orgSub++++++++", orgSub);
+
+                    if (orgSub.upgraded_from?.rzp_subscription_id) {
+                        await this.razorpay.subscriptions.cancel(
+                            orgSub.upgraded_from.rzp_subscription_id,
+                            false
+                        );
+                        await this.prisma.organizationSubscription.update({
+                            where: { id: orgSub.upgraded_from.id },
+                            data: {
+                                status: "UPGRADED",
+                                auto_renew: false,
+                            },
+                        });
+                    }
 
                     continue;
                 }

@@ -7,12 +7,13 @@ import { CommonDto } from 'src/auth/dto/common.dto';
 import { AnyFilesInterceptor, FileFieldsInterceptor } from '@nestjs/platform-express';
 import { ImageUploadService } from '@/common/services/image-upload.service';
 import { ApiResponse } from '@/common/helper/response.helper';
-import { buildUserRootFolder, decryptData, encryptData } from '@/common/helper/common.helper';
+import { decryptData, encryptData } from '@/common/helper/common.helper';
 import { Account, Onboarding } from '@/common/enum/account.enum';
 import { AccountStatus, OnboardingStatus } from '@/common/decorators/status.decorator';
 import { AccountStatusGuard, OnboardingStatusGuard } from '@/common/guards/status.guard';
 import { upload } from '@/common/config/multer.config';
 import { R2Service } from '@/common/helper/r2.helper';
+import slugify from 'slugify';
 
 @Controller({ path: 'user', version: '1' })
 export class UserController {
@@ -87,17 +88,25 @@ export class UserController {
       if (findUser?.role?.name === "AGENT" && !panNumber) {
         throw new BadRequestException("PAN not found. Complete KYC first.");
       }
+      const safeName = slugify(`${findUser.first_name} ${findUser.last_name}`, { lower: true });
+      const safePan = panNumber ?? "admin".toUpperCase().replace(/\s+/g, "");
 
-      const rootFolder = buildUserRootFolder(
-        `${findUser.first_name} ${findUser.last_name}`,
-        panNumber ?? "admin",
-        userId.toString()
-      );
+      // const rootFolder = buildUserRootFolder(
+      //   `${findUser.first_name} ${findUser.last_name}`,
+      //   panNumber ?? "admin",
+      //   userId.toString()
+      // );
+
+      const rootFolder =
+        `${process.env.ROOT_FOLDER}/
+      ${process.env.IMAGE_PATH}/
+      ${process.env.USER_IMAGE_PATH}/
+      ${safeName}_${safePan}_${userId.toString()}`;
 
       const uploadResult = await ImageUploadService.uploadBase64ImageToR2(
         data.image,
         rootFolder,
-        `profile_${userId}`
+        `profile`
       );
 
       const user = await this.userService.updateProfileImage(userId, data?.delete, {
@@ -146,11 +155,15 @@ export class UserController {
       const uploads: any = {};
       const kycData = decryptData(kycDto.data);
 
-      const rootFolder = buildUserRootFolder(
-        kycData.username,
-        kycData.pan_number,
-        userId.toString()
-      );
+      const safeName = slugify(kycData.username, { lower: true });
+      const safePan = kycData.pan_number.toUpperCase().replace(/\s+/g, "");
+
+      const rootFolder =
+        `${process.env.ROOT_FOLDER}/
+      ${process.env.IMAGE_PATH}/
+      ${process.env.USER_IMAGE_PATH}/
+      ${safeName}_${safePan}_${userId.toString()}`;
+      const basePath = `${safeName}_${safePan}_${userId.toString()}`
 
       if (files.pan_image?.[0]) {
         const ext = files.pan_image[0].mimetype.split("/")[1];
@@ -196,7 +209,7 @@ export class UserController {
         );
       }
 
-      const saved = await this.userService.saveKyc(userId, kycData, uploads, rootFolder);
+      const saved = await this.userService.saveKyc(userId, kycData, uploads, basePath);
 
       return res.status(HttpStatus.OK).json({
         data: encryptData(

@@ -58,7 +58,10 @@ export class ProductsController {
 
       let newImageKey: string | undefined;
       if (data?.image) {
-        const folderPath = `products/product_${id}`;
+        const folderPath = `
+        ${process.env.ROOT_FOLDER}/
+        ${process.env.IMAGE_PATH}/
+        ${process.env.PRODUCT_IMAGE_PATH}/product_${id}`;
 
         const uploadResult = await ImageUploadService.uploadBase64ImageToR2(
           data.image,
@@ -175,7 +178,10 @@ export class ProductsController {
       let imageKey: string | null = null;
 
       if (data?.image) {
-        const folderPath = `entities/entity_${id}`;
+        const folderPath = `
+        ${process.env.ROOT_FOLDER}
+        /${process.env.IMAGE_PATH}
+        /${process.env.ENTITY_IMAGE_PATH}/entity_${id}`;
         const { key } = await ImageUploadService.uploadBase64ImageToR2(
           data.image,
           folderPath,
@@ -320,7 +326,10 @@ export class ProductsController {
       let newImageKey: string | undefined;
 
       if (data?.image) {
-        const folderPath = `entities/entity_${id}`;
+        const folderPath = `
+        ${process.env.ROOT_FOLDER}/
+        ${process.env.IMAGE_PATH}/
+        ${process.env.ENTITY_IMAGE_PATH}/entity_${id}`;
 
         const { key } = await ImageUploadService.uploadBase64ImageToR2(
           data.image,
