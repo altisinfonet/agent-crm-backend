@@ -371,8 +371,18 @@ export class SubscriptionService {
     try {
       const payload = decryptData(dto.data);
       const { subscription_id, payment_id, payment_signature } = payload;
+      const subscription = await this.prisma.organizationSubscription.findFirst({
+        where: {
+          rzp_subscription_id: subscription_id
+        },
+      })
 
-      if (subscription_id && !payment_id) {
+      if (subscription_id && !payment_id && subscription?.status === "INCOMPLETE") {
+        await this.prisma.razorpaySubscription.delete({
+          where: {
+            rzp_subscription_id: subscription_id
+          },
+        })
         await this.prisma.organizationSubscription.delete({
           where: {
             rzp_subscription_id: subscription_id

@@ -92,6 +92,7 @@ export class SubscriptionController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription payment initiated"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error) {
+      console.log("error:::::::", error);
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }
