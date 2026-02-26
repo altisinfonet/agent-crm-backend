@@ -280,7 +280,7 @@ export class SeedService {
                     first_name: "Agent",
                     last_name: "CRM",
                     email: "altisdev1@gmail.com",
-                    password: await hashPassword("l8n4n#On%c@m4JF&17$?"),
+                    password: await hashPassword("Admin@123"),
                     auth_method: "EMAIL_PW",
                     role_id: 1,
                     currency_id: 1,
