@@ -240,9 +240,16 @@ export class AuthService {
         try {
             // ========== EMAIL PASSWORD ==========
             if (auth_method === 'EMAIL_PW') {
-                const user = await this.prisma.user.findUnique({
-                    where: { email: email.toLowerCase() },
-                });
+                const user =
+                    await this.prisma.user.findFirst({
+                        where: {
+                            auth_method: "EMAIL_PW",
+                            email: {
+                                equals: email,
+                                mode: 'insensitive',
+                            },
+                        },
+                    });
 
                 if (!user) {
                     await handleAuthFailure(identifier, ip);

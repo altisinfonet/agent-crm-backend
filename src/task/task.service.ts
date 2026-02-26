@@ -6,7 +6,7 @@ import { SettingsService } from 'src/settings/settings.service';
 import { NotificationService } from '@/notification/notification.service';
 import { MailService } from '@/mail/mail.service';
 import { addWeeks, addMonths, addYears, differenceInCalendarDays } from 'date-fns';
-import { SubscriptionCycle } from '@generated/prisma';
+import { SubscriptionCycle, SubscriptionStatus } from '@generated/prisma';
 
 
 @Injectable()
@@ -31,106 +31,231 @@ export class TaskService {
         });
     }
 
-    @Cron(CronExpression.EVERY_10_MINUTES)
+    // @Cron(CronExpression.EVERY_10_MINUTES)
+    // async reconcileSubscriptions() {
+    //     this.logger.log("Starting subscription reconciliation");
+    //     const MAX_ATTEMPTS = 3;
+    //     const pendingSubs =
+    //         await this.prisma.organizationSubscription.findMany({
+    //             where: {
+    //                 status: "PENDING",
+    //                 reconciliation_attempts: {
+    //                     lt: MAX_ATTEMPTS
+    //                 },
+    //                 rzp_subscription_id: {
+    //                     not: null
+    //                 }
+    //             }
+    //         });
+
+    //     for (const sub of pendingSubs) {
+    //         try {
+    //             if (!sub || !sub.rzp_subscription_id) {
+    //                 throw new BadRequestException("Subscription not found.");
+    //             }
+
+    //             const rzpSub =
+    //                 await this.razorpay.subscriptions.fetch(
+    //                     sub.rzp_subscription_id
+    //                 );
+    //             if (
+    //                 rzpSub.status === "authenticated" ||
+    //                 rzpSub.status === "active"
+    //             ) {
+
+    //                 const orgSub =
+    //                     await this.prisma.organizationSubscription.findUnique({
+    //                         where: { rzp_subscription_id: sub.rzp_subscription_id },
+    //                         include: { upgraded_from: true },
+    //                     });
+
+    //                 if (!orgSub) return;
+
+    //                 const startAt = rzpSub.start_at
+    //                     ? new Date(rzpSub.start_at * 1000)
+    //                     : new Date();
+
+    //                 const endAt = rzpSub.end_at
+    //                     ? new Date(rzpSub.end_at * 1000)
+    //                     : null;
+
+
+    //                 await this.prisma.organizationSubscription.update({
+    //                     where: { id: sub.id },
+    //                     data: {
+    //                         status: "ACTIVE",
+    //                         start_at: startAt,
+    //                         end_at: endAt,
+    //                         last_reconciled_at: new Date()
+    //                     }
+    //                 });
+
+    //                 await this.prisma.razorpaySubscription.update({
+    //                     where: { rzp_subscription_id: sub.rzp_subscription_id },
+    //                     data: {
+    //                         status: rzpSub.status,
+    //                         current_cycle: rzpSub.paid_count ?? 0
+    //                     }
+    //                 });
+    //                 console.log("orgSub++++++++", orgSub);
+
+    //                 if (orgSub.upgraded_from?.rzp_subscription_id) {
+    //                     await this.razorpay.subscriptions.cancel(
+    //                         orgSub.upgraded_from.rzp_subscription_id,
+    //                         false
+    //                     );
+    //                     await this.prisma.organizationSubscription.update({
+    //                         where: { id: orgSub.upgraded_from.id },
+    //                         data: {
+    //                             status: "UPGRADED",
+    //                             auto_renew: false,
+    //                         },
+    //                     });
+    //                 }
+
+    //                 continue;
+    //             }
+
+    //             await this.prisma.organizationSubscription.update({
+    //                 where: { id: sub.id },
+    //                 data: {
+    //                     reconciliation_attempts: { increment: 1 },
+    //                     last_reconciled_at: new Date()
+    //                 }
+    //             });
+
+    //         } catch (error) {
+    //             await this.prisma.organizationSubscription.update({
+    //                 where: { id: sub.id },
+    //                 data: {
+    //                     reconciliation_attempts: { increment: 1 },
+    //                     last_reconciled_at: new Date()
+    //                 }
+    //             });
+    //         }
+    //     }
+    // }
+
+    @Cron(CronExpression.EVERY_5_MINUTES)
     async reconcileSubscriptions() {
         this.logger.log("Starting subscription reconciliation");
+
         const MAX_ATTEMPTS = 3;
-        const pendingSubs =
+        const now = new Date();
+
+        const subs =
             await this.prisma.organizationSubscription.findMany({
                 where: {
-                    status: "PENDING",
-                    reconciliation_attempts: {
-                        lt: MAX_ATTEMPTS
-                    },
-                    rzp_subscription_id: {
-                        not: null
-                    }
-                }
+                    status: { in: ["PENDING", "ACTIVE", "INCOMPLETE"] },
+                    reconciliation_attempts: { lt: MAX_ATTEMPTS },
+                    rzp_subscription_id: { not: null },
+                },
             });
 
-        for (const sub of pendingSubs) {
+        for (const sub of subs) {
             try {
-                if (!sub || !sub.rzp_subscription_id) {
-                    throw new BadRequestException("Subscription not found.");
-                }
+                if (!sub.rzp_subscription_id) continue;
 
                 const rzpSub =
                     await this.razorpay.subscriptions.fetch(
                         sub.rzp_subscription_id
                     );
-                if (
-                    rzpSub.status === "authenticated" ||
-                    rzpSub.status === "active"
-                ) {
 
-                    const orgSub =
-                        await this.prisma.organizationSubscription.findUnique({
-                            where: { rzp_subscription_id: sub.rzp_subscription_id },
-                            include: { upgraded_from: true },
-                        });
+                const startAt = rzpSub.start_at
+                    ? new Date(rzpSub.start_at * 1000)
+                    : sub.start_at;
 
-                    if (!orgSub) return;
+                const endAt = rzpSub.end_at
+                    ? new Date(rzpSub.end_at * 1000)
+                    : sub.end_at;
 
-                    const startAt = rzpSub.start_at
-                        ? new Date(rzpSub.start_at * 1000)
-                        : new Date();
+                let nextStatus: SubscriptionStatus | null = null;
 
-                    const endAt = rzpSub.end_at
-                        ? new Date(rzpSub.end_at * 1000)
-                        : null;
+                switch (rzpSub.status) {
+                    case "authenticated":
+                    case "active":
+                        nextStatus = "ACTIVE";
+                        break;
 
+                    case "completed":
+                        nextStatus = "EXPIRED";
+                        break;
 
-                    await this.prisma.organizationSubscription.update({
-                        where: { id: sub.id },
-                        data: {
-                            status: "ACTIVE",
-                            start_at: startAt,
-                            end_at: endAt,
-                            last_reconciled_at: new Date()
+                    case "cancelled": {
+                        if (endAt && endAt <= now) {
+                            nextStatus = "CANCELLED";
+                        } else {
+                            nextStatus = "ACTIVE";
                         }
-                    });
-
-                    await this.prisma.razorpaySubscription.update({
-                        where: { rzp_subscription_id: sub.rzp_subscription_id },
-                        data: {
-                            status: rzpSub.status,
-                            current_cycle: rzpSub.paid_count ?? 0
-                        }
-                    });
-                    console.log("orgSub++++++++", orgSub);
-
-                    if (orgSub.upgraded_from?.rzp_subscription_id) {
-                        await this.razorpay.subscriptions.cancel(
-                            orgSub.upgraded_from.rzp_subscription_id,
-                            false
-                        );
-                        await this.prisma.organizationSubscription.update({
-                            where: { id: orgSub.upgraded_from.id },
-                            data: {
-                                status: "UPGRADED",
-                                auto_renew: false,
-                            },
-                        });
+                        break;
                     }
 
-                    continue;
+                    case "halted":
+                        nextStatus = "PAUSED";
+                        break;
                 }
+                const updateData: any = {
+                    start_at: startAt,
+                    end_at: endAt,
+                    auto_renew:
+                        rzpSub.status === "cancelled" ? false : sub.auto_renew,
+                    last_reconciled_at: new Date(),
+                };
 
+                if (nextStatus) {
+                    updateData.status = nextStatus;
+                }
                 await this.prisma.organizationSubscription.update({
                     where: { id: sub.id },
+                    data: updateData,
+                });
+                await this.prisma.razorpaySubscription.updateMany({
+                    where: { rzp_subscription_id: sub.rzp_subscription_id },
                     data: {
-                        reconciliation_attempts: { increment: 1 },
-                        last_reconciled_at: new Date()
-                    }
+                        status: rzpSub.status,
+                        current_cycle: rzpSub.paid_count ?? 0,
+                    },
                 });
 
+                const currentSub = await this.prisma.organizationSubscription.findFirst({
+                    where: {
+                        rzp_subscription_id: sub.rzp_subscription_id,
+                    },
+                });
+
+                // if (sub?.status === "INCOMPLETE") {
+                if (currentSub && currentSub?.status === "INCOMPLETE") {
+                    await this.prisma.razorpaySubscription.delete({
+                        where: {
+                            rzp_subscription_id: sub.rzp_subscription_id
+                        },
+                    })
+                    await this.prisma.organizationSubscription.delete({
+                        where: {
+                            rzp_subscription_id: sub.rzp_subscription_id
+                        },
+                    })
+                    const payload = {
+                        subscription_id: sub.rzp_subscription_id,
+                        payment_id: null,
+                        payment_signature: null
+                    }
+                    await this.prisma.razorpayEvent.create({
+                        data: {
+                            razorpay_entity_id: sub.rzp_subscription_id,
+                            entity_type: "SUBSCRIPTION",
+                            event_type: "incomplete.subscription_request.deleted",
+                            payload,
+                        }
+                    })
+                }
             } catch (error) {
                 await this.prisma.organizationSubscription.update({
                     where: { id: sub.id },
                     data: {
                         reconciliation_attempts: { increment: 1 },
-                        last_reconciled_at: new Date()
-                    }
+                        last_reconciled_at: new Date(),
+                    },
                 });
             }
         }
@@ -249,12 +374,14 @@ export class TaskService {
     }
 
     @Cron(CronExpression.EVERY_HOUR)
-    async finalizeCancelledSubscriptions() {
+    async finalizeExpiredSubscriptions() {
         const now = new Date();
         const subscriptions =
             await this.prisma.organizationSubscription.findMany({
                 where: {
-                    status: "ACTIVE",
+                    status: {
+                        in: ['ACTIVE', 'TRIAL'],
+                    },
                     auto_renew: false,
                     end_at: {
                         lte: now,
@@ -266,12 +393,13 @@ export class TaskService {
             await this.prisma.organizationSubscription.update({
                 where: { id: sub.id },
                 data: {
-                    status: "CANCELLED",
+                    status: "EXPIRED",
                     cancelled_at: now,
                 },
             });
         }
-        this.logger.log(`[CRON] Finalized ${subscriptions.length} cancelled subscriptions`);
+
+        this.logger.log(`[CRON] Finalized ${subscriptions.length} expired subscriptions`,);
     }
 
 

@@ -243,7 +243,7 @@ export class UserService {
                         'ACTIVE',
                         'PAUSED',
                         'CANCELLED',
-                        'UPGRADED',
+                        "TRIAL",
                         'PENDING',
                         'INCOMPLETE',
                       ],
@@ -325,11 +325,11 @@ export class UserService {
          * 4️⃣ ADMIN-upgraded (always valid)
          */
         if (!isSubscribed) {
-          const adminUpgraded = subs.find(
-            s => s.status === 'UPGRADED' && s.source === 'ADMIN'
+          const inTrial = subs.find(
+            s => s.status === "TRIAL" && s.source === 'ADMIN'
           );
-          if (adminUpgraded) {
-            subscriptionStatus = 'UPGRADED';
+          if (inTrial) {
+            subscriptionStatus = 'TRIAL';
             isSubscribed = true;
           }
         }
@@ -342,6 +342,7 @@ export class UserService {
             s =>
               (s.status === 'ACTIVE' ||
                 s.status === 'PAUSED' ||
+                s.status === 'EXPIRED' ||
                 s.status === 'CANCELLED') &&
               s.end_at &&
               s.end_at <= now
@@ -352,11 +353,12 @@ export class UserService {
         }
 
         /**
-         * 6️⃣ Pending / Incomplete (fallback)
-         */
-        if (!subscriptionStatus) {
-          const pending = subs.find(s => s.status === 'PENDING');
-          if (pending) subscriptionStatus = 'PENDING';
+        * 6️⃣ Pending / Incomplete (fallback)
+        */
+        const pending = subs.find(s => s.status === 'PENDING');
+        if (pending) {
+          subscriptionStatus = 'PENDING';
+          isSubscribed = false;
         }
 
         if (!subscriptionStatus) {
@@ -368,6 +370,7 @@ export class UserService {
           subscriptionStatus,
           isSubscribed,
         };
+        console.log("agentExtras", agentExtras);
 
       }
 

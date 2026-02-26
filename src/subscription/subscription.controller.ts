@@ -163,10 +163,11 @@ export class SubscriptionController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription upgraded"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error) {
+      console.log("Failed to upgrade subscription", error);
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }
-      throw new BadRequestException("Failed to upgrade subscription.");
+      throw new BadRequestException(error?.error?.description || "Failed to upgrade subscription.");
     }
   }
 

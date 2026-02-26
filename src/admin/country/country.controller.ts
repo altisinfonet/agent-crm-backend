@@ -20,8 +20,8 @@ import {
 @ApiTags('Admin - Countries')
 @ApiBearerAuth('access-token')
 @Controller({ path: '', version: '1' })
-// @UseGuards(JwtAuthGuard, RolesGuard)
-// @Roles(Role.ADMIN)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.ADMIN)
 export class CountryController {
   constructor(private readonly countryService: CountryService) { }
 
