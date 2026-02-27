@@ -8,22 +8,34 @@ import { SubscriptionCycle } from 'generated/prisma';
 
 @Injectable()
 export class SubscriptionService {
-  private razorpay: Razorpay;
+  // private razorpay: Razorpay;
   constructor(
     private prisma: PrismaService,
     private readonly settingsService: SettingsService
   ) { }
-  async onModuleInit() {
-    await this.initRazorpay();
-  }
-  private async initRazorpay() {
-    const RazorpaySetting = await this.settingsService.paymentSettings("payment-settings");
+  // async onModuleInit() {
+  //   await this.initRazorpay();
+  // }
 
-    this.razorpay = new Razorpay({
-      key_id: RazorpaySetting.RAZORPAY_KEY_ID,
-      key_secret: RazorpaySetting.RAZORPAY_KEY_SECRET
+  private async getRazorpayInstance(): Promise<Razorpay> {
+    const settings =
+      await this.settingsService.paymentSettings("payment-settings");
+
+    return new Razorpay({
+      key_id: settings.RAZORPAY_KEY_ID,
+      key_secret: settings.RAZORPAY_KEY_SECRET,
     });
   }
+
+  // private async initRazorpay() {
+  //   const RazorpaySetting = await this.settingsService.paymentSettings("payment-settings");
+  //   console.log("RazorpaySetting+++++++", RazorpaySetting);
+
+  //   this.razorpay = new Razorpay({
+  //     key_id: RazorpaySetting.RAZORPAY_KEY_ID,
+  //     key_secret: RazorpaySetting.RAZORPAY_KEY_SECRET
+  //   });
+  // }
 
   async syncPlan() {
     try {
@@ -34,7 +46,9 @@ export class SubscriptionService {
         yearly: SubscriptionCycle.YEARLY,
       };
 
-      const rzpPlans = await this.razorpay.plans.all({ count: 100 });
+      const razorpay = await this.getRazorpayInstance();
+
+      const rzpPlans = await razorpay.plans.all({ count: 100 });
       const results: any[] = [];
 
       for (const rzpPlan of rzpPlans.items) {
@@ -79,6 +93,7 @@ export class SubscriptionService {
 
         results.push(plan);
       }
+      console.log("results++++++", results);
 
       return results;
     } catch (error) {
@@ -447,9 +462,10 @@ export class SubscriptionService {
       if (!orgSubscription?.rzp_subscription_id) return;
 
       let rzpSub: any;
+      const razorpay = await this.getRazorpayInstance();
 
       try {
-        rzpSub = await this.razorpay.subscriptions.fetch(
+        rzpSub = await razorpay.subscriptions.fetch(
           orgSubscription.rzp_subscription_id
         );
       } catch (error) {
@@ -459,7 +475,7 @@ export class SubscriptionService {
 
       try {
         if (rzpSub.paid_count === 0) {
-          await this.razorpay.subscriptions.pause(
+          await razorpay.subscriptions.pause(
             orgSubscription.rzp_subscription_id
           );
           await this.prisma.organizationSubscription.update({
@@ -472,7 +488,7 @@ export class SubscriptionService {
             },
           });
         } else {
-          await this.razorpay.subscriptions.cancel(
+          await razorpay.subscriptions.cancel(
             orgSubscription.rzp_subscription_id,
             true
           );

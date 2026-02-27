@@ -9,22 +9,32 @@ import { SubscriptionCycle } from '@generated/prisma';
 
 @Injectable()
 export class SubscriptionService {
-  private razorpay: Razorpay;
+  // private razorpay: Razorpay;
   private razorpaySecret: string;
   constructor(
     private prisma: PrismaService,
     private readonly settingsService: SettingsService
   ) { }
-  async onModuleInit() {
-    await this.initRazorpay();
-  }
-  private async initRazorpay() {
-    const RazorpaySetting = await this.settingsService.paymentSettings("payment-settings");
+  // async onModuleInit() {
+  //   await this.initRazorpay();
+  // }
+  // private async initRazorpay() {
+  //   const RazorpaySetting = await this.settingsService.paymentSettings("payment-settings");
 
-    this.razorpaySecret = RazorpaySetting.RAZORPAY_KEY_SECRET;
-    this.razorpay = new Razorpay({
-      key_id: RazorpaySetting.RAZORPAY_KEY_ID,
-      key_secret: RazorpaySetting.RAZORPAY_KEY_SECRET,
+  //   this.razorpaySecret = RazorpaySetting.RAZORPAY_KEY_SECRET;
+  //   this.razorpay = new Razorpay({
+  //     key_id: RazorpaySetting.RAZORPAY_KEY_ID,
+  //     key_secret: RazorpaySetting.RAZORPAY_KEY_SECRET,
+  //   });
+  // }
+
+  private async getRazorpayInstance(): Promise<Razorpay> {
+    const settings =
+      await this.settingsService.paymentSettings("payment-settings");
+
+    return new Razorpay({
+      key_id: settings.RAZORPAY_KEY_ID,
+      key_secret: settings.RAZORPAY_KEY_SECRET,
     });
   }
 
@@ -330,8 +340,9 @@ export class SubscriptionService {
           trial_days: '0',
         },
       };
+      const razorpay = await this.getRazorpayInstance();
 
-      const rzpSub = await this.razorpay.subscriptions.create(rzpPayload);
+      const rzpSub = await razorpay.subscriptions.create(rzpPayload);
 
       const orgSubscription =
         await this.prisma.organizationSubscription.create({
@@ -541,7 +552,7 @@ export class SubscriptionService {
       const rzpUpdatePayload = {
         plan_id: newPlan.rzp_plan_id,
         remaining_count: 1,
-        schedule_change_at: "now" as const,
+        schedule_change_at: "cycle_end" as const,
         customer_notify: true,
         // notes: {
         //   org_id: org.id.toString(),
@@ -549,9 +560,10 @@ export class SubscriptionService {
         //   upgraded_to: newPlan.code,
         // },
       };
+      const razorpay = await this.getRazorpayInstance();
 
       const updatedRzpSub =
-        await this.razorpay.subscriptions.update(
+        await razorpay.subscriptions.update(
           currentSub.rzp_subscription_id,
           rzpUpdatePayload
         );
@@ -634,9 +646,10 @@ export class SubscriptionService {
       if (generatedSignature !== payment_signature) {
         throw new BadRequestException("Invalid payment signature");
       }
+      const razorpay = await this.getRazorpayInstance();
 
       const rzpSubscription =
-        await this.razorpay.subscriptions.fetch(subscription_id);
+        await razorpay.subscriptions.fetch(subscription_id);
 
       console.log("rzpSubscription", rzpSubscription);
 
@@ -1121,9 +1134,10 @@ export class SubscriptionService {
       const activeSubscription: any = subscriptions.find(
         (sub) => sub.status === "ACTIVE" && sub.rzp_subscription_id
       );
+      const razorpay = await this.getRazorpayInstance();
 
       const rzpSubscription = activeSubscription
-        ? await this.razorpay.subscriptions.fetch(
+        ? await razorpay.subscriptions.fetch(
           activeSubscription?.rzp_subscription_id
         )
         : null;
@@ -1340,9 +1354,10 @@ export class SubscriptionService {
         paid_count: number;
         start_at: number
       };
+      const razorpay = await this.getRazorpayInstance();
 
       try {
-        rzpSub = await this.razorpay.subscriptions.fetch(
+        rzpSub = await razorpay.subscriptions.fetch(
           orgSubscription.rzp_subscription_id
         );
       } catch (error: any) {
@@ -1352,7 +1367,7 @@ export class SubscriptionService {
 
       try {
         if (rzpSub.paid_count === 0) {
-          await this.razorpay.subscriptions.pause(
+          await razorpay.subscriptions.pause(
             orgSubscription.rzp_subscription_id
           );
           await this.prisma.organizationSubscription.update({
@@ -1365,7 +1380,7 @@ export class SubscriptionService {
             },
           });
         } else {
-          await this.razorpay.subscriptions.cancel(
+          await razorpay.subscriptions.cancel(
             orgSubscription.rzp_subscription_id,
             true
           );

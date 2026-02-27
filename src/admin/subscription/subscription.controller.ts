@@ -42,6 +42,11 @@ export class SubscriptionController {
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }
+      if (error?.statusCode === 401) {
+        throw new BadRequestException(
+          "Invalid Razorpay API credentials. Please verify Key ID and Key Secret."
+        );
+      }
       throw new BadRequestException("Failed to sync subscription plans.");
     }
   }

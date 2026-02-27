@@ -11,7 +11,7 @@ import { SubscriptionCycle, SubscriptionStatus } from '@generated/prisma';
 
 @Injectable()
 export class TaskService {
-    private razorpay: Razorpay;
+    // private razorpay: Razorpay;
     private readonly logger = new Logger(TaskService.name);
     constructor(
         private readonly prisma: PrismaService,
@@ -19,15 +19,25 @@ export class TaskService {
         private readonly notificationService: NotificationService,
         private readonly mailService: MailService,
     ) { }
-    async onModuleInit() {
-        await this.initRazorpay();
-    }
-    private async initRazorpay() {
-        const RazorpaySetting = await this.settingsService.paymentSettings("payment-settings");
+    // async onModuleInit() {
+    //     await this.initRazorpay();
+    // }
+    // private async initRazorpay() {
+    //     const RazorpaySetting = await this.settingsService.paymentSettings("payment-settings");
 
-        this.razorpay = new Razorpay({
-            key_id: RazorpaySetting.RAZORPAY_KEY_ID,
-            key_secret: RazorpaySetting.RAZORPAY_KEY_SECRET
+    //     this.razorpay = new Razorpay({
+    //         key_id: RazorpaySetting.RAZORPAY_KEY_ID,
+    //         key_secret: RazorpaySetting.RAZORPAY_KEY_SECRET
+    //     });
+    // }
+
+    private async getRazorpayInstance(): Promise<Razorpay> {
+        const settings =
+            await this.settingsService.paymentSettings("payment-settings");
+
+        return new Razorpay({
+            key_id: settings.RAZORPAY_KEY_ID,
+            key_secret: settings.RAZORPAY_KEY_SECRET,
         });
     }
 
@@ -151,13 +161,14 @@ export class TaskService {
                     rzp_subscription_id: { not: null },
                 },
             });
+        const razorpay = await this.getRazorpayInstance();
 
         for (const sub of subs) {
             try {
                 if (!sub.rzp_subscription_id) continue;
 
                 const rzpSub =
-                    await this.razorpay.subscriptions.fetch(
+                    await razorpay.subscriptions.fetch(
                         sub.rzp_subscription_id
                     );
 
