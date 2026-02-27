@@ -93,7 +93,6 @@ export class SubscriptionService {
 
         results.push(plan);
       }
-      console.log("results++++++", results);
 
       return results;
     } catch (error) {
@@ -248,88 +247,15 @@ export class SubscriptionService {
     });
   }
 
-  // async adminUpgradeSubscription(dto: CommonDto) {
-  //   try {
-  //     const payload = decryptData(dto.data);
-  //     console.log("payload", payload);
-
-  //     const { orgId, planId, endDate } = payload;
-
-  //     if (!orgId || !planId) {
-  //       throw new BadRequestException("organization Id and plan Id are required.");
-  //     }
-
-  //     if (!endDate) {
-  //       throw new BadRequestException("Subscription end date is required.");
-  //     }
-
-  //     const plan = await this.prisma.subscriptionPlan.findUnique({
-  //       where: { id: planId }
-  //     });
-
-  //     if (!plan) {
-  //       throw new BadRequestException("Invalid plan");
-  //     }
-
-  //     await this.prisma.$transaction(async (tx) => {
-  //       const activeSub = await tx.organizationSubscription.findFirst({
-  //         where: {
-  //           org_id: orgId,
-  //           status: "ACTIVE"
-  //         }
-  //       });
-  //       console.log("activeSub", activeSub);
-
-  //       if (activeSub && activeSub.source === "ADMIN") {
-  //         await tx.organizationSubscription.update({
-  //           where: { id: activeSub.id },
-  //           data: {
-  //             plan_id: planId,
-  //             start_at: new Date(),
-  //             end_at: endDate
-  //           }
-  //         });
-  //         return;
-  //       }
-
-  //       if (activeSub && activeSub.source === "RAZORPAY") {
-  //         await tx.organizationSubscription.update({
-  //           where: { id: activeSub.id },
-  //           data: {
-  //             status: "UPGRADED"
-  //           }
-  //         });
-  //       }
-
-  //       await tx.organizationSubscription.create({
-  //         data: {
-  //           org_id: orgId,
-  //           plan_id: planId,
-  //           status: "ACTIVE",
-  //           source: "ADMIN",
-  //           start_at: new Date(),
-  //           end_at: endDate,
-  //           auto_renew: false
-  //         }
-  //       });
-  //     });
-
-  //     return true;
-  //   } catch (error) {
-  //     throw error;
-  //   }
-  // }
-
-
   async adminUpgradeSubscription(dto: CommonDto) {
     try {
       const payload = decryptData(dto.data);
+      console.log("payload", payload);
+
       const { orgId, planId, endDate } = payload;
 
       if (!orgId || !planId) {
-        throw new BadRequestException(
-          "organization Id and plan Id are required."
-        );
+        throw new BadRequestException("organization Id and plan Id are required.");
       }
 
       if (!endDate) {
@@ -337,7 +263,7 @@ export class SubscriptionService {
       }
 
       const plan = await this.prisma.subscriptionPlan.findUnique({
-        where: { id: planId },
+        where: { id: planId }
       });
 
       if (!plan) {
@@ -348,33 +274,32 @@ export class SubscriptionService {
         const activeSub = await tx.organizationSubscription.findFirst({
           where: {
             org_id: orgId,
-            status: "ACTIVE",
-          },
+            status: "ACTIVE"
+          }
         });
+        console.log("activeSub", activeSub);
 
-        /**
-         * CASE 1: Active subscription exists
-         * → Mutate in place
-         */
-        if (activeSub) {
+        if (activeSub && activeSub.source === "ADMIN") {
           await tx.organizationSubscription.update({
             where: { id: activeSub.id },
             data: {
               plan_id: planId,
-              source: "ADMIN",
               start_at: new Date(),
-              end_at: endDate,
-              auto_renew: false,
-              cancelled_at: null,
-            },
+              end_at: endDate
+            }
           });
           return;
         }
 
-        /**
-         * CASE 2: No active subscription
-         * → Create fresh ADMIN subscription
-         */
+        if (activeSub && activeSub.source === "RAZORPAY") {
+          await tx.organizationSubscription.update({
+            where: { id: activeSub.id },
+            data: {
+              status: "UPGRADED"
+            }
+          });
+        }
+
         await tx.organizationSubscription.create({
           data: {
             org_id: orgId,
@@ -383,8 +308,8 @@ export class SubscriptionService {
             source: "ADMIN",
             start_at: new Date(),
             end_at: endDate,
-            auto_renew: false,
-          },
+            auto_renew: false
+          }
         });
       });
 
@@ -393,6 +318,80 @@ export class SubscriptionService {
       throw error;
     }
   }
+
+
+  // async adminUpgradeSubscription(dto: CommonDto) {
+  //   try {
+  //     const payload = decryptData(dto.data);
+  //     const { orgId, planId, endDate } = payload;
+
+  //     if (!orgId || !planId) {
+  //       throw new BadRequestException(
+  //         "organization Id and plan Id are required."
+  //       );
+  //     }
+
+  //     if (!endDate) {
+  //       throw new BadRequestException("Subscription end date is required.");
+  //     }
+
+  //     const plan = await this.prisma.subscriptionPlan.findUnique({
+  //       where: { id: planId },
+  //     });
+
+  //     if (!plan) {
+  //       throw new BadRequestException("Invalid plan");
+  //     }
+
+  //     await this.prisma.$transaction(async (tx) => {
+  //       const activeSub = await tx.organizationSubscription.findFirst({
+  //         where: {
+  //           org_id: orgId,
+  //           status: "ACTIVE",
+  //         },
+  //       });
+
+  //       /**
+  //        * CASE 1: Active subscription exists
+  //        * → Mutate in place
+  //        */
+  //       if (activeSub) {
+  //         await tx.organizationSubscription.update({
+  //           where: { id: activeSub.id },
+  //           data: {
+  //             plan_id: planId,
+  //             source: "ADMIN",
+  //             start_at: new Date(),
+  //             end_at: endDate,
+  //             auto_renew: false,
+  //             cancelled_at: null,
+  //           },
+  //         });
+  //         return;
+  //       }
+
+  //       /**
+  //        * CASE 2: No active subscription
+  //        * → Create fresh ADMIN subscription
+  //        */
+  //       await tx.organizationSubscription.create({
+  //         data: {
+  //           org_id: orgId,
+  //           plan_id: planId,
+  //           status: "ACTIVE",
+  //           source: "ADMIN",
+  //           start_at: new Date(),
+  //           end_at: endDate,
+  //           auto_renew: false,
+  //         },
+  //       });
+  //     });
+
+  //     return true;
+  //   } catch (error) {
+  //     throw error;
+  //   }
+  // }
 
   async adminAssignSubscriptionToAgent(dto: CommonDto) {
     try {
@@ -535,6 +534,35 @@ export class SubscriptionService {
         ...(auto_renew !== undefined && { auto_renew }),
         ...(source && { source }),
 
+        // ...(search && {
+        //   OR: [
+        //     {
+        //       organization: {
+        //         name: {
+        //           contains: search,
+        //           mode: "insensitive",
+        //         },
+        //       },
+        //     },
+        //     {
+        //       plan: {
+        //         name: {
+        //           contains: search,
+        //           mode: "insensitive",
+        //         },
+        //       },
+        //     },
+        //     {
+        //       plan: {
+        //         code: {
+        //           contains: search,
+        //           mode: "insensitive",
+        //         },
+        //       },
+        //     },
+        //   ],
+        // }),
+
         ...(search && {
           OR: [
             {
@@ -545,6 +573,23 @@ export class SubscriptionService {
                 },
               },
             },
+            {
+              organization: {
+                pan_number: {
+                  contains: search,
+                  mode: "insensitive",
+                },
+              },
+            },
+            {
+              organization: {
+                gst_number: {
+                  contains: search,
+                  mode: "insensitive",
+                },
+              },
+            },
+
             {
               plan: {
                 name: {
@@ -558,6 +603,47 @@ export class SubscriptionService {
                 code: {
                   contains: search,
                   mode: "insensitive",
+                },
+              },
+            },
+
+            {
+              organization: {
+                createdByUser: {
+                  first_name: {
+                    contains: search,
+                    mode: "insensitive",
+                  },
+                },
+              },
+            },
+            {
+              organization: {
+                createdByUser: {
+                  last_name: {
+                    contains: search,
+                    mode: "insensitive",
+                  },
+                },
+              },
+            },
+            {
+              organization: {
+                createdByUser: {
+                  email: {
+                    contains: search,
+                    mode: "insensitive",
+                  },
+                },
+              },
+            },
+            {
+              organization: {
+                createdByUser: {
+                  phone_no: {
+                    contains: search,
+                    mode: "insensitive",
+                  },
                 },
               },
             },

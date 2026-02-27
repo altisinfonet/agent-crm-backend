@@ -227,6 +227,30 @@ export class TaskService {
                         current_cycle: rzpSub.paid_count ?? 0,
                     },
                 });
+                if (nextStatus === "ACTIVE") {
+                    const orgSub =
+                        await this.prisma.organizationSubscription.findUnique({
+                            where: { rzp_subscription_id: sub.rzp_subscription_id },
+                            include: { upgraded_from: true },
+                        });
+
+                    if (!orgSub) return;
+
+                    if (orgSub.upgraded_from?.rzp_subscription_id) {
+                        await razorpay.subscriptions.cancel(
+                            orgSub.upgraded_from.rzp_subscription_id,
+                            false
+                        );
+                        await this.prisma.organizationSubscription.update({
+                            where: { id: orgSub.upgraded_from.id },
+                            data: {
+                                status: "UPGRADED",
+                                auto_renew: false,
+                                upgraded_at: new Date(),
+                            },
+                        });
+                    }
+                }
 
                 const currentSub = await this.prisma.organizationSubscription.findFirst({
                     where: {

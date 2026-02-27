@@ -136,7 +136,7 @@ export class FaqService {
     try {
       const payload = decryptData(updateFaqDto.data);
 
-      let { name, desc, status_id, rank } = payload;
+      let { name, desc, status, rank } = payload;
 
       const currentModule = await this.prisma.fAQModule.findUnique({
         where: { id: module_id },
@@ -150,7 +150,7 @@ export class FaqService {
       const updatedData: any = {
         ...(name && { name }),
         ...(desc && { desc }),
-        ...(status_id && { status_id }),
+        ...(status && { status }),
       };
 
       if (rank && currentRank !== BigInt(rank)) {

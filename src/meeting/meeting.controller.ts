@@ -17,11 +17,12 @@ import {
   ApiBody,
   ApiResponse as SwaggerApiResponse,
 } from '@nestjs/swagger';
+import { SubscriptionGuard } from '@/common/guards/subscription.guard';
 
 @ApiTags('Agent - Meetings')
 @ApiBearerAuth('access-token')
 @Controller({ path: 'meeting', version: '1' })
-@UseGuards(JwtAuthGuard, AccountStatusGuard)
+@UseGuards(JwtAuthGuard, AccountStatusGuard, SubscriptionGuard)
 @AccountStatus(Account.ACTIVE)
 export class MeetingController {
   constructor(private readonly meetingService: MeetingService) { }

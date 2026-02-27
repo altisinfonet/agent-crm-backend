@@ -63,27 +63,6 @@ enum CustomerStatus {
     LOST
 }
 
-enum SubscriptionStatus {
-    TRIAL
-    PENDING
-    ACTIVE
-    PAUSED
-    CANCELLED
-    EXPIRED
-    INCOMPLETE
-}
-
-enum SubscriptionSource {
-    RAZORPAY
-    ADMIN
-}
-
-enum RazorpayEntityType {
-    SUBSCRIPTION
-    PAYMENT
-    INVOICE
-}
-
 enum SubscriptionCycle {
     WEEKLY
     MONTHLY
@@ -812,28 +791,85 @@ model SubscriptionPlan {
     @@map("tbl_subscription_plan")
 }
 
+// model OrganizationSubscription {
+//     id                        BigInt                 @id @unique @default(autoincrement())
+//     org_id                    BigInt
+//     organization              Organization           @relation(fields: [org_id], references: [id])
+//     plan_id                   BigInt
+//     plan                      SubscriptionPlan       @relation(fields: [plan_id], references: [id])
+//     status                    SubscriptionStatus
+//     source                    SubscriptionSource     @default(RAZORPAY)
+//     start_at                  DateTime
+//     end_at                    DateTime?
+//     auto_renew                Boolean                @default(true)
+//     cancelled_at              DateTime?
+//     rzp_subscription_id       String?                @unique
+//     reconciliation_attempts   Int                    @default(0)
+//     last_reconciled_at        DateTime?
+//     expiry_reminder_days_sent Int[]                  @default([])
+//     rzp_payment_id            String?                @unique
+//     signature                 String?                @unique
+//     created_at                DateTime               @default(now())
+//     upgraded_at               DateTime?
+//     updated_at                DateTime               @updatedAt
+//     razorpaySubscriptions     RazorpaySubscription[]
+
+//     @@unique([org_id, rzp_subscription_id])
+//     @@index([org_id, plan_id, status])
+//     @@map("tbl_org_subscription")
+// }
+
+enum SubscriptionStatus {
+    TRIAL
+    PENDING
+    ACTIVE
+    PAUSED
+    CANCELLED
+    UPGRADED
+    EXPIRED
+    INCOMPLETE
+}
+
+enum SubscriptionSource {
+    RAZORPAY
+    ADMIN
+    FREE
+}
+
+enum RazorpayEntityType {
+    SUBSCRIPTION
+    PAYMENT
+    INVOICE
+}
+
 model OrganizationSubscription {
-    id                        BigInt                 @id @unique @default(autoincrement())
+    id                        BigInt                     @id @unique @default(autoincrement())
     org_id                    BigInt
-    organization              Organization           @relation(fields: [org_id], references: [id])
+    organization              Organization               @relation(fields: [org_id], references: [id])
     plan_id                   BigInt
-    plan                      SubscriptionPlan       @relation(fields: [plan_id], references: [id])
+    plan                      SubscriptionPlan           @relation(fields: [plan_id], references: [id])
     status                    SubscriptionStatus
-    source                    SubscriptionSource     @default(RAZORPAY)
+    source                    SubscriptionSource         @default(RAZORPAY)
     start_at                  DateTime
     end_at                    DateTime?
-    auto_renew                Boolean                @default(true)
+    auto_renew                Boolean                    @default(true)
     cancelled_at              DateTime?
-    rzp_subscription_id       String?                @unique
-    reconciliation_attempts   Int                    @default(0)
+    rzp_subscription_id       String?                    @unique
+    upgraded_from_id          BigInt?
+    upgraded_to_id            BigInt?
+    upgraded_from             OrganizationSubscription?  @relation("UpgradeFrom", fields: [upgraded_from_id], references: [id])
+    upgraded_to               OrganizationSubscription?  @relation("UpgradeTo", fields: [upgraded_to_id], references: [id])
+    reconciliation_attempts   Int                        @default(0)
     last_reconciled_at        DateTime?
-    expiry_reminder_days_sent Int[]                  @default([])
-    rzp_payment_id            String?                @unique
-    signature                 String?                @unique
-    created_at                DateTime               @default(now())
+    expiry_reminder_days_sent Int[]                      @default([])
+    rzp_payment_id            String?                    @unique
+    signature                 String?                    @unique
+    created_at                DateTime                   @default(now())
+    updated_at                DateTime                   @updatedAt
     upgraded_at               DateTime?
-    updated_at                DateTime               @updatedAt
     razorpaySubscriptions     RazorpaySubscription[]
+    upgraded_from_children    OrganizationSubscription[] @relation("UpgradeTo")
+    upgraded_to_children      OrganizationSubscription[] @relation("UpgradeFrom")
 
     @@unique([org_id, rzp_subscription_id])
     @@index([org_id, plan_id, status])

@@ -295,6 +295,16 @@ export class UserService {
           isSubscribed = true;
         }
 
+        if (!isSubscribed) {
+          const inTrial = subs.find(
+            s => s.status === "TRIAL" && s.source === 'FREE'
+          );
+          if (inTrial) {
+            subscriptionStatus = 'TRIAL';
+            isSubscribed = true;
+          }
+        }
+
         /**
          * 2️⃣ PAUSED (trial access)
          */
@@ -317,19 +327,16 @@ export class UserService {
           );
           if (cancelled) {
             subscriptionStatus = 'CANCELLED';
-            isSubscribed = true;
+            isSubscribed = false;
           }
         }
 
-        /**
-         * 4️⃣ ADMIN-upgraded (always valid)
-         */
         if (!isSubscribed) {
-          const inTrial = subs.find(
-            s => s.status === "TRIAL" && s.source === 'ADMIN'
+          const adminUpgraded = subs.find(
+            s => s.status === 'UPGRADED' && s.source === 'ADMIN'
           );
-          if (inTrial) {
-            subscriptionStatus = 'TRIAL';
+          if (adminUpgraded) {
+            subscriptionStatus = 'UPGRADED';
             isSubscribed = true;
           }
         }
@@ -370,8 +377,6 @@ export class UserService {
           subscriptionStatus,
           isSubscribed,
         };
-        console.log("agentExtras", agentExtras);
-
       }
 
       let image = user.image;

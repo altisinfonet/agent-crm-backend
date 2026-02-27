@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { CommonDto } from 'src/auth/dto/common.dto';
 import { decryptData } from '@/common/helper/common.helper';
 import { R2Service } from '@/common/helper/r2.helper';
@@ -313,7 +313,25 @@ export class AgentService {
             where: { user_id: agent_id },
           }),
         ]);
-        await this.subscriptionService.cancelSubscription(agent_id)
+        const org = await this.prisma.organization.findUnique({
+          where: { created_by: agent_id },
+          select: { id: true },
+        });
+
+        if (!org) {
+          throw new BadRequestException("User does not own any organization");
+        }
+        const orgSubscription =
+          await this.prisma.organizationSubscription.findFirst({
+            orderBy: { created_at: "desc" },
+            where: {
+              org_id: org.id,
+              status: "ACTIVE",
+            },
+          });
+        if (orgSubscription) {
+          await this.subscriptionService.cancelSubscription(agent_id)
+        }
       }
 
       return true;

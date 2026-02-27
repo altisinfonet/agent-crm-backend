@@ -18,6 +18,7 @@ import {
   ApiExcludeEndpoint,
   ApiResponse as SwaggerApiResponse,
 } from '@nestjs/swagger';
+import { SubscriptionGuard } from '@/common/guards/subscription.guard';
 
 @ApiTags('Agent - Subscriptions')
 @ApiBearerAuth('access-token')
@@ -63,6 +64,8 @@ export class SubscriptionController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription initiated"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error) {
+      console.log("Error initiating subscription", error);
+
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }
@@ -195,16 +198,26 @@ export class SubscriptionController {
     }
   }
 
-
-  @Patch(':id')
+  @UseGuards(JwtAuthGuard, AccountStatusGuard, SubscriptionGuard)
+  @AccountStatus(Account.ACTIVE)
+  @Get('invoice/:id')
   @ApiExcludeEndpoint()
-  update(@Param('id') id: string, @Body() updateSubscriptionDto: CommonDto) {
-    return this.subscriptionService.update(+id, updateSubscriptionDto);
+  async getInvoice(@Res() res: Response, @GetCurrentUserId() userId: bigint, @Param('id') sub_id: string) {
+    try {
+      const subscribe = await this.subscriptionService.getSubscriptionInvoices(userId, BigInt(sub_id));
+      let result = JSON.stringify(subscribe, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription cancelled"));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error) {
+      console.log("Failed to cancel subscription", error);
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to cancel subscription.");
+    }
   }
 
-  @Delete(':id')
-  @ApiExcludeEndpoint()
-  remove(@Param('id') id: string) {
-    return this.subscriptionService.remove(+id);
-  }
 }

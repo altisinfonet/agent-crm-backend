@@ -48,17 +48,84 @@ export class CustomerService {
           createdByUser: {
             select: {
               agentKYC: {
-                select: {
-                  base_img_path: true,
-                }
+                select: { base_img_path: true }
               }
             }
           }
-        },
+        }
       });
 
       if (!org?.id) {
         throw new BadRequestException("Agent organization not found");
+      }
+
+      const now = new Date();
+
+      const subscription =
+        await this.prisma.organizationSubscription.findFirst({
+          where: {
+            org_id: org.id,
+            status: {
+              in: ["ACTIVE", "TRIAL", "PAUSED", "CANCELLED", "UPGRADED"],
+            },
+            OR: [
+              { end_at: null },
+              { end_at: { gt: now } },
+            ],
+          },
+          orderBy: [
+            { start_at: "desc" },
+            { created_at: "desc" },
+          ],
+          include: {
+            plan: {
+              select: {
+                max_customers: true,
+              },
+            },
+          },
+        });
+
+      let isSubscribed = false;
+
+      if (!subscription) {
+        isSubscribed = false;
+      } else {
+        switch (subscription.status) {
+          case "ACTIVE":
+          case "TRIAL":
+          case "PAUSED":
+          case "UPGRADED":
+            isSubscribed = true;
+            break;
+
+          case "CANCELLED":
+            isSubscribed = false;
+            break;
+          default:
+            isSubscribed = false;
+        }
+      }
+
+      if (!isSubscribed) {
+        throw new BadRequestException(
+          "Active subscription required to create customers"
+        );
+      }
+
+      const maxCustomers = subscription?.plan.max_customers;
+
+      const currentCustomerCount = await this.prisma.customer.count({
+        where: { org_id: org.id },
+      });
+
+      if (
+        typeof maxCustomers === "number" &&
+        currentCustomerCount >= maxCustomers
+      ) {
+        throw new BadRequestException(
+          "Maximum customer limit reached for your current plan"
+        );
       }
 
       let existingCustomer = await this.prisma.customer.findFirst({
@@ -1878,6 +1945,103 @@ export class CustomerService {
       product: product_slug,
       uploaded_documents: uploadedDocs.map(d => d.file_path),
     };
+  }
+
+  async removeSale(
+    agent_id: bigint,
+    sale_id: bigint
+  ) {
+    try {
+      const org = await this.prisma.organization.findUnique({
+        where: { created_by: agent_id },
+        select: { id: true },
+      });
+
+      if (!org?.id) {
+        throw new BadRequestException("Agent organization not found");
+      }
+
+      const sale = await this.prisma.agentSale.findFirst({
+        where: {
+          id: sale_id,
+          org_id: org.id,
+        },
+        include: {
+          productEntity: {
+            include: { products: true },
+          },
+        },
+      });
+
+      if (!sale) {
+        throw new NotFoundException("Sale not found");
+      }
+
+      const documents = await this.prisma.saleDocument.findMany({
+        where: {
+          sale_id: sale_id,
+          deleted_at: null,
+        },
+        select: {
+          id: true,
+          file_path: true,
+        },
+      });
+
+      for (const doc of documents) {
+        try {
+          await R2Service.remove(doc.file_path);
+        } catch (err) {
+          console.error("Failed to delete R2 file:", doc.file_path);
+        }
+      }
+
+      await this.prisma.$transaction(async (tx) => {
+        const productSlug = sale.productEntity.products.slug;
+
+        switch (productSlug) {
+          case "fixed-deposit":
+            await tx.productFixedDeposit.deleteMany({
+              where: { sale_id },
+            });
+            break;
+
+          case "insurance":
+            await tx.productInsurance.deleteMany({
+              where: { sale_id },
+            });
+            break;
+
+          case "mutual-funds":
+            await tx.productMutualFund.deleteMany({
+              where: { sale_id },
+            });
+            break;
+
+          case "real-estate":
+            await tx.productRealEstate.deleteMany({
+              where: { sale_id },
+            });
+            break;
+        }
+
+        await tx.saleDocument.deleteMany({
+          where: { sale_id },
+        });
+
+        await tx.agentSale.delete({
+          where: { id: sale_id },
+        });
+      });
+
+      return {
+        success: true,
+        message: "Sale deleted successfully",
+        sale_id: sale_id.toString(),
+      };
+    } catch (error) {
+      throw error;
+    }
   }
 
   async removeFile(

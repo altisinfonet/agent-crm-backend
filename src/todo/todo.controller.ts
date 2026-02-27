@@ -17,10 +17,11 @@ import {
 import { AccountStatusGuard } from '@/common/guards/status.guard';
 import { Account } from '@/common/enum/account.enum';
 import { AccountStatus } from '@/common/decorators/status.decorator';
+import { SubscriptionGuard } from '@/common/guards/subscription.guard';
 
 @ApiTags('Agent - Todos')
 @ApiBearerAuth('access-token')
-@UseGuards(JwtAuthGuard, AccountStatusGuard)
+@UseGuards(JwtAuthGuard, AccountStatusGuard, SubscriptionGuard)
 @AccountStatus(Account.ACTIVE)
 @Controller({ path: 'todo', version: '1' })
 export class TodoController {
@@ -61,6 +62,8 @@ export class TodoController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Todo list."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
+      console.log("error read todo list", error);
+
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }

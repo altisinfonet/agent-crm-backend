@@ -20,10 +20,11 @@ import {
 } from '@nestjs/swagger';
 import { documentFileFilter, imageFileFilter, upload } from '@/common/config/multer.config';
 import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
+import { SubscriptionGuard } from '@/common/guards/subscription.guard';
 
 @ApiTags('Agent - Customers')
 @ApiBearerAuth('access-token')
-@UseGuards(JwtAuthGuard, AccountStatusGuard)
+@UseGuards(JwtAuthGuard, AccountStatusGuard, SubscriptionGuard)
 @AccountStatus(Account.ACTIVE)
 @Controller({ path: 'customer', version: '1' })
 export class CustomerController {
@@ -246,6 +247,28 @@ export class CustomerController {
       throw new BadRequestException("Failed to upload documents");
     }
   }
+
+
+  @Delete('sale/:id')
+  @ApiOperation({ summary: 'Sale deleted successfully' })
+  @ApiParam({ name: 'id', example: 1 })
+  @SwaggerApiResponse({ status: 200, description: 'Sale deleted successfully' })
+  async removeSale(@Res() res: Response, @GetCurrentUserId() userId: bigint, @Param('id') sale_id: string) {
+    try {
+      const sale = await this.customerService.removeSale(userId, BigInt(sale_id));
+      let result = JSON.stringify(sale, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Sale deleted"));
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error) {
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException("Failed to delete sale");
+    }
+  }
+
 
   @Delete('sale/docs/:id')
   @ApiOperation({ summary: 'Delete docs file' })

@@ -67,11 +67,11 @@ export class TodoService {
         org_id: org?.id,
         agent_id,
         ...(payload.is_completed && { is_completed: payload.is_completed }),
+        ...(payload.status && { priority: payload.status }),
         ...(payload.search && {
           OR: [
             { title: { contains: payload.search, mode: "insensitive" } },
             { description: { contains: payload.search, mode: "insensitive" } },
-            { priority: { contains: payload.search, mode: "insensitive" } },
           ],
         }),
       };

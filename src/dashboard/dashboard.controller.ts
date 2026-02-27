@@ -16,11 +16,12 @@ import { Response } from 'express';
 import { GetCurrentUserId } from '@/common/decorators/current-user-id.decorator';
 import { encryptData } from '@/common/helper/common.helper';
 import { ApiResponse } from '@/common/helper/response.helper';
+import { SubscriptionGuard } from '@/common/guards/subscription.guard';
 
 @ApiTags('Agent - dashboard')
 @ApiBearerAuth('access-token')
 @Controller({ path: 'agent/dashboard', version: '1' })
-@UseGuards(JwtAuthGuard, AccountStatusGuard)
+@UseGuards(JwtAuthGuard, AccountStatusGuard, SubscriptionGuard)
 @AccountStatus(Account.ACTIVE)
 export class DashboardController {
   constructor(private readonly dashboardService: DashboardService) { }
