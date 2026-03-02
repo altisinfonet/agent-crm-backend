@@ -159,7 +159,7 @@ export class TodoService {
 
       const updateData: any = {
         title: payload.title,
-        description: payload.description,
+        description: payload.desc,
         due_date: payload.due_date,
         priority: payload.priority,
       };
