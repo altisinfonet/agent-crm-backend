@@ -72,6 +72,8 @@ export const SUGGESTION_FIELDS = {
     "real-estate": [
         "property_type",
         "transaction_type",
+        "property_title",
+        "property_address",
         "city",
         "state",
         "builder_name",
