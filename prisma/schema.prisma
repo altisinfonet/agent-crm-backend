@@ -518,15 +518,16 @@ model CustomerStatusHistory {
  */
 
 model Products {
-    id         BigInt          @id @default(autoincrement())
-    name       String          @unique
-    slug       String          @unique
-    desc       String?
-    image      String?
-    status     Status          @default(ACTIVE)
-    created_at DateTime        @default(now())
-    updated_at DateTime        @updatedAt
-    entities   ProductEntity[]
+    id                   BigInt                @id @default(autoincrement())
+    name                 String                @unique
+    slug                 String                @unique
+    desc                 String?
+    image                String?
+    status               Status                @default(ACTIVE)
+    created_at           DateTime              @default(now())
+    updated_at           DateTime              @updatedAt
+    entities             ProductEntity[]
+    agentFormSuggestions AgentFormSuggestion[]
 
     @@index([name, status])
     @@map("tbl_products")
@@ -760,17 +761,18 @@ model SaleDocument {
 }
 
 model AgentFormSuggestion {
-    id           BigInt          @id @default(autoincrement())
+    id           BigInt    @id @default(autoincrement())
     sale_id      BigInt
-    sale         AgentSale       @relation(fields: [sale_id], references: [id], onDelete: Cascade)
+    sale         AgentSale @relation(fields: [sale_id], references: [id], onDelete: Cascade)
     agent_id     BigInt
-    agent        User            @relation(fields: [agent_id], references: [id], onDelete: Cascade)
-    product_type SaleProductType
+    agent        User      @relation(fields: [agent_id], references: [id], onDelete: Cascade)
+    product_type String
+    product      Products  @relation(fields: [product_type], references: [slug], onDelete: Cascade)
     field_name   String
     field_value  String
-    usage_count  Int             @default(1)
-    last_used_at DateTime        @updatedAt
-    created_at   DateTime        @default(now())
+    usage_count  Int       @default(1)
+    last_used_at DateTime  @updatedAt
+    created_at   DateTime  @default(now())
 
     @@index([agent_id, product_type, field_name])
     @@map("tbl_agent_form_suggestions")

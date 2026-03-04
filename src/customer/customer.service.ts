@@ -794,7 +794,7 @@ export class CustomerService {
               tx,
               agent_id,
               sale.id,
-              SaleProductType.FIXED_DEPOSIT,
+              productEntity.products.slug,
               product_data
             );
             break;
@@ -805,7 +805,7 @@ export class CustomerService {
               tx,
               agent_id,
               sale.id,
-              SaleProductType.INSURANCE,
+              productEntity.products.slug,
               product_data
             );
             break;
@@ -816,7 +816,7 @@ export class CustomerService {
               tx,
               agent_id,
               sale.id,
-              SaleProductType.MUTUAL_FUND,
+              productEntity.products.slug,
               product_data
             );
             break;
@@ -827,7 +827,7 @@ export class CustomerService {
               tx,
               agent_id,
               sale.id,
-              SaleProductType.REAL_ESTATE,
+              productEntity.products.slug,
               product_data
             );
             break;
@@ -835,6 +835,7 @@ export class CustomerService {
           default:
             throw new BadRequestException("Unsupported product type");
         }
+        console.log("here---->4");
         return sale;
       });
     } catch (error) {
@@ -1353,7 +1354,7 @@ export class CustomerService {
               tx,
               agent_id,
               sale_id,
-              SaleProductType.FIXED_DEPOSIT,
+              productSlug,
               changedFDfields
             );
             break;
@@ -1368,7 +1369,7 @@ export class CustomerService {
               tx,
               agent_id,
               sale_id,
-              SaleProductType.INSURANCE,
+              productSlug,
               changedFields
             );
             break;
@@ -1383,7 +1384,7 @@ export class CustomerService {
               tx,
               agent_id,
               sale_id,
-              SaleProductType.MUTUAL_FUND,
+              productSlug,
               changedMFfields
             );
             break;
@@ -1398,7 +1399,7 @@ export class CustomerService {
               tx,
               agent_id,
               sale_id,
-              SaleProductType.REAL_ESTATE,
+              productSlug,
               changedREfields
             );
             break;

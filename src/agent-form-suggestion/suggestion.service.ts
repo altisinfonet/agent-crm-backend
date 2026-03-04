@@ -63,7 +63,7 @@ export class FormSuggestionService {
     agentId: bigint,
     saleId: bigint,
     // payload: any
-    productType: SaleProductType,
+    productType: string,
     productData: Record<string, any>
   ) {
     try {
@@ -88,11 +88,9 @@ export class FormSuggestionService {
           field_name: field,
           field_value: String(value).trim()
         });
-
       }
 
       for (const suggestion of suggestions) {
-
         const existing = await tx.agentFormSuggestion.findFirst({
           where: {
             agent_id: suggestion.agent_id,
@@ -103,7 +101,6 @@ export class FormSuggestionService {
         });
 
         if (existing) {
-
           await tx.agentFormSuggestion.update({
             where: { id: existing.id },
             data: {
@@ -116,16 +113,68 @@ export class FormSuggestionService {
           await tx.agentFormSuggestion.create({
             data: suggestion
           });
-
         }
-
       }
+      return true;
 
     } catch (error) {
+      console.log("error", error);
       throw error;
     }
   }
 
+
+  // async getSuggestions(
+  //   agentId: bigint,
+  //   product?: string,
+  //   field?: string,
+  // ) {
+  //   try {
+  //     const where: any = {
+  //       agent_id: agentId,
+  //     };
+  //     if (product) {
+  //       where.product_type = product;
+  //     }
+
+  //     if (field) {
+  //       where.field_name = field;
+  //     }
+
+  //     const suggestions = await this.prisma.agentFormSuggestion.findMany({
+  //       where,
+  //       orderBy: [
+  //         { usage_count: "desc" },
+  //         { last_used_at: "desc" },
+  //       ],
+  //       select: {
+  //         product_type: true,
+  //         field_name: true,
+  //         field_value: true,
+  //       },
+  //     });
+
+  //     if (field) {
+  //       return suggestions.map(s => s.field_value);
+  //     }
+
+  //     const grouped: Record<string, any> = {};
+  //     for (const row of suggestions) {
+  //       if (!grouped[row.product_type]) {
+  //         grouped[row.product_type] = {};
+  //       }
+
+  //       if (!grouped[row.product_type][row.field_name]) {
+  //         grouped[row.product_type][row.field_name] = [];
+  //       }
+  //       grouped[row.product_type][row.field_name].push(row.field_value);
+  //     }
+
+  //     return grouped;
+  //   } catch (error) {
+  //     throw error;
+  //   }
+  // }
 
   async getSuggestions(
     agentId: bigint,
@@ -151,6 +200,7 @@ export class FormSuggestionService {
           { last_used_at: "desc" },
         ],
         select: {
+          sale_id: true,
           product_type: true,
           field_name: true,
           field_value: true,
@@ -158,22 +208,27 @@ export class FormSuggestionService {
       });
 
       if (field) {
-        return suggestions.map(s => s.field_value);
+        return [...new Set(suggestions.map(s => s.field_value))];
       }
 
-      const grouped: Record<string, any> = {};
+      const result: Record<string, any> = {};
       for (const row of suggestions) {
-        if (!grouped[row.product_type]) {
-          grouped[row.product_type] = {};
+        if (!result[row.product_type]) {
+          result[row.product_type] = {};
         }
-
-        if (!grouped[row.product_type][row.field_name]) {
-          grouped[row.product_type][row.field_name] = [];
+        const sale_id = Number(row.sale_id)
+        if (!result[row.product_type][sale_id]) {
+          result[row.product_type][sale_id] = {};
         }
-        grouped[row.product_type][row.field_name].push(row.field_value);
+        result[row.product_type][sale_id][row.field_name] = row.field_value;
       }
 
-      return grouped;
+      const finalResult: Record<string, any[]> = {};
+
+      for (const productType in result) {
+        finalResult[productType] = Object.values(result[productType]);
+      }
+      return finalResult;
     } catch (error) {
       throw error;
     }
