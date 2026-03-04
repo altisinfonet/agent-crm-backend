@@ -23,6 +23,7 @@ import { OrganizationModule } from './organization/organization.module';
 import { LocationModule } from './location/location.module';
 import { AgentModule } from './agent/agent.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { FormSuggestionModule } from './agent-form-suggestion/suggestion.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     LocationModule,
     DashboardModule,
     AgentModule,
+    FormSuggestionModule,
   ],
   controllers: [AppController],
   providers: [AppService, MailService],

@@ -311,6 +311,7 @@ model User {
     meetings                Meeting[]
     inAppNotifications      InAppNotifications[]
     toDos                   ToDo[]
+    agentFormSuggestions    AgentFormSuggestion[]
 
     @@index([first_name, last_name, email, phone_no, auth_method, country_id, currency_id])
     @@map("tbl_user")
@@ -582,24 +583,25 @@ model AgentProductEntity {
  */
 
 model AgentSale {
-    id                BigInt               @id @default(autoincrement())
-    org_id            BigInt?
-    organization      Organization?        @relation(fields: [org_id], references: [id])
-    agent_id          BigInt
-    agent             User                 @relation(fields: [agent_id], references: [id])
-    customer_id       BigInt
-    customer          Customer             @relation(fields: [customer_id], references: [id])
-    product_entity_id BigInt
-    productEntity     ProductEntity        @relation(fields: [product_entity_id], references: [id])
-    sale_date         DateTime             @default(now())
-    status            Status               @default(ACTIVE)
-    created_at        DateTime             @default(now())
-    updated_at        DateTime             @updatedAt
-    fixedDeposit      ProductFixedDeposit?
-    insurance         ProductInsurance?
-    mutualFund        ProductMutualFund?
-    realEstate        ProductRealEstate?
-    saleDocuments     SaleDocument[]
+    id                   BigInt                @id @default(autoincrement())
+    org_id               BigInt?
+    organization         Organization?         @relation(fields: [org_id], references: [id])
+    agent_id             BigInt
+    agent                User                  @relation(fields: [agent_id], references: [id])
+    customer_id          BigInt
+    customer             Customer              @relation(fields: [customer_id], references: [id])
+    product_entity_id    BigInt
+    productEntity        ProductEntity         @relation(fields: [product_entity_id], references: [id])
+    sale_date            DateTime              @default(now())
+    status               Status                @default(ACTIVE)
+    created_at           DateTime              @default(now())
+    updated_at           DateTime              @updatedAt
+    fixedDeposit         ProductFixedDeposit?
+    insurance            ProductInsurance?
+    mutualFund           ProductMutualFund?
+    realEstate           ProductRealEstate?
+    saleDocuments        SaleDocument[]
+    agentFormSuggestions AgentFormSuggestion[]
 
     @@index([agent_id, customer_id, product_entity_id, sale_date, status])
     @@map("tbl_agent_sale")
@@ -755,6 +757,23 @@ model SaleDocument {
 
     @@index([sale_id])
     @@map("tbl_sale_documents")
+}
+
+model AgentFormSuggestion {
+    id           BigInt          @id @default(autoincrement())
+    sale_id      BigInt
+    sale         AgentSale       @relation(fields: [sale_id], references: [id], onDelete: Cascade)
+    agent_id     BigInt
+    agent        User            @relation(fields: [agent_id], references: [id], onDelete: Cascade)
+    product_type SaleProductType
+    field_name   String
+    field_value  String
+    usage_count  Int             @default(1)
+    last_used_at DateTime        @updatedAt
+    created_at   DateTime        @default(now())
+
+    @@index([agent_id, product_type, field_name])
+    @@map("tbl_agent_form_suggestions")
 }
 
 enum SaleProductType {

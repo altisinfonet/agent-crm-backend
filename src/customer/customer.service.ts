@@ -5,16 +5,18 @@ import { PrismaService } from '@/prisma/prisma.service';
 import { isValidImageBuffer, validateSafePdf } from '@/common/config/multer.config';
 import { extname, basename } from 'path';
 import { R2Service } from '@/common/helper/r2.helper';
-import { CustomerStatus, Prisma } from '@generated/prisma';
+import { CustomerStatus, Prisma, SaleProductType } from '@generated/prisma';
 import slugify from 'slugify';
 import * as fs from 'fs';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
+import { FormSuggestionService } from '@/agent-form-suggestion/suggestion.service';
 
 @Injectable()
 export class CustomerService {
   constructor(
     private prisma: PrismaService,
+    private formSuggestionService: FormSuggestionService,
   ) { }
 
   async sanitizeFileName(filename: string) {
@@ -791,18 +793,42 @@ export class CustomerService {
         switch (productEntity.products.slug) {
           case "fixed-deposit":
             await this.createFixedDepositSale(tx, sale.id, product_data);
+            await this.formSuggestionService.createSuggestions(
+              agent_id,
+              sale.id,
+              SaleProductType.FIXED_DEPOSIT,
+              product_data
+            );
             break;
 
           case "insurance":
             await this.createInsuranceSale(tx, sale.id, product_data);
+            await this.formSuggestionService.createSuggestions(
+              agent_id,
+              sale.id,
+              SaleProductType.INSURANCE,
+              product_data
+            );
             break;
 
           case "mutual-funds":
             await this.createMutualFundSale(tx, sale.id, product_data);
+            await this.formSuggestionService.createSuggestions(
+              agent_id,
+              sale.id,
+              SaleProductType.MUTUAL_FUND,
+              product_data
+            );
             break;
 
           case "real-estate":
             await this.createRealEstateSale(tx, sale.id, product_data);
+            await this.formSuggestionService.createSuggestions(
+              agent_id,
+              sale.id,
+              SaleProductType.REAL_ESTATE,
+              product_data
+            );
             break;
 
           default:
@@ -1317,19 +1343,59 @@ export class CustomerService {
         const productSlug = sale.productEntity.products.slug;
         switch (productSlug) {
           case "fixed-deposit":
+            const existingFD = await tx.productFixedDeposit.findUnique({
+              where: { sale_id }
+            });
             await this.updateFixedDepositSale(tx, sale_id, product_data);
+            const changedFDfields = this.getChangedFields(existingFD, product_data);
+            await this.formSuggestionService.createSuggestions(
+              agent_id,
+              sale_id,
+              SaleProductType.FIXED_DEPOSIT,
+              changedFDfields
+            );
             break;
 
           case "insurance":
+            const existingInsurance = await tx.productInsurance.findUnique({
+              where: { sale_id }
+            });
             await this.updateInsuranceSale(tx, sale_id, product_data);
+            const changedFields = this.getChangedFields(existingInsurance, product_data);
+            await this.formSuggestionService.createSuggestions(
+              agent_id,
+              sale_id,
+              SaleProductType.INSURANCE,
+              changedFields
+            );
             break;
 
           case "mutual-funds":
+            const existingMF = await tx.productMutualFund.findUnique({
+              where: { sale_id }
+            });
             await this.updateMutualFundSale(tx, sale_id, product_data);
+            const changedMFfields = this.getChangedFields(existingMF, product_data);
+            await this.formSuggestionService.createSuggestions(
+              agent_id,
+              sale_id,
+              SaleProductType.MUTUAL_FUND,
+              changedMFfields
+            );
             break;
 
           case "real-estate":
+            const existingRE = await tx.productRealEstate.findUnique({
+              where: { sale_id }
+            });
             await this.updateRealEstateSale(tx, sale_id, product_data);
+            const changedREfields = this.getChangedFields(existingRE, product_data);
+            await this.formSuggestionService.createSuggestions(
+              agent_id,
+              sale_id,
+              SaleProductType.REAL_ESTATE,
+              changedREfields
+            );
             break;
 
           default:
@@ -1341,6 +1407,16 @@ export class CustomerService {
     } catch (error) {
       throw error;
     }
+  }
+
+  private getChangedFields(oldData: any, newData: any) {
+    const changed: Record<string, any> = {};
+    for (const key in newData) {
+      if (newData[key] !== oldData[key]) {
+        changed[key] = newData[key];
+      }
+    }
+    return changed;
   }
 
   private async updateFixedDepositSale(
