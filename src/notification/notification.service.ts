@@ -13,6 +13,62 @@ export class NotificationService {
     private FirebaseAdmin: FirebaseAdminService,
   ) { }
 
+  private buildDataPayload(
+    url?: string,
+    data?: Record<string, any>,
+  ): Record<string, string> {
+    const payload: Record<string, string> = {};
+
+    if (url !== undefined) {
+      payload.url = url || '';
+    }
+
+    if (data) {
+      for (const [key, value] of Object.entries(data)) {
+        if (value === undefined || value === null) continue;
+        payload[key] = String(value);
+      }
+    }
+
+    return payload;
+  }
+
+  private async sendToTokens(
+    deviceTokens: string[],
+    title: string,
+    body: string,
+    options?: {
+      url?: string;
+      data?: Record<string, any>;
+    },
+  ) {
+    if (!deviceTokens || deviceTokens.length === 0) {
+      throw new BadRequestException("No token found.");
+    }
+
+    const dataPayload = this.buildDataPayload(options?.url, options?.data);
+    const message: any = {
+      notification: {
+        title,
+        body,
+      },
+      tokens: deviceTokens,
+    };
+
+    if (Object.keys(dataPayload).length > 0) {
+      message.data = dataPayload;
+    }
+
+    const response = await this.FirebaseAdmin.messaging().sendEachForMulticast(message);
+    const results = response.responses.map((res: any, index: number) => ({
+      token: deviceTokens[index],
+      success: res.success,
+      error: res.error?.message,
+    }));
+
+    return results
+  }
+
   async AddFCMToken(user_id: bigint, dto: CommonDto) {
     try {
       const { tokens: deviceToken } = decryptData(dto?.data);
@@ -51,23 +107,29 @@ export class NotificationService {
   async sendNotification(sendNotificationDto: CommonDto) {
     try {
       const { deviceTokens, title, body, url } = decryptData(sendNotificationDto?.data);
-      const message = {
-        notification: {
-          title,
-          body,
-        },
-        data: { url: url || '' },
-        tokens: deviceTokens,
-      };
+      return await this.sendToTokens(deviceTokens, title, body, { url: url || '' });
+    } catch (error) {
+      throw error
+    }
+  }
 
-      const response = await this.FirebaseAdmin.messaging().sendEachForMulticast(message);
-      const results = response.responses.map((res: any, index: any) => ({
-        token: deviceTokens[index],
-        success: res.success,
-        error: res.error?.message,
-      }));
+  async sendUserPushNotification(
+    user_id: bigint,
+    title: string,
+    body: string,
+    data?: Record<string, any>,
+    url?: string,
+  ) {
+    try {
+      const tokens = await this.prisma.userFCMToken.findMany({
+        where: { user_id },
+        select: { token: true },
+      });
 
-      return results
+      const deviceTokens = tokens.map((t) => t.token).filter(Boolean);
+      if (!deviceTokens.length) return [];
+
+      return await this.sendToTokens(deviceTokens, title, body, { url, data });
     } catch (error) {
       throw error
     }
@@ -290,7 +352,7 @@ export class NotificationService {
               'HBD',
               'Happy Birthday 🎉',
               `Happy Birthday ${user_name}! 🎂
-               Wishing you a great year ahead.`,
+              Wishing you a great year ahead.`,
               {
                 action: 'birthday',
                 year: currentYear,

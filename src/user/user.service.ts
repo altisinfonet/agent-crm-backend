@@ -245,6 +245,7 @@ export class UserService {
                         'CANCELLED',
                         "TRIAL",
                         'PENDING',
+                        'EXPIRED',
                         'INCOMPLETE',
                       ],
                     },

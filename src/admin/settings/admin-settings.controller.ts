@@ -20,14 +20,15 @@ import {
 @ApiTags('Admin - Settings')
 @ApiBearerAuth('access-token')
 @Controller({ path: '', version: '1' })
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN, Role.AGENT)
+
 export class AdminSettingsController {
 
   constructor(
     private readonly adminSettingsService: AdminSettingsService,
   ) { }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
   @Post()
   @ApiOperation({ summary: 'Create admin settings (Admin)' })
   @ApiBody({ type: CommonDto })
@@ -53,6 +54,8 @@ export class AdminSettingsController {
     }
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.AGENT)
   @Get()
   @ApiOperation({ summary: 'Get admin settings (Admin)' })
   @SwaggerApiResponse({ status: 200, description: 'Settings fetched successfully' })
@@ -85,7 +88,8 @@ export class AdminSettingsController {
     return this.adminSettingsService.findOne(+id);
   }
 
-
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
   @Patch(':id')
   @ApiOperation({ summary: 'Update admin settings (Admin)' })
   @ApiParam({ name: 'id', example: 1 })

@@ -12,35 +12,40 @@ export class FirebaseAdminService implements OnModuleInit {
     }
 
     private async initializeFirebase() {
-        if (FCMAdmin.apps.length) return;
+        try {
+            if (FCMAdmin.apps.length) return;
 
-        const settings = await this.prisma.adminSettings.findFirst({
-            where: { title: 'app-settings' },
-        });
+            const settings = await this.prisma.adminSettings.findFirst({
+                where: { title: 'firebase-settings' },
+            });
 
-        if (!settings || !settings.metadata) {
-            // throw new Error("App settings or metadata not found.");
-            return "App settings or metadata not found.";
+            if (!settings || !settings.metadata) {
+                // throw new Error("App settings or metadata not found.");
+                return "App settings or metadata not found.";
+            }
+
+            const metadata = settings.metadata as Record<string, any>;
+            const firebasePrivateKey = metadata?.firebasePrivateKey;
+            if (!firebasePrivateKey) {
+                return 'Firebase private key not found.';
+            }
+
+            const firebaseCreds =
+                typeof firebasePrivateKey === 'string'
+                    ? JSON.parse(firebasePrivateKey)
+                    : firebasePrivateKey;
+
+
+            if (firebaseCreds.private_key?.includes('\\n')) {
+                firebaseCreds.private_key = firebaseCreds.private_key.replace(/\\n/g, '\n');
+            }
+
+            FCMAdmin.initializeApp({
+                credential: FCMAdmin.credential.cert(firebaseCreds),
+            });
+        } catch (error) {
+            console.error(error);
         }
-        const metadata = settings.metadata as Record<string, any>;
-        const firebasePrivateKey = metadata?.firebasePrivateKey;
-        if (!firebasePrivateKey) {
-            return 'Firebase private key not found.';
-        }
-
-        const firebaseCreds =
-            typeof firebasePrivateKey === 'string'
-                ? JSON.parse(firebasePrivateKey)
-                : firebasePrivateKey;
-
-
-        if (firebaseCreds.private_key?.includes('\\n')) {
-            firebaseCreds.private_key = firebaseCreds.private_key.replace(/\\n/g, '\n');
-        }
-
-        FCMAdmin.initializeApp({
-            credential: FCMAdmin.credential.cert(firebaseCreds),
-        });
     }
 
     messaging(): FCMAdmin.messaging.Messaging {

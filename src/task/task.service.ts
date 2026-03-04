@@ -7,6 +7,7 @@ import { NotificationService } from '@/notification/notification.service';
 import { MailService } from '@/mail/mail.service';
 import { addWeeks, addMonths, addYears, differenceInCalendarDays } from 'date-fns';
 import { SubscriptionCycle, SubscriptionStatus } from '@generated/prisma';
+import { MeetingService } from '@/meeting/meeting.service';
 
 
 @Injectable()
@@ -17,6 +18,7 @@ export class TaskService {
         private readonly prisma: PrismaService,
         private readonly settingsService: SettingsService,
         private readonly notificationService: NotificationService,
+        private readonly meetingService: MeetingService,
         private readonly mailService: MailService,
     ) { }
     // async onModuleInit() {
@@ -442,5 +444,11 @@ export class TaskService {
     async sendBirthdayNotifications() {
         this.logger.log('Running birthday notification job');
         await this.notificationService.sendHBDNotifications();
+    }
+
+    @Cron(CronExpression.EVERY_DAY_AT_10AM)
+    async sendMeetingReminderNotifications() {
+        this.logger.log('Running Meeting Reminder notification job');
+        await this.meetingService.sendMeetingReminderNotifications();
     }
 }

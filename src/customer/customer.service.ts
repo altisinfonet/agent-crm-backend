@@ -791,6 +791,7 @@ export class CustomerService {
           case "fixed-deposit":
             await this.createFixedDepositSale(tx, sale.id, product_data);
             await this.formSuggestionService.createSuggestions(
+              tx,
               agent_id,
               sale.id,
               SaleProductType.FIXED_DEPOSIT,
@@ -801,6 +802,7 @@ export class CustomerService {
           case "insurance":
             await this.createInsuranceSale(tx, sale.id, product_data);
             await this.formSuggestionService.createSuggestions(
+              tx,
               agent_id,
               sale.id,
               SaleProductType.INSURANCE,
@@ -811,6 +813,7 @@ export class CustomerService {
           case "mutual-funds":
             await this.createMutualFundSale(tx, sale.id, product_data);
             await this.formSuggestionService.createSuggestions(
+              tx,
               agent_id,
               sale.id,
               SaleProductType.MUTUAL_FUND,
@@ -821,6 +824,7 @@ export class CustomerService {
           case "real-estate":
             await this.createRealEstateSale(tx, sale.id, product_data);
             await this.formSuggestionService.createSuggestions(
+              tx,
               agent_id,
               sale.id,
               SaleProductType.REAL_ESTATE,
@@ -1346,6 +1350,7 @@ export class CustomerService {
             await this.updateFixedDepositSale(tx, sale_id, product_data);
             const changedFDfields = this.getChangedFields(existingFD, product_data);
             await this.formSuggestionService.createSuggestions(
+              tx,
               agent_id,
               sale_id,
               SaleProductType.FIXED_DEPOSIT,
@@ -1360,6 +1365,7 @@ export class CustomerService {
             await this.updateInsuranceSale(tx, sale_id, product_data);
             const changedFields = this.getChangedFields(existingInsurance, product_data);
             await this.formSuggestionService.createSuggestions(
+              tx,
               agent_id,
               sale_id,
               SaleProductType.INSURANCE,
@@ -1374,6 +1380,7 @@ export class CustomerService {
             await this.updateMutualFundSale(tx, sale_id, product_data);
             const changedMFfields = this.getChangedFields(existingMF, product_data);
             await this.formSuggestionService.createSuggestions(
+              tx,
               agent_id,
               sale_id,
               SaleProductType.MUTUAL_FUND,
@@ -1388,6 +1395,7 @@ export class CustomerService {
             await this.updateRealEstateSale(tx, sale_id, product_data);
             const changedREfields = this.getChangedFields(existingRE, product_data);
             await this.formSuggestionService.createSuggestions(
+              tx,
               agent_id,
               sale_id,
               SaleProductType.REAL_ESTATE,

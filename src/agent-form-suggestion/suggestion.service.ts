@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { CreateAgentFormSuggestionDto } from './dto/create-agent-form-suggestion.dto';
 import { UpdateAgentFormSuggestionDto } from './dto/update-agent-form-suggestion.dto';
 import { PrismaService } from '@/prisma/prisma.service';
-import { SaleProductType } from '@generated/prisma';
+import { Prisma, SaleProductType } from '@generated/prisma';
 import { SUGGESTION_FIELDS } from './suggestion-fields.config';
 
 @Injectable()
@@ -59,6 +59,7 @@ export class FormSuggestionService {
 
 
   async createSuggestions(
+    tx: Prisma.TransactionClient,
     agentId: bigint,
     saleId: bigint,
     // payload: any
@@ -92,7 +93,7 @@ export class FormSuggestionService {
 
       for (const suggestion of suggestions) {
 
-        const existing = await this.prisma.agentFormSuggestion.findFirst({
+        const existing = await tx.agentFormSuggestion.findFirst({
           where: {
             agent_id: suggestion.agent_id,
             product_type: suggestion.product_type,
@@ -103,7 +104,7 @@ export class FormSuggestionService {
 
         if (existing) {
 
-          await this.prisma.agentFormSuggestion.update({
+          await tx.agentFormSuggestion.update({
             where: { id: existing.id },
             data: {
               usage_count: { increment: 1 },
@@ -112,8 +113,7 @@ export class FormSuggestionService {
           });
 
         } else {
-
-          await this.prisma.agentFormSuggestion.create({
+          await tx.agentFormSuggestion.create({
             data: suggestion
           });
 

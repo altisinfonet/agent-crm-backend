@@ -1,14 +1,17 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { CommonDto } from 'src/auth/dto/common.dto';
 import { createNotification, decryptData } from '@/common/helper/common.helper';
 import { MailService } from 'src/mail/mail.service';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { NotificationService } from '@/notification/notification.service';
 
 @Injectable()
 export class MeetingService {
   constructor(
     private readonly prisma: PrismaService,
-    private mailService: MailService
+    private mailService: MailService,
+    private notificationService: NotificationService,
   ) { }
 
   async create(agent_id: bigint, createMeetingDto: CommonDto) {
@@ -77,6 +80,17 @@ export class MeetingService {
               status: createdMeeting.status,
               action: 'created',
             }
+          );
+
+          await this.notificationService.sendUserPushNotification(
+            agent_id,
+            notification?.title,
+            notification?.desc,
+            {
+              meeting_id: createdMeeting.id,
+              status: createdMeeting.status,
+              action: 'created',
+            },
           );
         } catch (error) {
           console.error("Error sending metting email", error);
@@ -321,6 +335,17 @@ export class MeetingService {
                 action: 'updated',
               }
             );
+
+            await this.notificationService.sendUserPushNotification(
+              agent_id,
+              notification.title,
+              notification.desc,
+              {
+                meeting_id: updatedMeeting.id,
+                status: updatedMeeting.status,
+                action: 'updated',
+              },
+            );
           }
         } catch (error) {
           console.error("Error sending metting email", error);
@@ -422,6 +447,89 @@ export class MeetingService {
             },
           });
         }
+      }
+
+      return true;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  async sendMeetingReminderNotifications() {
+    try {
+      const now = new Date();
+      const DEFAULT_REMINDER_MINUTES = 60;
+
+      const meetings = await this.prisma.meeting.findMany({
+        where: {
+          status: {
+            in: ["SCHEDULED", "POSTPONED"],
+          },
+          reminder_sent: false,
+          start_time: {
+            gte: now,
+          },
+        },
+        select: {
+          id: true,
+          agent_id: true,
+          title: true,
+          start_time: true,
+          status: true,
+          reminder_before: true,
+        },
+      });
+
+      for (const meeting of meetings) {
+        const reminderMinutes =
+          meeting.reminder_before !== null && meeting.reminder_before !== undefined
+            ? meeting.reminder_before
+            : DEFAULT_REMINDER_MINUTES;
+
+        const reminderTime = new Date(
+          meeting.start_time.getTime() - reminderMinutes * 60 * 1000
+        );
+
+        if (now < reminderTime) continue;
+
+        const minutesLeft = Math.max(
+          0,
+          Math.round((meeting.start_time.getTime() - now.getTime()) / 60000)
+        );
+
+        const title = "Meeting reminder";
+        const desc =
+          minutesLeft > 1
+            ? `Your meeting on "${meeting.title}" starts in ${minutesLeft} minutes.`
+            : `Your meeting on "${meeting.title}" starts soon.`;
+
+        await createNotification(
+          meeting.agent_id,
+          'MEETING',
+          title,
+          desc,
+          {
+            meeting_id: meeting.id,
+            status: meeting.status,
+            action: 'reminder',
+          }
+        );
+
+        await this.notificationService.sendUserPushNotification(
+          meeting.agent_id,
+          title,
+          desc,
+          {
+            meeting_id: meeting.id,
+            status: meeting.status,
+            action: 'reminder',
+          },
+        );
+
+        await this.prisma.meeting.update({
+          where: { id: meeting.id },
+          data: { reminder_sent: true },
+        });
       }
 
       return true;
