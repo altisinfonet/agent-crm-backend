@@ -77,7 +77,6 @@ const upload = multer({
 export async function isValidImageBuffer(buffer: Buffer): Promise<boolean> {
     try {
         const data = await sharp(buffer).metadata();
-        console.log("data", data);
         return true;
     } catch (error: any) {
         console.log("erorr", error);

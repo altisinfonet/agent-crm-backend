@@ -260,8 +260,6 @@ export class UserService {
           },
         });
 
-        // console.log("agentData++++", agentData?.organizations?.[0]?.subscription?.[0]);
-
         // const subscriptionStatus =
         //   agentData?.organizations?.[0]?.subscription?.[0]?.status ?? null;
 

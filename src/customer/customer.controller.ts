@@ -115,7 +115,7 @@ export class CustomerController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Product sell to customer."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log("Error", error);
+      console.log("error", error);
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }
@@ -240,7 +240,7 @@ export class CustomerController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Document uploaded"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log("Error", error);
+      console.log("error", error);
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }

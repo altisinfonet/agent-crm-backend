@@ -194,7 +194,6 @@ export class SubscriptionService {
   //     };
   //     try {
   //       const rzpSub = await this.razorpay.subscriptions.create(rzpPayload);
-  //       console.log("rzpSub+++++++++", rzpSub);
 
   //       const orgSubscription =
   //         await this.prisma.organizationSubscription.create({
@@ -645,7 +644,6 @@ export class SubscriptionService {
         .createHmac("sha256", settings?.RAZORPAY_KEY_SECRET)
         .update(`${payment_id}|${subscription_id}`)
         .digest("hex");
-      console.log("generatedSignature", generatedSignature);
 
       if (generatedSignature !== payment_signature) {
         throw new BadRequestException("Invalid payment signature");
@@ -653,8 +651,6 @@ export class SubscriptionService {
 
       const rzpSubscription =
         await razorpay.subscriptions.fetch(subscription_id);
-
-      console.log("rzpSubscription", rzpSubscription);
 
       /* ---------------- FIND ORG SUBSCRIPTION ---------------- */
       const orgSubscription =
@@ -665,7 +661,6 @@ export class SubscriptionService {
       if (!orgSubscription) {
         throw new NotFoundException("Subscription not found");
       }
-      console.log("orgSubscription", orgSubscription);
 
       /* ---------------- IDP CHECK (SAFETY) ---------------- */
       if (orgSubscription.rzp_payment_id) {
@@ -1451,7 +1446,6 @@ export class SubscriptionService {
 
   async getSubscriptionInvoices(user_id: bigint, subscription_id: bigint) {
     try {
-      console.log("subscription_id", subscription_id);
 
       const org = await this.prisma.organization.findUnique({
         where: { created_by: user_id },
@@ -1474,14 +1468,10 @@ export class SubscriptionService {
         }
       })
 
-      console.log("orgSubscription", orgSubscription);
-
 
       if (orgSubscription === null || !orgSubscription.rzp_subscription_id) {
         throw new BadRequestException("No active subscription found for this organization");
       }
-
-      console.log("orgSubscription.rzp_subscription_id", orgSubscription.rzp_subscription_id);
 
       const razorpay = await this.getRazorpayInstance();
 

@@ -14,9 +14,6 @@ export class SubscriptionGuard implements CanActivate {
         const request = context.switchToHttp().getRequest();
         const userId = request.user?.userId;
 
-        console.log("userId", request.user);
-
-
         if (!userId) {
             throw new ForbiddenException('Unauthorized');
         }

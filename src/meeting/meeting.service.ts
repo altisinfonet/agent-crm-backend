@@ -24,7 +24,6 @@ export class MeetingService {
         meetingType,
         reminderBefore,
       } = payload;
-      console.log("payload++++++++", payload);
 
       if (!title || !start_time) {
         throw new BadRequestException("Title and start time are required");

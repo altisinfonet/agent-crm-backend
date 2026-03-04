@@ -39,7 +39,7 @@ export class AgentController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Agents fetched successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log("Error fetching agent list:", error);
+      console.log("error:", error);
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }
@@ -61,7 +61,7 @@ export class AgentController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Agent details fetched successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log("Error fetching agent details:", error);
+      console.log("error:", error);
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }
@@ -88,7 +88,7 @@ export class AgentController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Agent details updated successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log("Error updating agent details:", error);
+      console.log("error:", error);
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }
@@ -110,7 +110,7 @@ export class AgentController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Agent details deleted successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log("Error deleting agent details:", error);
+      console.log("error:", error);
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }

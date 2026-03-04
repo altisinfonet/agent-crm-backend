@@ -57,7 +57,6 @@ export class CountryService {
   async bulkCreate(createCountryDto: CommonDto) {
     try {
       const { data: payload } = decryptData(createCountryDto.data)
-      console.log("payload", payload);
 
       if (!Array.isArray(payload) || !payload.length) {
         throw new BadRequestException('Invalid payload');

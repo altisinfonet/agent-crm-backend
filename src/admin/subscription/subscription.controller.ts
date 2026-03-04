@@ -38,7 +38,6 @@ export class SubscriptionController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription plan synced successfully."));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
-      console.log("Error syncing plan sync", error);
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }

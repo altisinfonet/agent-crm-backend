@@ -29,7 +29,6 @@ export class SubscriptionService {
 
   // private async initRazorpay() {
   //   const RazorpaySetting = await this.settingsService.paymentSettings("payment-settings");
-  //   console.log("RazorpaySetting+++++++", RazorpaySetting);
 
   //   this.razorpay = new Razorpay({
   //     key_id: RazorpaySetting.RAZORPAY_KEY_ID,
@@ -250,7 +249,6 @@ export class SubscriptionService {
   async adminUpgradeSubscription(dto: CommonDto) {
     try {
       const payload = decryptData(dto.data);
-      console.log("payload", payload);
 
       const { orgId, planId, endDate } = payload;
 
@@ -277,7 +275,6 @@ export class SubscriptionService {
             status: "ACTIVE"
           }
         });
-        console.log("activeSub", activeSub);
 
         if (activeSub && activeSub.source === "ADMIN") {
           await tx.organizationSubscription.update({

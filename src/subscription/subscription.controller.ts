@@ -64,8 +64,7 @@ export class SubscriptionController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription initiated"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error) {
-      console.log("Error initiating subscription", error);
-
+      console.log("error", error);
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }
@@ -88,14 +87,10 @@ export class SubscriptionController {
         typeof value === 'bigint' ? value.toString() : value,
       );
 
-      console.log("payment", payment);
-      console.log("result", result);
-
-
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription payment initiated"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error) {
-      console.log("error:::::::", error);
+      console.log("error", error);
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }
@@ -166,7 +161,7 @@ export class SubscriptionController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription upgraded"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error) {
-      console.log("Failed to upgrade subscription", error);
+      console.log("error", error);
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }
@@ -190,7 +185,7 @@ export class SubscriptionController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription cancelled"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error) {
-      console.log("Failed to cancel subscription", error);
+      console.log("error", error);
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }
@@ -212,7 +207,7 @@ export class SubscriptionController {
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Subscription cancelled"));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error) {
-      console.log("Failed to cancel subscription", error);
+      console.log("error", error);
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }

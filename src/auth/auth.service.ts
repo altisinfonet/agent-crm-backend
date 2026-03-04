@@ -74,7 +74,6 @@ export class AuthService {
     async auth(commonDto: CommonDto, req: Request): Promise<Tokens> {
         try {
             const payload = decryptData(commonDto.data);
-            console.log("payload", payload);
 
             const {
                 auth_method,

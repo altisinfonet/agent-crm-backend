@@ -764,10 +764,7 @@ export class CustomerService {
   ) {
     try {
       const payload = decryptData(sellProductDto.data);
-      console.log("agent_id", agent_id);
-
       const { product_data } = payload;
-      console.log("product_data", product_data);
 
       const org = await this.prisma.organization.findUnique({
         where: { created_by: agent_id },
@@ -1577,8 +1574,6 @@ export class CustomerService {
   //   sale_id: bigint,
   //   files: any
   // ) {
-  //   console.log("files++++++", files);
-
   //   const org = await this.prisma.organization.findUnique({
   //     where: { created_by: agent_id },
   //     select: { id: true },
@@ -1629,7 +1624,6 @@ export class CustomerService {
 
   //   const documentKeys: string[] = [];
   //   for (const file of uploadedFiles) {
-  //     console.log("file++++++", file);
 
   //     const safeName = file.originalname;
 
