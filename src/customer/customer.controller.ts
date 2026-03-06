@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpStatus, BadRequestException, Res, UseGuards, Put, UseInterceptors, UploadedFile, UploadedFiles, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, HttpStatus, BadRequestException, Res, UseGuards, Put, UseInterceptors, UploadedFiles, Query } from '@nestjs/common';
 import { CustomerService } from './customer.service';
 import { CommonDto } from '@/auth/dto/common.dto';
 import { decryptData, encryptData } from '@/common/helper/common.helper';
@@ -18,9 +18,36 @@ import {
   ApiBody,
   ApiResponse as SwaggerApiResponse,
 } from '@nestjs/swagger';
-import { documentFileFilter, imageFileFilter, upload } from '@/common/config/multer.config';
-import { FileFieldsInterceptor, FileInterceptor } from '@nestjs/platform-express';
+import { documentFileFilter, imageFileFilter } from '@/common/config/multer.config';
+import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { SubscriptionGuard } from '@/common/guards/subscription.guard';
+
+const customerUploadOptions: multer.Options = {
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const imageOnlyFields = [
+      'image',
+      'pan_image',
+      'aadhar_front',
+      'aadhar_back',
+      'cancelled_cheque_photo',
+    ];
+
+    if (imageOnlyFields.includes(file.fieldname)) {
+      return imageFileFilter(req, file, cb);
+    }
+
+    if (file.fieldname === 'supporting_documents') {
+      if (file.mimetype?.startsWith('image/')) {
+        return imageFileFilter(req, file, cb);
+      }
+      return documentFileFilter(req, file, cb);
+    }
+
+    cb(new BadRequestException('Invalid upload field'), false);
+  },
+};
 
 @ApiTags('Agent - Customers')
 @ApiBearerAuth('access-token')
@@ -41,8 +68,10 @@ export class CustomerController {
         { name: "pan_image", maxCount: 1 },
         { name: "aadhar_front", maxCount: 1 },
         { name: "aadhar_back", maxCount: 1 },
+        { name: "cancelled_cheque_photo", maxCount: 1 },
+        { name: "supporting_documents", maxCount: 10 },
       ],
-      upload
+      customerUploadOptions
     )
   )
   async create(@Res() res: Response, @GetCurrentUserId() userId: bigint,
@@ -74,8 +103,10 @@ export class CustomerController {
         { name: "pan_image", maxCount: 1 },
         { name: "aadhar_front", maxCount: 1 },
         { name: "aadhar_back", maxCount: 1 },
+        { name: "cancelled_cheque_photo", maxCount: 1 },
+        { name: "supporting_documents", maxCount: 10 },
       ],
-      upload
+      customerUploadOptions
     )
   )
   @SwaggerApiResponse({ status: 200, description: 'Customer details updated successfully' })

@@ -12,8 +12,31 @@ import * as path from 'path';
 import { randomUUID } from 'crypto';
 import { FormSuggestionService } from '@/agent-form-suggestion/suggestion.service';
 
+type CustomerSupportingDocumentUpload = {
+  file_path: string;
+  file_name?: string | null;
+  mime_type?: string | null;
+};
+
 @Injectable()
 export class CustomerService {
+  private readonly supportingDocumentMimeTypes = new Set([
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/webp',
+    'image/gif',
+    'image/heic',
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'text/plain',
+  ]);
+
   constructor(
     private prisma: PrismaService,
     private formSuggestionService: FormSuggestionService,
@@ -26,6 +49,108 @@ export class CustomerService {
       .toLowerCase();
 
     return `${name}${extname(filename).toLowerCase()}`;
+  }
+
+  private extractBankDetails(payload: any) {
+    const bankDetails = payload?.bankDetails ?? payload?.bank_details ?? {};
+
+    return {
+      bankAccountNumber:
+        payload?.bankAccountNumber ??
+        payload?.bank_account_number ??
+        bankDetails?.accountNumber ??
+        bankDetails?.account_number,
+      ifscCode:
+        payload?.ifscCode ??
+        payload?.ifsc_code ??
+        bankDetails?.ifscCode ??
+        bankDetails?.ifsc_code,
+      bankName:
+        payload?.bankName ??
+        payload?.bank_name ??
+        bankDetails?.bankName ??
+        bankDetails?.bank_name,
+      branchName:
+        payload?.branchName ??
+        payload?.branch_name ??
+        bankDetails?.branchName ??
+        bankDetails?.branch_name,
+    };
+  }
+
+  private parseBigIntIds(value: unknown): bigint[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    const ids: bigint[] = [];
+    for (const item of value) {
+      try {
+        if (item !== null && item !== undefined && item !== '') {
+          ids.push(BigInt(item));
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    return ids;
+  }
+
+  private parseStringList(value: unknown): string[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+
+    return value
+      .filter((item): item is string => typeof item === 'string')
+      .map((item) => item.trim())
+      .filter(Boolean);
+  }
+
+  private async uploadSupportingDocuments(
+    supportingDocumentFiles: any[],
+    rootFolder: string,
+  ): Promise<CustomerSupportingDocumentUpload[]> {
+    const uploadedDocuments: CustomerSupportingDocumentUpload[] = [];
+
+    for (let index = 0; index < supportingDocumentFiles.length; index++) {
+      const file = supportingDocumentFiles[index];
+      const mimeType = (file?.mimetype || '').toLowerCase();
+
+      if (!this.supportingDocumentMimeTypes.has(mimeType)) {
+        throw new BadRequestException(
+          `Invalid supporting document: ${file?.originalname || `file-${index + 1}`}`,
+        );
+      }
+
+      if (mimeType.startsWith('image/')) {
+        const isValid = await isValidImageBuffer(file.buffer);
+        if (!isValid) {
+          throw new BadRequestException(
+            `Invalid supporting document image: ${file.originalname}`,
+          );
+        }
+      }
+
+      const sanitizedFileName = await this.sanitizeFileName(
+        file.originalname || `supporting-document-${index + 1}`,
+      );
+
+      const documentKey =
+        `${rootFolder}/supporting_documents/` +
+        `${Date.now()}_${index}_${sanitizedFileName}`;
+
+      await R2Service.upload(file.buffer, documentKey, file.mimetype);
+
+      uploadedDocuments.push({
+        file_path: documentKey,
+        file_name: sanitizedFileName,
+        mime_type: file.mimetype,
+      });
+    }
+
+    return uploadedDocuments;
   }
 
   async create(agent_id: bigint, files: any, createCustomerDto: CommonDto) {
@@ -41,8 +166,12 @@ export class CustomerService {
         panNumber,
         address,
         status,
-        country_id
+        country_id,
+        notes,
+        income,
       } = payload;
+      const { bankAccountNumber, ifscCode, bankName, branchName } =
+        this.extractBankDetails(payload);
 
       const org = await this.prisma.organization.findUnique({
         where: { created_by: agent_id },
@@ -168,6 +297,7 @@ export class CustomerService {
       let pan_image_key: string | null = null;
       let aadhar_front_key: string | null = null;
       let aadhar_back_key: string | null = null;
+      let cancelled_cheque_photo_key: string | null = null;
 
       const safeName = slugify(`${firstName}_${lastName}`, { lower: true });
 
@@ -193,6 +323,8 @@ export class CustomerService {
       const panImageFile = files.pan_image?.[0]
       const aadharFrontImageFile = files.aadhar_front?.[0]
       const aadharBackImageFile = files.aadhar_back?.[0]
+      const cancelledChequeFile = files.cancelled_cheque_photo?.[0];
+      const supportingDocumentFiles = files.supporting_documents || [];
 
       if (imageFile) {
         const isValid = await isValidImageBuffer(imageFile.buffer);
@@ -254,6 +386,26 @@ export class CustomerService {
         );
       }
 
+      if (cancelledChequeFile) {
+        const isValid = await isValidImageBuffer(cancelledChequeFile.buffer);
+        if (!isValid) {
+          throw new BadRequestException('Invalid cancelled cheque image file');
+        }
+        const ext = cancelledChequeFile.mimetype.split("/")[1];
+        cancelled_cheque_photo_key = `${rootFolder}/cancelled_cheque.${ext}`;
+
+        await R2Service.upload(
+          cancelledChequeFile.buffer,
+          cancelled_cheque_photo_key,
+          cancelledChequeFile.mimetype
+        );
+      }
+
+      const supportingDocuments = await this.uploadSupportingDocuments(
+        supportingDocumentFiles,
+        rootFolder,
+      );
+
       const customer = await this.prisma.customer.create({
         data: {
           org_id: org?.id,
@@ -271,8 +423,22 @@ export class CustomerService {
           panImage: pan_image_key,
           aadharFront: aadhar_front_key,
           aadharBack: aadhar_back_key,
+          bank_account_number: bankAccountNumber,
+          bank_ifsc_code: ifscCode,
+          bank_name: bankName,
+          bank_branch_name: branchName,
+          cancelled_cheque_photo: cancelled_cheque_photo_key,
+          notes,
+          income,
           base_folder_path: baseFolderPath,
-          status
+          status,
+          ...(supportingDocuments.length
+            ? {
+              supportingDocuments: {
+                create: supportingDocuments,
+              },
+            }
+            : {}),
         },
       });
 
@@ -302,11 +468,19 @@ export class CustomerService {
         country_id,
         status: newStatus,
         reason,
+        notes,
+        income,
         removeImage,
         removePanImage,
         removeAadharFront,
         removeAadharBack,
+        removeCancelledChequePhoto,
+        removeSupportingDocumentIds,
+        removeSupportingDocumentPaths,
+        removeAllSupportingDocuments,
       } = payload;
+      const { bankAccountNumber, ifscCode, bankName, branchName } =
+        this.extractBankDetails(payload);
 
       const org = await this.prisma.organization.findUnique({
         where: { created_by: agent_id },
@@ -331,6 +505,14 @@ export class CustomerService {
           id: customer_id,
           org_id: org.id,
         },
+        include: {
+          supportingDocuments: {
+            select: {
+              id: true,
+              file_path: true,
+            },
+          },
+        },
       });
 
       if (!customer) {
@@ -342,6 +524,8 @@ export class CustomerService {
       let pan_image_key: string | null = customer.panImage;
       let aadhar_front_key: string | null = customer.aadharFront;
       let aadhar_back_key: string | null = customer.aadharBack;
+      let cancelled_cheque_photo_key: string | null =
+        customer.cancelled_cheque_photo;
 
       const baseimgkey = customer?.base_folder_path || "";
       const rootFolder =
@@ -349,6 +533,38 @@ export class CustomerService {
       /${process.env.IMAGE_PATH}/
       ${process.env.USER_IMAGE_PATH}/
       ${baseimgkey}/${process.env.KYC_IMAGE_PATH}`;
+
+      const imageFile = files?.image?.[0];
+      const panImageFile = files?.pan_image?.[0];
+      const aadharFrontFile = files?.aadhar_front?.[0];
+      const aadharBackFile = files?.aadhar_back?.[0];
+      const cancelledChequeFile = files?.cancelled_cheque_photo?.[0];
+      const supportingDocumentFiles = files?.supporting_documents || [];
+
+      const supportingDocumentIdsToRemove = this.parseBigIntIds(
+        removeSupportingDocumentIds,
+      );
+      const supportingDocumentPathsToRemove = new Set(
+        this.parseStringList(removeSupportingDocumentPaths),
+      );
+      const shouldRemoveAllSupportingDocuments =
+        removeAllSupportingDocuments === true ||
+        removeAllSupportingDocuments === 'true';
+
+      const removableSupportingDocuments = customer.supportingDocuments.filter(
+        (doc) => {
+          if (shouldRemoveAllSupportingDocuments) {
+            return true;
+          }
+
+          const matchesId = supportingDocumentIdsToRemove.some(
+            (id) => id === doc.id,
+          );
+          const matchesPath = supportingDocumentPathsToRemove.has(doc.file_path);
+
+          return matchesId || matchesPath;
+        },
+      );
 
       if (removeImage && customer.image) {
         await R2Service.remove(customer.image);
@@ -370,10 +586,10 @@ export class CustomerService {
         aadhar_back_key = null;
       }
 
-      const imageFile = files?.image?.[0];
-      const panImageFile = files?.pan_image?.[0];
-      const aadharFrontFile = files?.aadhar_front?.[0];
-      const aadharBackFile = files?.aadhar_back?.[0];
+      if (removeCancelledChequePhoto && customer.cancelled_cheque_photo) {
+        await R2Service.remove(customer.cancelled_cheque_photo);
+        cancelled_cheque_photo_key = null;
+      }
 
       if (imageFile) {
         const isValid = await isValidImageBuffer(imageFile.buffer);
@@ -437,6 +653,38 @@ export class CustomerService {
         );
       }
 
+      if (cancelledChequeFile) {
+        const isValid = await isValidImageBuffer(cancelledChequeFile.buffer);
+        if (!isValid) {
+          throw new BadRequestException('Invalid cancelled cheque image file');
+        }
+
+        if (cancelled_cheque_photo_key) {
+          await R2Service.remove(cancelled_cheque_photo_key);
+        }
+
+        const ext = cancelledChequeFile.mimetype.split('/')[1];
+        cancelled_cheque_photo_key = `${rootFolder}/cancelled_cheque.${ext}`;
+
+        await R2Service.upload(
+          cancelledChequeFile.buffer,
+          cancelled_cheque_photo_key,
+          cancelledChequeFile.mimetype,
+        );
+      }
+
+      for (const doc of removableSupportingDocuments) {
+        await R2Service.remove(doc.file_path);
+      }
+
+      const supportingDocumentsToCreate = await this.uploadSupportingDocuments(
+        supportingDocumentFiles,
+        rootFolder,
+      );
+      const removableSupportingDocumentIds = removableSupportingDocuments.map(
+        (doc) => doc.id,
+      );
+
       const updatedCustomer = await this.prisma.$transaction(async (tx) => {
         const updated = await tx.customer.update({
           where: { id: customer_id },
@@ -454,6 +702,13 @@ export class CustomerService {
             panImage: pan_image_key,
             aadharFront: aadhar_front_key,
             aadharBack: aadhar_back_key,
+            bank_account_number: bankAccountNumber,
+            bank_ifsc_code: ifscCode,
+            bank_name: bankName,
+            bank_branch_name: branchName,
+            cancelled_cheque_photo: cancelled_cheque_photo_key,
+            notes,
+            income,
             status: newStatus ?? customer.status,
           },
         });
@@ -481,6 +736,27 @@ export class CustomerService {
               action: 'status_update',
             },
           );
+        }
+
+        if (removableSupportingDocumentIds.length) {
+          await tx.customerSupportingDocument.deleteMany({
+            where: {
+              id: {
+                in: removableSupportingDocumentIds,
+              },
+            },
+          });
+        }
+
+        if (supportingDocumentsToCreate.length) {
+          await tx.customerSupportingDocument.createMany({
+            data: supportingDocumentsToCreate.map((doc) => ({
+              customer_id,
+              file_path: doc.file_path,
+              file_name: doc.file_name,
+              mime_type: doc.mime_type,
+            })),
+          });
         }
 
         return updated;
@@ -759,6 +1035,54 @@ export class CustomerService {
     }
   }
 
+  private async createLoanSale(
+    tx: Prisma.TransactionClient,
+    saleId: bigint,
+    data: any,
+  ) {
+    try {
+      if (!data.loan_type) {
+        throw new BadRequestException("Loan type is required");
+      }
+
+      if (!data.loan_provider_name) {
+        throw new BadRequestException("Loan provider name is required");
+      }
+
+      return tx.productLoan.create({
+        data: {
+          sale_id: saleId,
+          loan_type: data.loan_type,
+          loan_provider_name: data.loan_provider_name,
+          loan_account_number: data.loan_account_number,
+          loan_amount: data.loan_amount,
+          interest_rate: data.interest_rate,
+          loan_tenure_months: data.loan_tenure_months,
+          emi_amount: data.emi_amount,
+          loan_start_date: data.loan_start_date,
+          loan_end_date: data.loan_end_date,
+          loan_status: data.loan_status,
+          property_value: data.property_value,
+          property_address: data.property_address,
+          vehicle_type: data.vehicle_type,
+          vehicle_brand: data.vehicle_brand,
+          vehicle_model: data.vehicle_model,
+          vehicle_onroad_price: data.vehicle_onroad_price,
+          business_name: data.business_name,
+          business_type: data.business_type,
+          annual_turnover: data.annual_turnover,
+          processing_fee: data.processing_fee,
+          commission_percentage: data.commission_percentage,
+          kyc_status: data.kyc_status,
+          application_status: data.application_status,
+          remarks: data.remarks,
+        },
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
 
   async sellProduct(
     agent_id: bigint,
@@ -836,6 +1160,17 @@ export class CustomerService {
             );
             break;
 
+          case "loan":
+            await this.createLoanSale(tx, sale.id, product_data);
+            await this.formSuggestionService.createSuggestions(
+              tx,
+              agent_id,
+              sale.id,
+              productEntity.products.slug,
+              product_data
+            );
+            break;
+
           default:
             throw new BadRequestException("Unsupported product type");
         }
@@ -895,25 +1230,48 @@ export class CustomerService {
             last_name: true,
             email: true,
             phone: true,
+            date_of_birth: true,
             aadhaar_number: true,
             pan_number: true,
             address: true,
             image: true,
+            bank_account_number: true,
+            bank_ifsc_code: true,
+            bank_name: true,
+            bank_branch_name: true,
+            cancelled_cheque_photo: true,
+            notes: true,
+            income: true,
             status: true,
             country: true,
             created_at: true,
+            _count: {
+              select: {
+                supportingDocuments: true,
+              },
+            },
           },
         }),
         this.prisma.customer.count({ where }),
       ]);
 
       const customersWithImageUrl = await Promise.all(
-        customers.map(async (customer) => ({
-          ...customer,
-          image: customer.image
-            ? await R2Service.getSignedUrl(customer.image)
-            : null,
-        })),
+        customers.map(async (customer) => {
+          const { _count, ...customerData } = customer;
+          const [imageUrl, cancelledChequePhotoUrl] = await Promise.all([
+            customer.image ? R2Service.getSignedUrl(customer.image) : null,
+            customer.cancelled_cheque_photo
+              ? R2Service.getSignedUrl(customer.cancelled_cheque_photo)
+              : null,
+          ]);
+
+          return {
+            ...customerData,
+            image: imageUrl,
+            cancelled_cheque_photo: cancelledChequePhotoUrl,
+            supporting_documents_count: _count.supportingDocuments,
+          };
+        }),
       );
 
       return {
@@ -1129,12 +1487,31 @@ export class CustomerService {
           aadhaar_number: true,
           pan_number: true,
           address: true,
+          bank_account_number: true,
+          bank_ifsc_code: true,
+          bank_name: true,
+          bank_branch_name: true,
+          notes: true,
+          income: true,
           image: true,
           panImage: true,
           aadharFront: true,
           aadharBack: true,
+          cancelled_cheque_photo: true,
           country: true,
           status: true,
+          supportingDocuments: {
+            orderBy: {
+              created_at: 'desc',
+            },
+            select: {
+              id: true,
+              file_path: true,
+              file_name: true,
+              mime_type: true,
+              created_at: true,
+            },
+          },
           statusHistories: {
             select: {
               id: true,
@@ -1169,6 +1546,7 @@ export class CustomerService {
               insurance: true,
               mutualFund: true,
               realEstate: true,
+              loan: true,
             },
           },
           meetings: {
@@ -1200,12 +1578,24 @@ export class CustomerService {
         panImageUrl,
         aadharFrontUrl,
         aadharBackUrl,
+        cancelledChequePhotoUrl,
       ] = await Promise.all([
         customer.image ? R2Service.getSignedUrl(customer.image) : null,
         customer.panImage ? R2Service.getSignedUrl(customer.panImage) : null,
         customer.aadharFront ? R2Service.getSignedUrl(customer.aadharFront) : null,
         customer.aadharBack ? R2Service.getSignedUrl(customer.aadharBack) : null,
+        customer.cancelled_cheque_photo ? R2Service.getSignedUrl(customer.cancelled_cheque_photo) : null,
       ]);
+
+      const supportingDocuments = await Promise.all(
+        customer.supportingDocuments.map(async (doc) => ({
+          id: doc.id.toString(),
+          file_name: doc.file_name,
+          mime_type: doc.mime_type,
+          uploaded_at: doc.created_at,
+          url: await R2Service.getSignedUrl(doc.file_path),
+        })),
+      );
 
       /* -----------------------------
        * 4️⃣ FETCH ALL SALE DOCUMENTS (ONCE)
@@ -1248,6 +1638,8 @@ export class CustomerService {
         panImage: panImageUrl,
         aadharFront: aadharFrontUrl,
         aadharBack: aadharBackUrl,
+        cancelled_cheque_photo: cancelledChequePhotoUrl,
+        supportingDocuments,
 
         agentSales: await Promise.all(
           customer.agentSales.map(async (sale: any) => {
@@ -1303,6 +1695,13 @@ export class CustomerService {
             if (sale.realEstate) {
               formattedSale.realEstate = {
                 ...sale.realEstate,
+                documents: resolvedDocuments,
+              };
+            }
+
+            if (sale.loan) {
+              formattedSale.loan = {
+                ...sale.loan,
                 documents: resolvedDocuments,
               };
             }
@@ -1405,6 +1804,21 @@ export class CustomerService {
               sale_id,
               productSlug,
               changedREfields
+            );
+            break;
+
+          case "loan":
+            const existingLoan = await tx.productLoan.findUnique({
+              where: { sale_id }
+            });
+            await this.updateLoanSale(tx, sale_id, product_data);
+            const changedLoanFields = this.getChangedFields(existingLoan, product_data);
+            await this.formSuggestionService.createSuggestions(
+              tx,
+              agent_id,
+              sale_id,
+              productSlug,
+              changedLoanFields
             );
             break;
 
@@ -1575,6 +1989,46 @@ export class CustomerService {
           loan_required: data?.loan_required,
           commission_percentage: data?.commission_percentage,
           commission_amount: data?.commission_amount,
+        },
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  private async updateLoanSale(
+    tx: Prisma.TransactionClient,
+    sale_id: bigint,
+    data: any,
+  ) {
+    try {
+      return tx.productLoan.update({
+        where: { sale_id },
+        data: {
+          loan_type: data?.loan_type,
+          loan_provider_name: data?.loan_provider_name,
+          loan_account_number: data?.loan_account_number,
+          loan_amount: data?.loan_amount,
+          interest_rate: data?.interest_rate,
+          loan_tenure_months: data?.loan_tenure_months,
+          emi_amount: data?.emi_amount,
+          loan_start_date: data?.loan_start_date,
+          loan_end_date: data?.loan_end_date,
+          loan_status: data?.loan_status,
+          property_value: data?.property_value,
+          property_address: data?.property_address,
+          vehicle_type: data?.vehicle_type,
+          vehicle_brand: data?.vehicle_brand,
+          vehicle_model: data?.vehicle_model,
+          vehicle_onroad_price: data?.vehicle_onroad_price,
+          business_name: data?.business_name,
+          business_type: data?.business_type,
+          annual_turnover: data?.annual_turnover,
+          processing_fee: data?.processing_fee,
+          commission_percentage: data?.commission_percentage,
+          kyc_status: data?.kyc_status,
+          application_status: data?.application_status,
+          remarks: data?.remarks,
         },
       });
     } catch (error) {
@@ -1855,6 +2309,13 @@ export class CustomerService {
         });
         break;
 
+      case "loan":
+        await this.prisma.productLoan.update({
+          where: { sale_id },
+          data: { documents: { push: documentKeys } },
+        });
+        break;
+
       default:
         throw new BadRequestException("Unsupported product type");
     }
@@ -1924,6 +2385,7 @@ export class CustomerService {
       "insurance": "INSURANCE",
       "mutual-funds": "MUTUAL_FUND",
       "real-estate": "REAL_ESTATE",
+      "loan": "LOAN",
     };
 
     const product_type = productTypeMap[product_slug];
@@ -2103,6 +2565,12 @@ export class CustomerService {
 
           case "real-estate":
             await tx.productRealEstate.deleteMany({
+              where: { sale_id },
+            });
+            break;
+
+          case "loan":
+            await tx.productLoan.deleteMany({
               where: { sale_id },
             });
             break;

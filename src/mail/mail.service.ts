@@ -233,7 +233,6 @@ export class MailService {
                     },
                 ],
             });
-            console.log("send+++++++++++", send);
             return true;
         } catch (error) {
             console.error("error:", error);
