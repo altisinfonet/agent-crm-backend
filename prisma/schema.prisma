@@ -467,35 +467,57 @@ model OrganizationUser {
  */
 
 model Customer {
-    id               BigInt                  @id @default(autoincrement())
-    org_id           BigInt
-    organization     Organization            @relation(fields: [org_id], references: [id])
-    created_by       BigInt
-    createdByUser    User                    @relation("CustomerCreatedBy", fields: [created_by], references: [id])
-    first_name       String?
-    last_name        String?
-    email            String?
-    phone            String?
-    date_of_birth    String?
-    country_id       BigInt?
-    country          Country?                @relation(fields: [country_id], references: [id])
-    image            String?
-    aadhaar_number   String?
-    pan_number       String?
-    panImage         String?
-    aadharFront      String?
-    aadharBack       String?
-    address          String?
-    status           CustomerStatus          @default(NEW_LEAD)
-    base_folder_path String?
-    created_at       DateTime                @default(now())
-    updated_at       DateTime                @updatedAt
-    agentSales       AgentSale[]
-    meetings         Meeting[]
-    statusHistories  CustomerStatusHistory[]
+    id                     BigInt                       @id @default(autoincrement())
+    org_id                 BigInt
+    organization           Organization                 @relation(fields: [org_id], references: [id])
+    created_by             BigInt
+    createdByUser          User                         @relation("CustomerCreatedBy", fields: [created_by], references: [id])
+    first_name             String?
+    last_name              String?
+    email                  String?
+    phone                  String?
+    date_of_birth          String?
+    country_id             BigInt?
+    country                Country?                     @relation(fields: [country_id], references: [id])
+    image                  String?
+    aadhaar_number         String?
+    pan_number             String?
+    panImage               String?
+    aadharFront            String?
+    aadharBack             String?
+    address                String?
+    bank_account_number    String?
+    bank_ifsc_code         String?
+    bank_name              String?
+    bank_branch_name       String?
+    cancelled_cheque_photo String?
+    notes                  String?
+    income                 String?
+    status                 CustomerStatus               @default(NEW_LEAD)
+    base_folder_path       String?
+    created_at             DateTime                     @default(now())
+    updated_at             DateTime                     @updatedAt
+    agentSales             AgentSale[]
+    meetings               Meeting[]
+    statusHistories        CustomerStatusHistory[]
+    supportingDocuments    CustomerSupportingDocument[]
 
     @@index([first_name, last_name, email, phone, aadhaar_number, pan_number])
     @@map("tbl_customer")
+}
+
+model CustomerSupportingDocument {
+    id          BigInt   @id @default(autoincrement())
+    customer_id BigInt
+    customer    Customer @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+    file_path   String
+    file_name   String?
+    mime_type   String?
+    created_at  DateTime @default(now())
+    updated_at  DateTime @updatedAt
+
+    @@index([customer_id])
+    @@map("tbl_customer_supporting_documents")
 }
 
 model CustomerStatusHistory {
@@ -602,6 +624,7 @@ model AgentSale {
     insurance            ProductInsurance?
     mutualFund           ProductMutualFund?
     realEstate           ProductRealEstate?
+    loan                 ProductLoan?
     saleDocuments        SaleDocument[]
     agentFormSuggestions AgentFormSuggestion[]
 
@@ -744,6 +767,42 @@ model ProductRealEstate {
     @@map("tbl_product_real_estate")
 }
 
+model ProductLoan {
+    id                    BigInt    @id @default(autoincrement())
+    sale_id               BigInt    @unique
+    sale                  AgentSale @relation(fields: [sale_id], references: [id])
+    loan_type             String
+    loan_provider_name    String
+    loan_account_number   String?
+    loan_amount           String?
+    interest_rate         String?
+    loan_tenure_months    Int?
+    emi_amount            String?
+    loan_start_date       DateTime?
+    loan_end_date         DateTime?
+    loan_status           String?
+    property_value        String?
+    property_address      String?
+    vehicle_type          String?
+    vehicle_brand         String?
+    vehicle_model         String?
+    vehicle_onroad_price  String?
+    business_name         String?
+    business_type         String?
+    annual_turnover       String?
+    processing_fee        String?
+    commission_percentage String?
+    kyc_status            String?
+    application_status    String?
+    remarks               String?
+    documents             String[]
+    created_at            DateTime  @default(now())
+    updated_at            DateTime  @updatedAt
+
+    @@index([loan_type, loan_provider_name])
+    @@map("tbl_product_loan")
+}
+
 model SaleDocument {
     id           BigInt          @id @default(autoincrement())
     sale_id      BigInt
@@ -784,6 +843,7 @@ enum SaleProductType {
     INSURANCE
     MUTUAL_FUND
     REAL_ESTATE
+    LOAN
 }
 
 /**
@@ -812,34 +872,6 @@ model SubscriptionPlan {
     @@index([code, billing_cycle, is_active])
     @@map("tbl_subscription_plan")
 }
-
-// model OrganizationSubscription {
-//     id                        BigInt                 @id @unique @default(autoincrement())
-//     org_id                    BigInt
-//     organization              Organization           @relation(fields: [org_id], references: [id])
-//     plan_id                   BigInt
-//     plan                      SubscriptionPlan       @relation(fields: [plan_id], references: [id])
-//     status                    SubscriptionStatus
-//     source                    SubscriptionSource     @default(RAZORPAY)
-//     start_at                  DateTime
-//     end_at                    DateTime?
-//     auto_renew                Boolean                @default(true)
-//     cancelled_at              DateTime?
-//     rzp_subscription_id       String?                @unique
-//     reconciliation_attempts   Int                    @default(0)
-//     last_reconciled_at        DateTime?
-//     expiry_reminder_days_sent Int[]                  @default([])
-//     rzp_payment_id            String?                @unique
-//     signature                 String?                @unique
-//     created_at                DateTime               @default(now())
-//     upgraded_at               DateTime?
-//     updated_at                DateTime               @updatedAt
-//     razorpaySubscriptions     RazorpaySubscription[]
-
-//     @@unique([org_id, rzp_subscription_id])
-//     @@index([org_id, plan_id, status])
-//     @@map("tbl_org_subscription")
-// }
 
 enum SubscriptionStatus {
     TRIAL

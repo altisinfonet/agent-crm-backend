@@ -77,5 +77,9 @@ export const SUGGESTION_FIELDS = {
         "city",
         "state",
         "builder_name",
+    ],
+
+    "loan": [
+        "loan_provider_name"
     ]
 };

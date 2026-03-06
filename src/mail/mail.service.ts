@@ -210,15 +210,21 @@ export class MailService {
     async sendDataExportEmail(email: string, name: string, reportText: string) {
         try {
             const displayName = name?.trim() || 'User';
+            const textBody =
+                `Hello ${displayName},\n\n` +
+                `Your data request has been approved. Please find your requested data attached in the text file.\n\n` +
+                `Best regards,\n` +
+                `FinMitra Team`;
+            const htmlBody =
+                `<p>Hello ${displayName},</p>` +
+                `<p>Your data request has been approved. Please find your requested data attached in the text file.</p>` +
+                `<p>Best regards,<br/>FinMitra Team</p>`;
 
-            await this.mailer.sendMail({
+            const send = await this.mailer.sendMail({
                 to: email,
                 subject: 'Your requested data report',
-                text:
-                    `Hello ${displayName},\n\n` +
-                    `Your data request has been approved. Please find your requested data attached in the text file.\n\n` +
-                    `Best regards,\n` +
-                    `FinMitra Team`,
+                text: textBody,
+                html: htmlBody,
                 attachments: [
                     {
                         filename: 'data.txt',
@@ -227,8 +233,10 @@ export class MailService {
                     },
                 ],
             });
+            console.log("send+++++++++++", send);
             return true;
         } catch (error) {
+            console.error("error:", error);
             throw error;
         }
     }

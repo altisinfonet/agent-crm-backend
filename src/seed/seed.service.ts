@@ -9,46 +9,46 @@ export class SeedService {
     async seed() {
 
         //Role
-        await this.prisma.role.createMany({
-            data: [
-                {
-                    name: "ADMIN",
-                    description: "admin"
-                },
-                {
-                    name: "AGENT",
-                    description: "agent"
-                },
-            ]
-        })
+        // await this.prisma.role.createMany({
+        //     data: [
+        //         {
+        //             name: "ADMIN",
+        //             description: "admin"
+        //         },
+        //         {
+        //             name: "AGENT",
+        //             description: "agent"
+        //         },
+        //     ]
+        // })
 
 
-        await this.prisma.country.createMany({
-            data: [
-                {
-                    name: "India",
-                    region: "Asia",
-                    iso_code: "IN",
-                    phoneLength: 10,
-                    phone_code: "+91",
-                    timezone: "Asia/Kolkata",
-                    utc_offset_min: 330,
-                    image: "https://cdn.jsdelivr.net/npm/country-flag-emoji-json@2.0.0/dist/images/IN.svg"
-                }
-            ]
-        })
+        // await this.prisma.country.createMany({
+        //     data: [
+        //         {
+        //             name: "India",
+        //             region: "Asia",
+        //             iso_code: "IN",
+        //             phoneLength: 10,
+        //             phone_code: "+91",
+        //             timezone: "Asia/Kolkata",
+        //             utc_offset_min: 330,
+        //             image: "https://cdn.jsdelivr.net/npm/country-flag-emoji-json@2.0.0/dist/images/IN.svg"
+        //         }
+        //     ]
+        // })
 
 
-        await this.prisma.currency.createMany({
-            data: [
-                {
-                    name: "Indian Rupee",
-                    code: "INR",
-                    symbol: "₹",
-                    exchange_rate: 1,
-                }
-            ]
-        })
+        // await this.prisma.currency.createMany({
+        //     data: [
+        //         {
+        //             name: "Indian Rupee",
+        //             code: "INR",
+        //             symbol: "₹",
+        //             exchange_rate: 1,
+        //         }
+        //     ]
+        // })
 
 
         const productsData = [
@@ -170,6 +170,49 @@ export class SeedService {
                     },
                 ],
             },
+            {
+                name: "Loans",
+                slug: "loans",
+                desc: "A financial product where a lender provides money to a borrower that must be repaid with interest over a specified period.",
+                entities: [
+                    {
+                        name: "Personal Loan",
+                        slug: "personal-loan",
+                        desc: "An unsecured loan used for personal expenses like travel, weddings, or medical emergencies."
+                    },
+                    {
+                        name: "Home Loan",
+                        slug: "home-loan",
+                        desc: "A loan taken to purchase, build, or renovate a residential property."
+                    },
+                    {
+                        name: "Business Loan",
+                        slug: "business-loan",
+                        desc: "A loan designed to support business needs such as expansion, working capital, or equipment purchase."
+                    },
+                    {
+                        name: "Loan Against Property",
+                        slug: "loan-against-property",
+                        desc: "A secured loan where residential or commercial property is used as collateral."
+                    },
+                    {
+                        name: "Vehicle Loan",
+                        slug: "vehicle-loan",
+                        desc: "A loan used to purchase vehicles such as cars, bikes, or commercial vehicles."
+                    },
+                    {
+                        name: "Education Loan",
+                        slug: "education-loan",
+                        desc: "A loan provided to students to cover tuition fees, books, and other education-related expenses."
+                    },
+                    {
+                        name: "Gold Loan",
+                        slug: "gold-loan",
+                        desc: "A secured loan where gold jewelry or ornaments are pledged as collateral."
+                    },
+
+                ]
+            }
         ];
 
         // =======================
@@ -197,107 +240,30 @@ export class SeedService {
             });
         }
 
-
-        // await this.prisma.products.createMany({
+        // await this.prisma.user.createMany({
         //     data: [
         //         {
-        //             name: "Life Insurance",
-        //             slug: "life-insurance"
-        //         },
-        //         {
-        //             name: "Medical Insurance",
-        //             slug: "medical-insurance"
-        //         },
-        //         {
-        //             name: "Real - estate",
-        //             slug: "real-estate"
-        //         },
-        //         {
-        //             name: "Mutual Fund",
-        //             slug: "mutual-fund"
+        //             first_name: "Agent",
+        //             last_name: "CRM",
+        //             email: "altisdev1@gmail.com",
+        //             password: await hashPassword("Admin@123"),
+        //             auth_method: "EMAIL_PW",
+        //             role_id: 1,
+        //             currency_id: 1,
+        //             country_id: 1
         //         }
         //     ]
+        // });
+
+        // await this.prisma.adminSettings.create({
+        //     data: {
+        //         title: "payment-settings",
+        //         metadata: {
+        //             razorpayid: "rzp_test_4zb9K0qHh06srW",
+        //             razorpaysecretkey: "B8uxIDjFDuk5MbB9Nq4q9YF8"
+        //         }
+        //     }
         // })
-
-        // await this.prisma.productEntity.createMany({
-        //     data: [
-        //         {
-        //             product_id: 1,
-        //             name: "LIC",
-        //             slug: "lic"
-        //         },
-        //         {
-        //             product_id: 1,
-        //             name: "HDFC Life",
-        //             slug: "hdfc-life"
-        //         },
-        //         {
-        //             product_id: 1,
-        //             name: "ICICI Prudential Life",
-        //             slug: "icici-prudential-life"
-        //         },
-        //         {
-        //             product_id: 2,
-        //             name: "Star Health",
-        //             slug: "star-health"
-        //         },
-        //         {
-        //             product_id: 2,
-        //             name: "HDFC ERGO",
-        //             slug: "hdfc-ergo"
-        //         },
-        //         {
-        //             product_id: 2,
-        //             name: "ICICI Lombard",
-        //             slug: "icici-lombard"
-        //         },
-        //         {
-        //             product_id: 3,
-        //             name: "DLF",
-        //             slug: "dlf"
-        //         },
-        //         {
-        //             product_id: 3,
-        //             name: "Lodha Group",
-        //             slug: "lodha-group"
-        //         },
-        //         {
-        //             product_id: 4,
-        //             name: "SBI Mutual Fund",
-        //             slug: "sbi-mutual-fund"
-        //         },
-        //         {
-        //             product_id: 4,
-        //             name: "HDFC Mutual Fund",
-        //             slug: "hdfc-mutual-fund"
-        //         },
-        //     ]
-        // })
-
-        await this.prisma.user.createMany({
-            data: [
-                {
-                    first_name: "Agent",
-                    last_name: "CRM",
-                    email: "altisdev1@gmail.com",
-                    password: await hashPassword("Admin@123"),
-                    auth_method: "EMAIL_PW",
-                    role_id: 1,
-                    currency_id: 1,
-                    country_id: 1
-                }
-            ]
-        });
-
-        await this.prisma.adminSettings.create({
-            data: {
-                title: "payment-settings",
-                metadata: {
-                    razorpayid: "rzp_test_4zb9K0qHh06srW",
-                    razorpaysecretkey: "B8uxIDjFDuk5MbB9Nq4q9YF8"
-                }
-            }
-        })
 
         console.log('Seed data inserted');
     }
