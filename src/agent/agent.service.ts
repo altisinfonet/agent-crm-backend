@@ -253,6 +253,7 @@ export class AgentService {
           insurance: true,
           mutualFund: true,
           realEstate: true,
+          loan: true,
         },
       });
 
@@ -318,6 +319,11 @@ export class AgentService {
         case "real-estate":
           productKey = "realEstate";
           productData = sale.realEstate;
+          break;
+
+        case "loans":
+          productKey = "loan";
+          productData = sale.loan;
           break;
 
         default:

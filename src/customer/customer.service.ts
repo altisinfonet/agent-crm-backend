@@ -1115,6 +1115,8 @@ export class CustomerService {
           org.id,
           productEntity.id
         );
+        console.log("productEntity.products.slug", productEntity.products.slug);
+
         switch (productEntity.products.slug) {
           case "fixed-deposit":
             await this.createFixedDepositSale(tx, sale.id, product_data);
@@ -1160,7 +1162,7 @@ export class CustomerService {
             );
             break;
 
-          case "loan":
+          case "loans":
             await this.createLoanSale(tx, sale.id, product_data);
             await this.formSuggestionService.createSuggestions(
               tx,
@@ -1807,7 +1809,7 @@ export class CustomerService {
             );
             break;
 
-          case "loan":
+          case "loans":
             const existingLoan = await tx.productLoan.findUnique({
               where: { sale_id }
             });
@@ -2309,7 +2311,7 @@ export class CustomerService {
         });
         break;
 
-      case "loan":
+      case "loans":
         await this.prisma.productLoan.update({
           where: { sale_id },
           data: { documents: { push: documentKeys } },
@@ -2385,7 +2387,7 @@ export class CustomerService {
       "insurance": "INSURANCE",
       "mutual-funds": "MUTUAL_FUND",
       "real-estate": "REAL_ESTATE",
-      "loan": "LOAN",
+      "loans": "LOAN",
     };
 
     const product_type = productTypeMap[product_slug];
