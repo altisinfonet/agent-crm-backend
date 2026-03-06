@@ -476,6 +476,7 @@ model Customer {
     last_name        String?
     email            String?
     phone            String?
+    date_of_birth    String?
     country_id       BigInt?
     country          Country?                @relation(fields: [country_id], references: [id])
     image            String?

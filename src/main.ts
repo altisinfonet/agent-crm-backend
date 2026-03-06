@@ -52,8 +52,8 @@ async function bootstrap() {
 
   // Swagger
   const config = new DocumentBuilder()
-    .setTitle('Agent CRM API')
-    .setDescription('API documentation for Agent CRM backend')
+    .setTitle('FinMitra API')
+    .setDescription('API documentation for FinMitra backend')
     .setVersion('1.0.0')
     .addBearerAuth(
       {

@@ -76,9 +76,7 @@ export class FormSuggestionService {
       const suggestions: any = [];
 
       for (const field of allowedFields) {
-
         const value = productData[field];
-
         if (!value) continue;
 
         suggestions.push({
@@ -93,6 +91,7 @@ export class FormSuggestionService {
       for (const suggestion of suggestions) {
         const existing = await tx.agentFormSuggestion.findFirst({
           where: {
+            sale_id: suggestion.sale_id,
             agent_id: suggestion.agent_id,
             product_type: suggestion.product_type,
             field_name: suggestion.field_name,

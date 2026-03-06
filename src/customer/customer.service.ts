@@ -36,6 +36,7 @@ export class CustomerService {
         lastName,
         email,
         phone,
+        date_of_birth,
         aadhaarNumber,
         panNumber,
         address,
@@ -261,6 +262,7 @@ export class CustomerService {
           last_name: lastName,
           email,
           phone,
+          date_of_birth,
           country_id,
           aadhaar_number: aadhaarNumber,
           pan_number: panNumber,
@@ -293,6 +295,7 @@ export class CustomerService {
         lastName,
         email,
         phone,
+        date_of_birth,
         aadhaarNumber,
         panNumber,
         address,
@@ -442,6 +445,7 @@ export class CustomerService {
             last_name: lastName ?? customer.last_name,
             email,
             phone,
+            date_of_birth,
             aadhaar_number: aadhaarNumber,
             pan_number: panNumber,
             address,
@@ -835,7 +839,6 @@ export class CustomerService {
           default:
             throw new BadRequestException("Unsupported product type");
         }
-        console.log("here---->4");
         return sale;
       });
     } catch (error) {
@@ -1122,6 +1125,7 @@ export class CustomerService {
           last_name: true,
           email: true,
           phone: true,
+          date_of_birth: true,
           aadhaar_number: true,
           pan_number: true,
           address: true,

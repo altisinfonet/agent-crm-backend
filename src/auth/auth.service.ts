@@ -426,6 +426,294 @@ export class AuthService {
         return true;
     }
 
+    async deleteAgentAccount(dto: CommonDto) {
+        try {
+            const payload = decryptData(dto.data);
+            console.log("payload", payload);
+
+            const rawEmail = payload?.email?.trim();
+            const otp = payload?.otp?.trim();
+
+            if (!rawEmail || !otp) {
+                throw new BadRequestException('Email and OTP are required.');
+            }
+
+            const normalizedEmail = rawEmail.toLowerCase();
+
+            const agent = await this.prisma.user.findFirst({
+                where: {
+                    email: {
+                        equals: normalizedEmail,
+                        mode: 'insensitive',
+                    },
+                    role: {
+                        name: 'AGENT',
+                    },
+                    is_deleted: false,
+                },
+                select: {
+                    id: true,
+                    first_name: true,
+                    last_name: true,
+                    email: true,
+                    phone_no: true,
+                    provider_id: true,
+                    agentKYC: {
+                        select: {
+                            pan_number: true,
+                            aadhar_number: true,
+                        },
+                    },
+                },
+            });
+
+            if (!agent) {
+                throw new BadRequestException('Agent account not found.');
+            }
+
+            await this.otpService.verifyOtp({
+                credential: rawEmail,
+                otp,
+                is_email: true,
+            });
+
+            const displayName =
+                `${agent.first_name ?? ''} ${agent.last_name ?? ''}`.trim() || 'User';
+            const targetEmail = agent.email ?? rawEmail;
+            setImmediate(async () => {
+                try {
+                    await this.mailService.sendAccountDeletedEmail(targetEmail, displayName);
+                } catch (error) {
+                    console.error('Error sending account deleted email', error);
+                }
+            });
+
+            const deletedSuffix = `${Date.now()}_${agent.id.toString()}`;
+            const deletedEmail = this.buildDeletedFieldValue(agent.email, deletedSuffix);
+            const deletedPhone = this.buildDeletedFieldValue(agent.phone_no, deletedSuffix);
+            const deletedProviderId = this.buildDeletedFieldValue(agent.provider_id, deletedSuffix);
+
+            await this.prisma.$transaction(async (tx) => {
+                await tx.user.update({
+                    where: {
+                        id: agent.id,
+                    },
+                    data: {
+                        is_deleted: true,
+                        status: 'INACTIVE',
+                        email: deletedEmail,
+                        phone_no: deletedPhone,
+                        provider_id: deletedProviderId,
+                        refresh_token: null,
+                        reset_token: null,
+                        reset_token_exp: null,
+                    },
+                });
+
+                if (agent.agentKYC) {
+                    await tx.agentKYC.update({
+                        where: {
+                            agent_id: agent.id,
+                        },
+                        data: {
+                            pan_number:
+                                this.buildDeletedFieldValue(agent.agentKYC.pan_number, deletedSuffix) ??
+                                agent.agentKYC.pan_number,
+                            aadhar_number:
+                                this.buildDeletedFieldValue(agent.agentKYC.aadhar_number, deletedSuffix) ??
+                                agent.agentKYC.aadhar_number,
+                        },
+                    });
+                }
+
+                await tx.userSession.deleteMany({
+                    where: {
+                        user_id: agent.id,
+                    },
+                });
+
+                await tx.invalidatedToken.deleteMany({
+                    where: {
+                        user_id: agent.id,
+                    },
+                });
+
+                await tx.userFCMToken.deleteMany({
+                    where: {
+                        user_id: agent.id,
+                    },
+                });
+            });
+
+            return true;
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    async downloadAgentData(dto: CommonDto) {
+        try {
+            const payload = decryptData(dto.data);
+            const rawEmail = payload?.email?.trim();
+            const otp = payload?.otp?.trim();
+
+            if (!rawEmail || !otp) {
+                throw new BadRequestException('Email and OTP are required.');
+            }
+
+            const normalizedEmail = rawEmail.toLowerCase();
+
+            const agent = await this.prisma.user.findFirst({
+                where: {
+                    email: {
+                        equals: normalizedEmail,
+                        mode: 'insensitive',
+                    },
+                    role: {
+                        name: 'AGENT',
+                    },
+                    is_deleted: false,
+                },
+                select: {
+                    id: true,
+                    first_name: true,
+                    last_name: true,
+                    email: true,
+                },
+            });
+
+            if (!agent) {
+                throw new BadRequestException('Agent account not found.');
+            }
+
+            await this.otpService.verifyOtp({
+                credential: rawEmail,
+                otp,
+                is_email: true,
+            });
+
+            const reportData = await this.fetchAgentDataForReport(agent.id);
+            const reportText = this.buildAgentDataReport(reportData);
+            const displayName =
+                `${agent.first_name ?? ''} ${agent.last_name ?? ''}`.trim() || 'User';
+
+            setImmediate(async () => {
+                try {
+                    await this.mailService.sendDataExportEmail(rawEmail, displayName, reportText);
+                } catch (error) {
+                    console.error('Error sending data export email', error);
+                }
+            });
+            return true;
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    private async fetchAgentDataForReport(agentId: bigint) {
+        const [user, sales] = await this.prisma.$transaction([
+            this.prisma.user.findUnique({
+                where: { id: agentId },
+                include: {
+                    role: true,
+                    country: true,
+                    currency: true,
+                    agentKYC: true,
+                    organizations: {
+                        include: {
+                            subscription: {
+                                include: {
+                                    plan: {
+                                        include: {
+                                            currency: true,
+                                        },
+                                    },
+                                },
+                                orderBy: { created_at: 'desc' },
+                            },
+                            users: {
+                                include: {
+                                    role: true,
+                                    user: {
+                                        select: {
+                                            id: true,
+                                            first_name: true,
+                                            last_name: true,
+                                            email: true,
+                                            phone_no: true,
+                                        },
+                                    },
+                                },
+                            },
+                        },
+                        orderBy: { created_at: 'desc' },
+                    },
+                    orgUsers: {
+                        include: {
+                            role: true,
+                            organization: true,
+                        },
+                        orderBy: { created_at: 'desc' },
+                    },
+                    customers: {
+                        include: {
+                            country: true,
+                        },
+                        orderBy: { created_at: 'desc' },
+                    },
+                    meetings: {
+                        include: {
+                            customer: true,
+                        },
+                        orderBy: { created_at: 'desc' },
+                    },
+                    toDos: {
+                        include: {
+                            organization: true,
+                        },
+                        orderBy: { created_at: 'desc' },
+                    },
+                    inAppNotifications: {
+                        orderBy: { created_at: 'desc' },
+                    },
+                    agentProductEntities: {
+                        include: {
+                            productEntity: {
+                                include: {
+                                    products: true,
+                                },
+                            },
+                        },
+                        orderBy: { created_at: 'desc' },
+                    },
+                },
+            }),
+            this.prisma.agentSale.findMany({
+                where: { agent_id: agentId },
+                include: {
+                    organization: true,
+                    customer: true,
+                    productEntity: {
+                        include: {
+                            products: true,
+                        },
+                    },
+                    fixedDeposit: true,
+                    insurance: true,
+                    mutualFund: true,
+                    realEstate: true,
+                    saleDocuments: true,
+                },
+                orderBy: { created_at: 'desc' },
+            }),
+        ]);
+
+        return {
+            user,
+            sales,
+        };
+    }
+
 
     async forgotPassword(dto: CommonDto) {
         const paylaod = decryptData(dto?.data)
@@ -515,6 +803,175 @@ export class AuthService {
         } catch (error) {
             throw error
         }
+    }
+
+    private buildAgentDataReport(data: any) {
+        const lines: string[] = [];
+        const user = data?.user;
+        const userName =
+            `${user?.first_name ?? ''} ${user?.last_name ?? ''}`.trim() || 'N/A';
+
+        lines.push('===== DATA REPORT =====');
+        lines.push('');
+
+        lines.push('-- User Info --');
+        lines.push(`Name: ${userName}`);
+        lines.push(`Email: ${this.formatValue(user?.email)}`);
+        lines.push(`Phone: ${this.formatValue(user?.phone_no)}`);
+        lines.push(`Role: ${this.formatValue(user?.role?.name)}`);
+        lines.push(`User ID: ${this.formatValue(user?.id)}`);
+        lines.push('');
+
+        lines.push('-- Profile Info --');
+        lines.push(
+            this.indentText(
+                this.toJson({
+                    status: user?.status,
+                    auth_method: user?.auth_method,
+                    onboarding_status: user?.onboardingStatus,
+                    date_of_birth: user?.dob,
+                    profile_image_path: user?.image,
+                    country: user?.country,
+                    currency: user?.currency,
+                    created_at: user?.created_at,
+                }),
+                '   ',
+            ),
+        );
+        lines.push('');
+
+        lines.push('-- Agent KYC --');
+        if (!user?.agentKYC) {
+            lines.push('No KYC data found.');
+        } else {
+            lines.push(this.indentText(this.toJson(user.agentKYC), '   '));
+        }
+        lines.push('');
+
+        this.appendCollectionSection(
+            lines,
+            'Organizations (Owned)',
+            user?.organizations,
+            (org: any) => `${this.formatValue(org?.name)} [${this.formatValue(org?.id)}]`,
+        );
+        this.appendCollectionSection(
+            lines,
+            'Organization Memberships',
+            user?.orgUsers,
+            (membership: any) =>
+                `${this.formatValue(membership?.organization?.name)} (${this.formatValue(membership?.role?.name)})`,
+        );
+        this.appendCollectionSection(
+            lines,
+            'Product Entities',
+            user?.agentProductEntities,
+            (item: any) =>
+                `${this.formatValue(item?.productEntity?.products?.name)} -> ${this.formatValue(item?.productEntity?.name)}`,
+        );
+        this.appendCollectionSection(
+            lines,
+            'Customers',
+            user?.customers,
+            (customer: any) =>
+                `${this.formatValue(customer?.first_name)} ${this.formatValue(customer?.last_name)} [${this.formatValue(customer?.id)}]`,
+        );
+        this.appendCollectionSection(
+            lines,
+            'Sales',
+            data?.sales,
+            (sale: any) =>
+                `Sale ${this.formatValue(sale?.id)} - ${this.formatValue(sale?.productEntity?.name)} (${this.formatValue(sale?.status)})`,
+        );
+        this.appendCollectionSection(
+            lines,
+            'Meetings',
+            user?.meetings,
+            (meeting: any) => `${this.formatValue(meeting?.title)} (${this.formatValue(meeting?.status)})`,
+        );
+        this.appendCollectionSection(
+            lines,
+            'ToDo',
+            user?.toDos,
+            (todo: any) => `${this.formatValue(todo?.title)} (${this.formatValue(todo?.priority)})`,
+        );
+        this.appendCollectionSection(
+            lines,
+            'Notifications',
+            user?.inAppNotifications,
+            (note: any) => `${this.formatValue(note?.title)} (${this.formatValue(note?.type)})`,
+        );
+
+        lines.push('===== END OF REPORT =====');
+        return lines.join('\n');
+    }
+
+    private appendCollectionSection(
+        lines: string[],
+        title: string,
+        items: any[] | null | undefined,
+        itemHeader: (item: any) => string,
+    ) {
+        lines.push(`-- ${title} --`);
+        if (!items?.length) {
+            lines.push(`No ${title.toLowerCase()} found.`);
+            lines.push('');
+            return;
+        }
+
+        items.forEach((item, index) => {
+            lines.push(`${index + 1}. ${itemHeader(item)}`);
+            lines.push(this.indentText(this.toJson(item), '   '));
+        });
+        lines.push('');
+    }
+
+    private formatValue(value: any) {
+        if (value === undefined || value === null || value === '') {
+            return 'N/A';
+        }
+        if (typeof value === 'bigint') {
+            return value.toString();
+        }
+        return String(value);
+    }
+
+    private formatDate(value: any) {
+        if (!value) {
+            return 'N/A';
+        }
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return this.formatValue(value);
+        }
+        return date.toISOString();
+    }
+
+    private toJson(value: any) {
+        return JSON.stringify(
+            value,
+            (key, item) => {
+                if (key === 'updated_at' || key === 'updatedAt') {
+                    return undefined;
+                }
+                return typeof item === 'bigint' ? item.toString() : item;
+            },
+            2,
+        );
+    }
+
+    private indentText(text: string, indent: string) {
+        return text
+            .split('\n')
+            .map((line) => `${indent}${line}`)
+            .join('\n');
+    }
+
+    private buildDeletedFieldValue(value: string | null | undefined, suffix: string) {
+        if (!value) {
+            return null;
+        }
+
+        return `deleted_${suffix}_${value}`;
     }
 
 }

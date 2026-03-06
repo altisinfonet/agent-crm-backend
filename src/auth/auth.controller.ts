@@ -22,6 +22,7 @@ import {
 import { AccountStatusGuard } from '@/common/guards/status.guard';
 import { Account } from '@/common/enum/account.enum';
 import { AccountStatus } from '@/common/decorators/status.decorator';
+import { Public } from '@/common/decorators/public.decorator';
 
 
 @ApiTags('Authentication')
@@ -149,6 +150,48 @@ export class AuthController {
                 return res.status(error.status).json(error.response);
             }
             throw new BadRequestException("Failed to update subscription plan.");
+        }
+    }
+
+    @ApiOperation({ summary: 'Delete agent account after OTP verification' })
+    @ApiBody({ type: CommonDto })
+    @SwaggerApiResponse({ status: 200, description: 'Agent account deleted successfully' })
+    @Public()
+    @Post('delete-account')
+    @HttpCode(HttpStatus.OK)
+    async deleteAccount(
+        @Body() dto: CommonDto,
+        @Res({ passthrough: true }) res: Response,
+    ) {
+        try {
+            await this.authService.deleteAgentAccount(dto);
+            return res.status(HttpStatus.OK).json(new ApiResponse(null, 'Agent account deleted successfully.'));
+        } catch (error: any) {
+            if (error.status && error.response) {
+                return res.status(error.status).json(error.response);
+            }
+            throw new BadRequestException('Failed to delete account.');
+        }
+    }
+
+    @ApiOperation({ summary: 'Download agent data report after OTP verification' })
+    @ApiBody({ type: CommonDto })
+    @SwaggerApiResponse({ status: 200, description: 'Data report emailed successfully' })
+    @Public()
+    @Post('download-data')
+    @HttpCode(HttpStatus.OK)
+    async downloadData(
+        @Body() dto: CommonDto,
+        @Res({ passthrough: true }) res: Response,
+    ) {
+        try {
+            await this.authService.downloadAgentData(dto);
+            return res.status(HttpStatus.OK).json(new ApiResponse(null, 'Data report sent to email successfully.'));
+        } catch (error: any) {
+            if (error.status && error.response) {
+                return res.status(error.status).json(error.response);
+            }
+            throw new BadRequestException('Failed to process data download request.');
         }
     }
 

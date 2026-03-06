@@ -206,4 +206,49 @@ export class MailService {
             console.error('Error sending meeting email', error);
         }
     }
+
+    async sendDataExportEmail(email: string, name: string, reportText: string) {
+        try {
+            const displayName = name?.trim() || 'User';
+
+            await this.mailer.sendMail({
+                to: email,
+                subject: 'Your requested data report',
+                text:
+                    `Hello ${displayName},\n\n` +
+                    `Your data request has been approved. Please find your requested data attached in the text file.\n\n` +
+                    `Best regards,\n` +
+                    `FinMitra Team`,
+                attachments: [
+                    {
+                        filename: 'data.txt',
+                        content: Buffer.from(reportText, 'utf-8'),
+                        contentType: 'text/plain',
+                    },
+                ],
+            });
+            return true;
+        } catch (error) {
+            throw error;
+        }
+    }
+
+    async sendAccountDeletedEmail(email: string, name: string) {
+        try {
+            const mailOptions = {
+                to: email,
+                subject: 'Your account has been deleted',
+                template: './account-deleted',
+                context: {
+                    name: name?.trim() || 'User',
+                    currentYear: new Date().getFullYear(),
+                },
+            };
+
+            await this.mailer.sendMail(mailOptions);
+            return true;
+        } catch (error) {
+            throw error;
+        }
+    }
 }

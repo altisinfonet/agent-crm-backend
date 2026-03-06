@@ -1155,44 +1155,76 @@ export class SubscriptionService {
         )
         : null;
 
-      const formattedSubscriptions = subscriptions.map((sub) => {
+      const formattedSubscriptions = await Promise.all(
+        subscriptions.map(async (sub) => {
 
-        const trialDays = this.calculateTrialDays(
-          sub.status,
-          sub.created_at,
-          sub.start_at,
-          sub.end_at
-        );
-        return {
-          id: Number(sub.id),
-          status: sub.status,
-          source: sub.source,
-          startAt: sub.start_at,
-          endAt: sub.end_at,
-          rzp_subscription_id: sub.rzp_subscription_id,
-          rzp_payment_id: sub.rzp_payment_id,
-          auto_renew: sub.auto_renew,
-          created_at: sub.created_at,
-          cancelled_at: sub.cancelled_at,
-          trialDays,
-          plan: {
-            id: Number(sub.plan.id),
-            code: sub.plan.code,
-            name: sub.plan.name,
-            description: sub.plan.description,
-            price: sub.plan.price,
-            rzp_plan_id: sub.plan.rzp_plan_id,
-            billing_cycle: sub.plan.billing_cycle,
-            currency: {
-              code: sub.plan.currency.code,
-              symbol: sub.plan.currency.symbol,
+          const trialDays = this.calculateTrialDays(
+            sub.status,
+            sub.created_at,
+            sub.start_at,
+            sub.end_at
+          );
+
+          let invoiceUrls: any[] = [];
+
+          if (sub.rzp_subscription_id) {
+            try {
+              const invoices = await razorpay.invoices.all({
+                subscription_id: sub.rzp_subscription_id,
+              });
+
+              console.log("invoices++++++", invoices);
+
+
+              invoiceUrls = invoices.items.map((invoice: any) => ({
+                invoice_url: invoice.short_url,
+              }));
+            } catch (err) {
+              console.log("Invoice fetch failed for:", sub.rzp_subscription_id);
+            }
+          }
+
+          return {
+            id: Number(sub.id),
+            status: sub.status,
+            source: sub.source,
+            startAt: sub.start_at,
+            endAt: sub.end_at,
+            rzp_subscription_id: sub.rzp_subscription_id,
+            rzp_payment_id: sub.rzp_payment_id,
+            auto_renew: sub.auto_renew,
+            created_at: sub.created_at,
+            cancelled_at: sub.cancelled_at,
+            trialDays,
+            plan: {
+              id: Number(sub.plan.id),
+              code: sub.plan.code,
+              name: sub.plan.name,
+              description: sub.plan.description,
+              price: sub.plan.price,
+              rzp_plan_id: sub.plan.rzp_plan_id,
+              billing_cycle: sub.plan.billing_cycle,
+              currency: {
+                code: sub.plan.currency.code,
+                symbol: sub.plan.currency.symbol,
+              },
+              features: sub.plan.subscriptionFeatures.map((f) => f.features),
             },
-            features: sub.plan.subscriptionFeatures.map(
-              (f) => f.features
-            ),
-          },
-        }
-      });
+            invoices: invoiceUrls,
+          };
+        })
+      );
+
+      let invoiceUrls: any[] = [];
+      if (activeSubscription?.rzp_subscription_id) {
+        const invoices = await razorpay.invoices.all({
+          subscription_id: activeSubscription.rzp_subscription_id,
+        });
+
+        invoiceUrls = invoices.items.map((invoice: any) => ({
+          invoice_url: invoice.short_url,
+        }));
+      }
 
       return {
         subscriptions: formattedSubscriptions,
@@ -1214,6 +1246,7 @@ export class SubscriptionService {
               ? new Date(rzpSubscription.end_at * 1000)
               : null,
             shortUrl: rzpSubscription.short_url,
+            invoice_url: invoiceUrls,
             created_at: rzpSubscription.created_at,
           }
           : null,
