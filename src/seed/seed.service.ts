@@ -9,46 +9,46 @@ export class SeedService {
     async seed() {
 
         //Role
-        // await this.prisma.role.createMany({
-        //     data: [
-        //         {
-        //             name: "ADMIN",
-        //             description: "admin"
-        //         },
-        //         {
-        //             name: "AGENT",
-        //             description: "agent"
-        //         },
-        //     ]
-        // })
+        await this.prisma.role.createMany({
+            data: [
+                {
+                    name: "ADMIN",
+                    description: "admin"
+                },
+                {
+                    name: "AGENT",
+                    description: "agent"
+                },
+            ]
+        })
 
 
-        // await this.prisma.country.createMany({
-        //     data: [
-        //         {
-        //             name: "India",
-        //             region: "Asia",
-        //             iso_code: "IN",
-        //             phoneLength: 10,
-        //             phone_code: "+91",
-        //             timezone: "Asia/Kolkata",
-        //             utc_offset_min: 330,
-        //             image: "https://cdn.jsdelivr.net/npm/country-flag-emoji-json@2.0.0/dist/images/IN.svg"
-        //         }
-        //     ]
-        // })
+        await this.prisma.country.createMany({
+            data: [
+                {
+                    name: "India",
+                    region: "Asia",
+                    iso_code: "IN",
+                    phoneLength: 10,
+                    phone_code: "+91",
+                    timezone: "Asia/Kolkata",
+                    utc_offset_min: 330,
+                    image: "https://cdn.jsdelivr.net/npm/country-flag-emoji-json@2.0.0/dist/images/IN.svg"
+                }
+            ]
+        })
 
 
-        // await this.prisma.currency.createMany({
-        //     data: [
-        //         {
-        //             name: "Indian Rupee",
-        //             code: "INR",
-        //             symbol: "₹",
-        //             exchange_rate: 1,
-        //         }
-        //     ]
-        // })
+        await this.prisma.currency.createMany({
+            data: [
+                {
+                    name: "Indian Rupee",
+                    code: "INR",
+                    symbol: "₹",
+                    exchange_rate: 1,
+                }
+            ]
+        })
 
 
         const productsData = [
@@ -240,30 +240,30 @@ export class SeedService {
             });
         }
 
-        // await this.prisma.user.createMany({
-        //     data: [
-        //         {
-        //             first_name: "Agent",
-        //             last_name: "CRM",
-        //             email: "altisdev1@gmail.com",
-        //             password: await hashPassword("Admin@123"),
-        //             auth_method: "EMAIL_PW",
-        //             role_id: 1,
-        //             currency_id: 1,
-        //             country_id: 1
-        //         }
-        //     ]
-        // });
+        await this.prisma.user.createMany({
+            data: [
+                {
+                    first_name: "Agent",
+                    last_name: "CRM",
+                    email: "altisdev1@gmail.com",
+                    password: await hashPassword("Admin@123"),
+                    auth_method: "EMAIL_PW",
+                    role_id: 1,
+                    currency_id: 1,
+                    country_id: 1
+                }
+            ]
+        });
 
-        // await this.prisma.adminSettings.create({
-        //     data: {
-        //         title: "payment-settings",
-        //         metadata: {
-        //             razorpayid: "rzp_test_4zb9K0qHh06srW",
-        //             razorpaysecretkey: "B8uxIDjFDuk5MbB9Nq4q9YF8"
-        //         }
-        //     }
-        // })
+        await this.prisma.adminSettings.create({
+            data: {
+                title: "payment-settings",
+                metadata: {
+                    razorpayid: "rzp_test_4zb9K0qHh06srW",
+                    razorpaysecretkey: "B8uxIDjFDuk5MbB9Nq4q9YF8"
+                }
+            }
+        })
 
         console.log('Seed data inserted');
     }
