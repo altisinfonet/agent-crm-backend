@@ -12,11 +12,13 @@ export class MailService {
 
     async sendOTPEmail(subject: string, email: string, otp: string) {
         try {
+            const logo = `${process.env.BASE_PATH}/${process.env.IMAGE_PATH}/logo/FinMitraLogo.webp`
             const mailOptions = {
                 to: email,
                 subject: subject,
                 template: './otp-email',
                 context: {
+                    logo,
                     otp: otp,
                     currentYear: new Date().getFullYear()
                 }
@@ -28,11 +30,13 @@ export class MailService {
     }
 
     async sendResetPasswordEmail(email: string, resetLink: string, token: string = '', expiry_minutes: number) {
+        const logo = `${process.env.BASE_PATH}/${process.env.IMAGE_PATH}/logo/FinMitraLogo.webp`
         const mailOptions = {
             to: email,
             subject: 'Reset your password',
             template: './forgot-password',
             context: {
+                logo,
                 code: token,
                 expiry_minutes: expiry_minutes,
                 currentYear: new Date().getFullYear(),
@@ -46,6 +50,7 @@ export class MailService {
 
     async sendMeetingEmail(meeting: any, action: 'created' | 'updated') {
         try {
+            const logo = `${process.env.BASE_PATH}/${process.env.IMAGE_PATH}/logo/FinMitraLogo.webp`
             const agent = await this.prisma.user.findUnique({
                 where: { id: meeting.agent_id }
             });
@@ -74,6 +79,7 @@ export class MailService {
             }
 
             const meetingData = {
+                logo,
                 title: meeting.title,
                 description: meeting.description,
                 start_time: (meeting.start_time),
@@ -127,6 +133,7 @@ export class MailService {
         renewalLink: string;
     }) {
         try {
+            const logo = `${process.env.BASE_PATH}/${process.env.IMAGE_PATH}/logo/FinMitraLogo.webp`
             const subject =
                 data.daysLeft === 0
                     ? "Your subscription expires today"
@@ -139,6 +146,7 @@ export class MailService {
                 subject: subject,
                 template: './subscription-expiry',
                 context: {
+                    logo,
                     agentName: data.name,
                     subscriptionPlan: data.planName,
                     expiryDate: data.expiryDate.toDateString(),
@@ -160,12 +168,14 @@ export class MailService {
 
     async sendMeetingReminderEmail(context: any) {
         try {
+            const logo = `${process.env.BASE_PATH}/${process.env.IMAGE_PATH}/logo/FinMitraLogo.webp`
             const subject = `Meeting Reminder: ${context?.meetingTitle}`
             const mailOptions = {
                 to: context.email,
                 subject: subject,
                 template: './meeting-notification',
                 context: {
+                    logo,
                     name: context?.name,
                     meetingTitle: context?.meetingTitle,
                     meetingDesc: context?.meetingDesc,
@@ -190,11 +200,13 @@ export class MailService {
 
     async sendHBDEmail(email: string, name: string) {
         try {
+            const logo = `${process.env.BASE_PATH}/${process.env.IMAGE_PATH}/logo/FinMitraLogo.webp`
             const mailOptions = {
                 to: email,
                 subject: `Happy Birthday, ${name} 🎉`,
                 template: './birthday-wish',
                 context: {
+                    logo,
                     name: name,
                     currentYear: new Date().getFullYear()
                 }
@@ -242,11 +254,13 @@ export class MailService {
 
     async sendAccountDeletedEmail(email: string, name: string) {
         try {
+            const logo = `${process.env.BASE_PATH}/${process.env.IMAGE_PATH}/logo/FinMitraLogo.webp`
             const mailOptions = {
                 to: email,
                 subject: 'Your account has been deleted',
                 template: './account-deleted',
                 context: {
+                    logo,
                     name: name?.trim() || 'User',
                     currentYear: new Date().getFullYear(),
                 },
