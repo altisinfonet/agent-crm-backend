@@ -12,7 +12,7 @@ export class MailService {
 
     async sendOTPEmail(subject: string, email: string, otp: string) {
         try {
-            const logo = `${process.env.BASE_PATH}/${process.env.IMAGE_PATH}/logo/FinMitraLogo.webp`
+            const logo = `${process.env.BASE_PATH}/${process.env.IMAGE_PATH}/logo/FinMitraLogo.png`
             console.log("logo+++++++++++++", logo);
 
             const mailOptions = {
@@ -32,7 +32,7 @@ export class MailService {
     }
 
     async sendResetPasswordEmail(email: string, resetLink: string, token: string = '', expiry_minutes: number) {
-        const logo = `${process.env.BASE_PATH}/${process.env.IMAGE_PATH}/logo/FinMitraLogo.webp`
+        const logo = `${process.env.BASE_PATH}/${process.env.IMAGE_PATH}/logo/FinMitraLogo.png`
         const mailOptions = {
             to: email,
             subject: 'Reset your password',
@@ -52,7 +52,7 @@ export class MailService {
 
     async sendMeetingEmail(meeting: any, action: 'created' | 'updated') {
         try {
-            const logo = `${process.env.BASE_PATH}/${process.env.IMAGE_PATH}/logo/FinMitraLogo.webp`
+            const logo = `${process.env.BASE_PATH}/${process.env.IMAGE_PATH}/logo/FinMitraLogo.png`
             const agent = await this.prisma.user.findUnique({
                 where: { id: meeting.agent_id }
             });
@@ -135,7 +135,7 @@ export class MailService {
         renewalLink: string;
     }) {
         try {
-            const logo = `${process.env.BASE_PATH}/${process.env.IMAGE_PATH}/logo/FinMitraLogo.webp`
+            const logo = `${process.env.BASE_PATH}/${process.env.IMAGE_PATH}/logo/FinMitraLogo.png`
             const subject =
                 data.daysLeft === 0
                     ? "Your subscription expires today"
@@ -170,7 +170,7 @@ export class MailService {
 
     async sendMeetingReminderEmail(context: any) {
         try {
-            const logo = `${process.env.BASE_PATH}/${process.env.IMAGE_PATH}/logo/FinMitraLogo.webp`
+            const logo = `${process.env.BASE_PATH}/${process.env.IMAGE_PATH}/logo/FinMitraLogo.png`
             const subject = `Meeting Reminder: ${context?.meetingTitle}`
             const mailOptions = {
                 to: context.email,
@@ -202,7 +202,7 @@ export class MailService {
 
     async sendHBDEmail(email: string, name: string) {
         try {
-            const logo = `${process.env.BASE_PATH}/${process.env.IMAGE_PATH}/logo/FinMitraLogo.webp`
+            const logo = `${process.env.BASE_PATH}/${process.env.IMAGE_PATH}/logo/FinMitraLogo.png`
             const mailOptions = {
                 to: email,
                 subject: `Happy Birthday, ${name} 🎉`,
@@ -256,7 +256,7 @@ export class MailService {
 
     async sendAccountDeletedEmail(email: string, name: string) {
         try {
-            const logo = `${process.env.BASE_PATH}/${process.env.IMAGE_PATH}/logo/FinMitraLogo.webp`
+            const logo = `${process.env.BASE_PATH}/${process.env.IMAGE_PATH}/logo/FinMitraLogo.png`
             const mailOptions = {
                 to: email,
                 subject: 'Your account has been deleted',
