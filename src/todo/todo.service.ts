@@ -1,12 +1,16 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { CommonDto } from '@/auth/dto/common.dto';
-import { decryptData } from '@/common/helper/common.helper';
+import { createNotification, decryptData } from '@/common/helper/common.helper';
 import { PrismaService } from '@/prisma/prisma.service';
+import { MailService } from '@/mail/mail.service';
+import { NotificationService } from '@/notification/notification.service';
 
 @Injectable()
 export class TodoService {
   constructor(
     private prisma: PrismaService,
+    private mailService: MailService,
+    private notificationService: NotificationService
   ) { }
 
   async create(agent_id: bigint, dto: CommonDto) {
@@ -26,7 +30,7 @@ export class TodoService {
         throw new BadRequestException("Agent organization not found");
       }
 
-      return await this.prisma.toDo.create({
+      const todo = await this.prisma.toDo.create({
         data: {
           org_id: org.id,
           agent_id,
@@ -36,6 +40,38 @@ export class TodoService {
           priority,
         },
       });
+
+      setImmediate(async () => {
+        try {
+          const TodoTitle = "Todo Created"
+          const TodoDesc = `Title: ${title}\n Description :${desc}`
+          await createNotification(
+            agent_id,
+            'Todo',
+            TodoTitle,
+            TodoDesc,
+            {
+              todo_id: todo.id,
+              priority: todo.priority,
+              action: 'created',
+            }
+          );
+
+          await this.notificationService.sendUserPushNotification(
+            agent_id,
+            TodoTitle,
+            TodoDesc,
+            {
+              todo_id: todo.id,
+              priority: todo.priority,
+              action: 'created',
+            },
+          );
+        } catch (error) {
+          console.error("Error sending metting email", error);
+        }
+      });
+      return todo;
     } catch (error) {
       throw error;
     }
@@ -171,10 +207,50 @@ export class TodoService {
         }
       }
 
-      return await this.prisma.toDo.update({
+      const isPriorityUpdated =
+        payload.priority !== undefined &&
+        payload.priority !== existingTodo.priority;
+
+      const updatedTodo = await this.prisma.toDo.update({
         where: { id: todo_id },
         data: updateData,
       });
+
+      if (isPriorityUpdated) {
+        setImmediate(async () => {
+          try {
+            const todoTitle = "Todo Priority Updated";
+            const todoDesc = `Priority for "${updatedTodo.title}" changed from ${existingTodo.priority} to ${updatedTodo.priority}.`;
+
+            await createNotification(
+              agent_id,
+              'Todo',
+              todoTitle,
+              todoDesc,
+              {
+                todo_id: updatedTodo.id,
+                priority: updatedTodo.priority,
+                action: 'updated',
+              }
+            );
+
+            await this.notificationService.sendUserPushNotification(
+              agent_id,
+              todoTitle,
+              todoDesc,
+              {
+                todo_id: updatedTodo.id,
+                priority: updatedTodo.priority,
+                action: 'updated',
+              },
+            );
+          } catch (error) {
+            console.error("Error sending todo priority update notification", error);
+          }
+        });
+      }
+
+      return updatedTodo;
     } catch (error) {
       throw error;
     }
