@@ -13,6 +13,8 @@ export class MailService {
     async sendOTPEmail(subject: string, email: string, otp: string) {
         try {
             const logo = `${process.env.BASE_PATH}/${process.env.IMAGE_PATH}/logo/FinMitraLogo.webp`
+            console.log("logo+++++++++++++", logo);
+
             const mailOptions = {
                 to: email,
                 subject: subject,
