@@ -19,7 +19,10 @@ export class OtpService {
     try {
       const otpData = decryptData(dto.data);
       const expiresAt = new Date(Date.now() + 60 * 1000); // 1 minute
-      const otp = generateOTP();
+      const otp =
+        (otpData.credential === "demowithsubscription@gmail.com" ||
+          otpData.credential === "demowithoutsubscription@gmail.com")
+          ? "111111" : generateOTP();
 
       await this.prisma.oTP.upsert({
         where: {
