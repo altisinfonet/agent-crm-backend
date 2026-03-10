@@ -68,7 +68,7 @@ export const generateOTP = () => {
     for (let i = 1; i < 6; i++) {
         otp += Math.floor(Math.random() * 10);
     }
-    return process.env.OTP_SMS_SEND === "true" ? otp : '111111';
+    return process.env.NODE_ENV === "production" ? otp : '111111';
 };
 
 
