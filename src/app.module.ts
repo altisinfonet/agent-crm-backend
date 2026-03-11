@@ -1,6 +1,7 @@
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -27,6 +28,9 @@ import { FormSuggestionModule } from './agent-form-suggestion/suggestion.module'
 
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'uploads'),
       serveRoot: '/uploads',
