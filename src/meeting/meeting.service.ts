@@ -381,10 +381,11 @@ export class MeetingService {
     }
   }
 
-  async sendReminder() {
+  async sendMeetingReminderNotifications() {
     try {
       const now = new Date();
-      const DEFAULT_REMINDER_MINUTES = 15;
+      const DEFAULT_REMINDER_MINUTES = 30;
+      const REMINDER_WINDOW_MS = 60 * 1000;
 
       const meetings = await this.prisma.meeting.findMany({
         where: {
@@ -396,10 +397,18 @@ export class MeetingService {
             gte: now,
           },
         },
-        include: {
+        select: {
+          id: true,
+          agent_id: true,
+          title: true,
+          description: true,
+          meeting_type: true,
+          start_time: true,
+          end_time: true,
+          status: true,
+          reminder_before: true,
           agent: {
             select: {
-              id: true,
               email: true,
               first_name: true,
               last_name: true,
@@ -416,72 +425,6 @@ export class MeetingService {
 
       for (const meeting of meetings) {
         const reminderMinutes =
-          meeting.reminder_before !== null
-            ? meeting.reminder_before
-            : DEFAULT_REMINDER_MINUTES;
-
-        const reminderTime = new Date(
-          meeting.start_time.getTime() - reminderMinutes * 60 * 1000
-        );
-
-        if (now >= reminderTime) {
-          const context = {
-            email: meeting.agent.email,
-            name: `${meeting.agent.first_name} ${meeting.agent.last_name}`,
-            meetingTitle: meeting.title,
-            meetingDesc: meeting.description,
-            meeting_type: meeting.meeting_type,
-            start_time: meeting.start_time,
-            end_time: meeting.end_time,
-            customerName: meeting.customer
-              ? `${meeting.customer.first_name} ${meeting.customer.last_name}`
-              : null,
-          };
-
-          await this.mailService.sendMeetingReminderEmail(context);
-
-          await this.prisma.meeting.update({
-            where: { id: meeting.id },
-            data: {
-              reminder_sent: true,
-            },
-          });
-        }
-      }
-
-      return true;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  async sendMeetingReminderNotifications() {
-    try {
-      const now = new Date();
-      const DEFAULT_REMINDER_MINUTES = 60;
-
-      const meetings = await this.prisma.meeting.findMany({
-        where: {
-          status: {
-            in: ["SCHEDULED", "POSTPONED"],
-          },
-          reminder_sent: false,
-          start_time: {
-            gte: now,
-          },
-        },
-        select: {
-          id: true,
-          agent_id: true,
-          title: true,
-          start_time: true,
-          status: true,
-          reminder_before: true,
-        },
-      });
-
-      for (const meeting of meetings) {
-        const reminderMinutes =
           meeting.reminder_before !== null && meeting.reminder_before !== undefined
             ? meeting.reminder_before
             : DEFAULT_REMINDER_MINUTES;
@@ -489,12 +432,13 @@ export class MeetingService {
         const reminderTime = new Date(
           meeting.start_time.getTime() - reminderMinutes * 60 * 1000
         );
+        const reminderWindowEnd = new Date(reminderTime.getTime() + REMINDER_WINDOW_MS);
 
-        if (now < reminderTime) continue;
+        if (now < reminderTime || now >= reminderWindowEnd) continue;
 
         const minutesLeft = Math.max(
           0,
-          Math.round((meeting.start_time.getTime() - now.getTime()) / 60000)
+          Math.ceil((meeting.start_time.getTime() - now.getTime()) / 60000)
         );
 
         const title = "Meeting reminder";
@@ -505,13 +449,13 @@ export class MeetingService {
 
         await createNotification(
           meeting.agent_id,
-          'MEETING',
+          "MEETING",
           title,
           desc,
           {
             meeting_id: meeting.id,
             status: meeting.status,
-            action: 'reminder',
+            action: "reminder",
           }
         );
 
@@ -522,9 +466,24 @@ export class MeetingService {
           {
             meeting_id: meeting.id,
             status: meeting.status,
-            action: 'reminder',
+            action: "reminder",
           },
         );
+
+        if (meeting.agent?.email) {
+          await this.mailService.sendMeetingReminderEmail({
+            email: meeting.agent.email,
+            name: `${meeting.agent.first_name ?? ""} ${meeting.agent.last_name ?? ""}`.trim() || "Agent",
+            meetingTitle: meeting.title,
+            meetingDesc: meeting.description,
+            meeting_type: meeting.meeting_type,
+            start_time: meeting.start_time,
+            end_time: meeting.end_time,
+            customerName: meeting.customer
+              ? `${meeting.customer.first_name ?? ""} ${meeting.customer.last_name ?? ""}`.trim()
+              : null,
+          });
+        }
 
         await this.prisma.meeting.update({
           where: { id: meeting.id },
@@ -541,3 +500,4 @@ export class MeetingService {
 
 
 }
+

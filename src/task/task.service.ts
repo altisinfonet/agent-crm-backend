@@ -446,9 +446,10 @@ export class TaskService {
         await this.notificationService.sendHBDNotifications();
     }
 
-    @Cron(CronExpression.EVERY_DAY_AT_10AM)
+    @Cron(CronExpression.EVERY_MINUTE)
     async sendMeetingReminderNotifications() {
         this.logger.log('Running Meeting Reminder notification job');
         await this.meetingService.sendMeetingReminderNotifications();
     }
 }
+

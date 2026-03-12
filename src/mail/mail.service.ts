@@ -173,7 +173,7 @@ export class MailService {
             const mailOptions = {
                 to: context.email,
                 subject: subject,
-                template: './meeting-notification',
+                template: './meeting-reminder',
                 context: {
                     logo,
                     name: context?.name,
@@ -273,3 +273,4 @@ export class MailService {
         }
     }
 }
+
