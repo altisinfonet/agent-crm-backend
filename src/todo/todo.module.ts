@@ -8,5 +8,6 @@ import { MailModule } from '@/mail/mail.module';
   imports: [MailModule, NotificationModule],
   controllers: [TodoController],
   providers: [TodoService],
+  exports: [TodoService],
 })
 export class TodoModule { }

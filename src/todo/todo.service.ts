@@ -207,48 +207,10 @@ export class TodoService {
         }
       }
 
-      const isPriorityUpdated =
-        payload.priority !== undefined &&
-        payload.priority !== existingTodo.priority;
-
       const updatedTodo = await this.prisma.toDo.update({
         where: { id: todo_id },
         data: updateData,
       });
-
-      if (isPriorityUpdated) {
-        setImmediate(async () => {
-          try {
-            const todoTitle = "Todo Priority Updated";
-            const todoDesc = `Priority for "${updatedTodo.title}" changed from ${existingTodo.priority} to ${updatedTodo.priority}.`;
-
-            await createNotification(
-              agent_id,
-              'Todo',
-              todoTitle,
-              todoDesc,
-              {
-                todo_id: updatedTodo.id,
-                priority: updatedTodo.priority,
-                action: 'updated',
-              }
-            );
-
-            await this.notificationService.sendUserPushNotification(
-              agent_id,
-              todoTitle,
-              todoDesc,
-              {
-                todo_id: updatedTodo.id,
-                priority: updatedTodo.priority,
-                action: 'updated',
-              },
-            );
-          } catch (error) {
-            console.error("Error sending todo priority update notification", error);
-          }
-        });
-      }
 
       return updatedTodo;
     } catch (error) {
@@ -256,6 +218,63 @@ export class TodoService {
     }
   }
 
+  async sendTodoReminderNotifications() {
+    try {
+      const now = new Date();
+      const REMINDER_BEFORE_MINUTES = 30;
+      const reminderWindowStart = new Date(now.getTime() + REMINDER_BEFORE_MINUTES * 60 * 1000);
+      const reminderWindowEnd = new Date(reminderWindowStart.getTime() + 60 * 1000);
+
+      const todos = await this.prisma.toDo.findMany({
+        where: {
+          is_completed: false,
+          due_date: {
+            gte: reminderWindowStart,
+            lt: reminderWindowEnd,
+          },
+        },
+        select: {
+          id: true,
+          agent_id: true,
+          title: true,
+          due_date: true,
+          priority: true,
+        },
+      });
+
+      for (const todo of todos) {
+        const todoTitle = 'Todo Reminder';
+        const todoDesc = `Your todo "${todo.title}" (${todo.priority} priority) is due in 30 minutes.`;
+
+        await createNotification(
+          todo.agent_id,
+          'Todo',
+          todoTitle,
+          todoDesc,
+          {
+            todo_id: todo.id,
+            priority: todo.priority,
+            action: 'reminder',
+          }
+        );
+
+        await this.notificationService.sendUserPushNotification(
+          todo.agent_id,
+          todoTitle,
+          todoDesc,
+          {
+            todo_id: todo.id,
+            priority: todo.priority,
+            action: 'reminder',
+          },
+        );
+      }
+
+      return true;
+    } catch (error) {
+      throw error;
+    }
+  }
 
   async remove(agent_id: bigint, id: bigint) {
     try {
@@ -271,3 +290,5 @@ export class TodoService {
   }
 
 }
+
+

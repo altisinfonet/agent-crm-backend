@@ -8,6 +8,7 @@ import { MailService } from '@/mail/mail.service';
 import { addWeeks, addMonths, addYears, differenceInCalendarDays } from 'date-fns';
 import { SubscriptionCycle, SubscriptionStatus } from '@generated/prisma';
 import { MeetingService } from '@/meeting/meeting.service';
+import { TodoService } from '@/todo/todo.service';
 
 
 @Injectable()
@@ -19,6 +20,7 @@ export class TaskService {
         private readonly settingsService: SettingsService,
         private readonly notificationService: NotificationService,
         private readonly meetingService: MeetingService,
+        private readonly todoService: TodoService,
         private readonly mailService: MailService,
     ) { }
     // async onModuleInit() {
@@ -445,7 +447,11 @@ export class TaskService {
         this.logger.log('Running birthday notification job');
         await this.notificationService.sendHBDNotifications();
     }
-
+    @Cron(CronExpression.EVERY_MINUTE)
+    async sendTodoReminderNotifications() {
+        this.logger.log('Running Todo Reminder notification job');
+        await this.todoService.sendTodoReminderNotifications();
+    }
     @Cron(CronExpression.EVERY_MINUTE)
     async sendMeetingReminderNotifications() {
         this.logger.log('Running Meeting Reminder notification job');
