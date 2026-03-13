@@ -183,7 +183,7 @@ export class MeetingService {
         this.prisma.meeting.findMany({
           where,
           ...(isPaginated && { skip, take }),
-          orderBy: { created_at: 'desc' },
+          orderBy: { start_time: 'desc' },
           select: {
             id: true,
             title: true,
