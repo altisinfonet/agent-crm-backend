@@ -1419,7 +1419,7 @@ export class SubscriptionService {
           await this.prisma.organizationSubscription.update({
             where: { id: orgSubscription.id },
             data: {
-              status: "PAUSED",
+              status: "CANCELLED",
               auto_renew: false,
               cancelled_at: new Date(),
               end_at: new Date(rzpSub.start_at * 1000),
