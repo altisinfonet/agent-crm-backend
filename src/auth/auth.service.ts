@@ -137,10 +137,10 @@ export class AuthService {
                     throw new BadRequestException('Provider ID required');
                 }
 
-                if (user.auth_method === "EMAIL_OTP") {
+                if (user && user.auth_method === "EMAIL_OTP") {
                     throw new BadRequestException('Invalid login method. Please log in using Email & OTP.');
                 }
-                if (user.auth_method === "EMAIL_PW") {
+                if (user && user.auth_method === "EMAIL_PW") {
                     throw new BadRequestException('Invalid login method. Please log in using Email & Password.');
                 }
 
@@ -222,7 +222,6 @@ export class AuthService {
                 refreshToken: encryptData(refreshPlain),
             };
         } catch (error) {
-            console.log("Erorr while login", error);
             throw error;
         }
     }
