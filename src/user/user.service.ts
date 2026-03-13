@@ -246,6 +246,7 @@ export class UserService {
                     status: {
                       in: [
                         'ACTIVE',
+                        'UPGRADED',
                         'PAUSED',
                         'CANCELLED',
                         "TRIAL",
@@ -266,42 +267,48 @@ export class UserService {
           },
         });
 
-        // const subscriptionStatus =
-        //   agentData?.organizations?.[0]?.subscription?.[0]?.status ?? null;
-
-        // const isSubscribed =
-        //   (subscriptionStatus === 'ACTIVE' ||
-        //     subscriptionStatus === 'UPGRADED') && agentData?.organizations?.[0]?.subscription?.[0].end_at ;
-
-        // agentExtras = {
-        //   subscriptionStatus,
-        //   isSubscribed,
-        // };
-
         const subs = agentData?.organizations?.[0]?.subscription ?? [];
         const now = new Date();
 
         let subscriptionStatus: SubscriptionStatus | null = null;
         let isSubscribed = false;
 
-        /**
-         * Helper: check validity by end date
-         */
-        const isValidByDate = (endAt?: Date | null) =>
-          !endAt || endAt > now;
+        const isValidByDate = (endAt?: Date | null) => !endAt || endAt > now;
 
-        /**
-         * 1️⃣ ACTIVE
-         */
-        const active = subs.find(s => s.status === 'ACTIVE');
-        if (active && isValidByDate(active.end_at)) {
+        const active = subs.find(s => s.status === 'ACTIVE' && isValidByDate(s.end_at));
+        if (active) {
           subscriptionStatus = 'ACTIVE';
           isSubscribed = true;
         }
 
-        if (!isSubscribed) {
+        if (!subscriptionStatus) {
+          const adminUpgraded = subs.find(s => s.status === 'UPGRADED' && s.source === 'ADMIN');
+          if (adminUpgraded) {
+            subscriptionStatus = 'UPGRADED';
+            isSubscribed = true;
+          }
+        }
+
+        if (!subscriptionStatus) {
+          const paused = subs.find(s => s.status === 'PAUSED' && isValidByDate(s.end_at));
+          if (paused) {
+            subscriptionStatus = 'PAUSED';
+            isSubscribed = true;
+          }
+        }
+
+        // Keep CANCELLED ahead of TRIAL so older trial rows do not override cancellation.
+        if (!subscriptionStatus) {
+          const cancelled = subs.find(s => s.status === 'CANCELLED');
+          if (cancelled) {
+            subscriptionStatus = cancelled.end_at && cancelled.end_at <= now ? 'EXPIRED' : 'CANCELLED';
+            isSubscribed = false;
+          }
+        }
+
+        if (!subscriptionStatus) {
           const inTrial = subs.find(
-            s => s.status === "TRIAL" && s.source === 'FREE'
+            s => s.status === 'TRIAL' && s.source === 'FREE' && isValidByDate(s.end_at)
           );
           if (inTrial) {
             subscriptionStatus = 'TRIAL';
@@ -309,72 +316,36 @@ export class UserService {
           }
         }
 
-        /**
-         * 2️⃣ PAUSED (trial access)
-         */
-        if (!isSubscribed) {
-          const paused = subs.find(
-            s => s.status === 'PAUSED' && isValidByDate(s.end_at)
-          );
-          if (paused) {
-            subscriptionStatus = 'PAUSED';
-            isSubscribed = true;
-          }
-        }
-
-        /**
-         * 3️⃣ CANCELLED but still valid till cycle end
-         */
-        if (!isSubscribed) {
-          const cancelled = subs.find(
-            s => s.status === 'CANCELLED' && isValidByDate(s.end_at)
-          );
-          if (cancelled) {
-            subscriptionStatus = 'CANCELLED';
-            isSubscribed = false;
-          }
-        }
-
-        if (!isSubscribed) {
-          const adminUpgraded = subs.find(
-            s => s.status === 'UPGRADED' && s.source === 'ADMIN'
-          );
-          if (adminUpgraded) {
-            subscriptionStatus = 'UPGRADED';
-            isSubscribed = true;
-          }
-        }
-
-        /**
-         * 5️⃣ EXPIRED STATES (no access)
-         */
         if (!subscriptionStatus) {
           const expired = subs.find(
             s =>
               (s.status === 'ACTIVE' ||
                 s.status === 'PAUSED' ||
                 s.status === 'EXPIRED' ||
-                s.status === 'CANCELLED') &&
+                s.status === 'UPGRADED') &&
               s.end_at &&
               s.end_at <= now
           );
           if (expired) {
             subscriptionStatus = 'EXPIRED';
+            isSubscribed = false;
           }
         }
 
-        /**
-        * 6️⃣ Pending / Incomplete (fallback)
-        */
-        const pending = subs.find(s => s.status === 'PENDING');
-        if (pending) {
-          subscriptionStatus = 'PENDING';
-          isSubscribed = false;
+        if (!subscriptionStatus) {
+          const pending = subs.find(s => s.status === 'PENDING');
+          if (pending) {
+            subscriptionStatus = 'PENDING';
+            isSubscribed = false;
+          }
         }
 
         if (!subscriptionStatus) {
           const incomplete = subs.find(s => s.status === 'INCOMPLETE');
-          if (incomplete) subscriptionStatus = 'INCOMPLETE';
+          if (incomplete) {
+            subscriptionStatus = 'INCOMPLETE';
+            isSubscribed = false;
+          }
         }
 
         agentExtras = {
@@ -762,3 +733,4 @@ export class UserService {
   }
 
 }
+
