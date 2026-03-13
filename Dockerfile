@@ -1,23 +1,20 @@
-FROM node:lts-trixie-slim
-
+# Build stage
+FROM node:lts-trixie-slim AS builder
 WORKDIR /app
-
 COPY package*.json ./
-RUN npm install
-
-RUN npm install @nestjs/cli
-
+RUN npm ci  # Installs devDependencies including @nestjs/cli
 COPY . .
-
 RUN npx prisma generate
+RUN npx nest build
 
-
-RUN npm run build
-
+# Production stage
+FROM node:lts-trixie-slim AS runner
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --only=production
+COPY --from=builder /app/dist ./dist
 EXPOSE 6969
-
-CMD [ "node", "dist/main.js" ]
-
+CMD ["node", "dist/main.js"]
 
 
 
