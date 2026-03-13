@@ -116,7 +116,7 @@ export class TodoService {
           where,
           ...(isPaginated && { skip, take }),
           orderBy: {
-            created_at: "desc",
+            due_date: "desc",
           },
           select: {
             id: true,
