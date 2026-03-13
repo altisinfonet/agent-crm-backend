@@ -222,6 +222,7 @@ export class AuthService {
                 refreshToken: encryptData(refreshPlain),
             };
         } catch (error) {
+            console.log("Erorr while login", error);
             throw error;
         }
     }
