@@ -232,11 +232,16 @@ export class UserService {
 
       if (user.role?.name === 'AGENT') {
         const agentData = await this.prisma.user.findUnique({
-          where: { id: userId },
+          where: {
+            id: userId
+          },
           select: {
             organizations: {
               select: {
                 subscription: {
+                  orderBy: {
+                    created_at: "desc"
+                  },
                   where: {
                     status: {
                       in: [
