@@ -1,4 +1,3 @@
-# Build stage
 FROM node:lts-trixie-slim AS builder
 WORKDIR /app
 COPY package*.json ./
@@ -7,7 +6,6 @@ COPY . .
 RUN npx prisma generate
 RUN npx nest build
 
-# Production stage
 FROM node:lts-trixie-slim AS runner
 WORKDIR /app
 COPY package*.json ./
