@@ -1,33 +1,61 @@
-# Build stage
-FROM node:22.22.1-alpine AS builder
+FROM node:lts-trixie-slim
 
 WORKDIR /app
 
-COPY package*.json ./
+RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/apt/lists/*
 
+COPY package*.json ./
 RUN npm install
 
 COPY . .
 
+RUN npx prisma generate
+
 RUN npm run build
-
-
-# Production stage
-FROM node:22.22.1-alpine
-
-WORKDIR /app
-
-COPY package*.json ./
-
-RUN npm install --omit=dev
-
-COPY --from=builder /app/dist ./dist
 
 EXPOSE 6969
 
-CMD ["node", "dist/main.js"]
+CMD [ "node", "dist/main.js" ]
 
 
+
+
+
+
+
+
+###############################
+
+# # Build stage
+# FROM node:22.22.1-alpine AS builder
+
+# WORKDIR /app
+
+# COPY package*.json ./
+
+# RUN npm install
+
+# COPY . .
+
+# RUN npm run build
+
+
+# # Production stage
+# FROM node:22.22.1-alpine
+
+# WORKDIR /app
+
+# COPY package*.json ./
+
+# RUN npm install --omit=dev
+
+# COPY --from=builder /app/dist ./dist
+
+# EXPOSE 6969
+
+# CMD ["node", "dist/main.js"]
+
+###############################################################
 
 # FROM node:22.22.1-alpine
 
