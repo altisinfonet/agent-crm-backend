@@ -2,7 +2,7 @@
 FROM node:lts-trixie-slim AS builder
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci  # Installs devDependencies including @nestjs/cli
+RUN npm ci --only=development
 COPY . .
 RUN npx prisma generate
 RUN npx nest build
