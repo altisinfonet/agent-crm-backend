@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { hashPassword } from '../common/helper/common.helper';
+import { CountryBulkItem, mapCountryPayloads } from '@/common/helper/country.helper';
+
+const countrySeedData = require('./country.json') as CountryBulkItem[];
 
 @Injectable()
 export class SeedService {
@@ -22,20 +25,11 @@ export class SeedService {
             ]
         })
 
+        const countries = mapCountryPayloads(countrySeedData);
 
         await this.prisma.country.createMany({
-            data: [
-                {
-                    name: "India",
-                    region: "Asia",
-                    iso_code: "IN",
-                    phoneLength: 10,
-                    phone_code: "+91",
-                    timezone: "Asia/Kolkata",
-                    utc_offset_min: 330,
-                    image: "https://cdn.jsdelivr.net/npm/country-flag-emoji-json@2.0.0/dist/images/IN.svg"
-                }
-            ]
+            data: countries,
+            skipDuplicates: true,
         })
 
 
@@ -44,7 +38,7 @@ export class SeedService {
                 {
                     name: "Indian Rupee",
                     code: "INR",
-                    symbol: "₹",
+                    symbol: "â‚¹",
                     exchange_rate: 1,
                 }
             ]
@@ -92,7 +86,7 @@ export class SeedService {
                     {
                         name: "Life Insurance",
                         slug: "life-insurance",
-                        desc: "Provides financial support to the nominee in case of the policyholder’s death.",
+                        desc: "Provides financial support to the nominee in case of the policyholder's death.",
                     },
                     {
                         name: "Health Insurance",
@@ -240,6 +234,25 @@ export class SeedService {
             });
         }
 
+        const [adminRole, india, inrCurrency] = await this.prisma.$transaction([
+            this.prisma.role.findFirst({
+                where: { name: "ADMIN" },
+                select: { id: true },
+            }),
+            this.prisma.country.findUnique({
+                where: { iso_code: "IN" },
+                select: { id: true },
+            }),
+            this.prisma.currency.findUnique({
+                where: { code: "INR" },
+                select: { id: true },
+            }),
+        ]);
+
+        if (!adminRole || !india || !inrCurrency) {
+            throw new Error('Required seed references are missing');
+        }
+
         await this.prisma.user.createMany({
             data: [
                 {
@@ -248,9 +261,9 @@ export class SeedService {
                     email: "altisdev1@gmail.com",
                     password: await hashPassword("Admin@123"),
                     auth_method: "EMAIL_PW",
-                    role_id: 1,
-                    currency_id: 1,
-                    country_id: 1
+                    role_id: adminRole.id,
+                    currency_id: inrCurrency.id,
+                    country_id: india.id
                 }
             ]
         });

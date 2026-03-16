@@ -2,27 +2,13 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { CommonDto } from 'src/auth/dto/common.dto';
 import { decryptData } from '@/common/helper/common.helper';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { mapCountryPayloads } from '@/common/helper/country.helper';
 
 @Injectable()
 export class CountryService {
   constructor(
     private prisma: PrismaService,
   ) { }
-
-  private parseTimezone(timezones: Record<string, string>) {
-    const [timezone, offset] = Object.entries(timezones)[0];
-
-    const sign = offset.startsWith('-') ? -1 : 1;
-    const [hours, minutes] = offset.replace('+', '').replace('-', '').split(':');
-
-    const utc_offset_min =
-      sign * (Number(hours) * 60 + Number(minutes));
-
-    return {
-      timezone,
-      utc_offset_min,
-    };
-  }
 
 
   async create(createCountryDto: CommonDto) {
@@ -61,28 +47,7 @@ export class CountryService {
       if (!Array.isArray(payload) || !payload.length) {
         throw new BadRequestException('Invalid payload');
       }
-      const mappedCountries = payload.map((item) => {
-        const { timezone, utc_offset_min } = this.parseTimezone(item.timezones);
-        const phoneLength = Array.isArray(item.phoneLength)
-          ? item.phoneLength[0]
-          : item.phoneLength ?? null;
-        return {
-          name: item.name,
-          iso_code: item.iso?.['alpha-2'],
-          phone_code: item.phone?.[0] ?? null,
-          region: item.region,
-          phoneLength,
-          timezone,
-          utc_offset_min,
-          image: item.emoji,
-        };
-      }).filter(c => c.iso_code);
-
-      const uniqueMap = new Map();
-      for (const c of mappedCountries) {
-        uniqueMap.set(c.iso_code, c);
-      }
-      const uniqueCountries = [...uniqueMap.values()];
+      const uniqueCountries = mapCountryPayloads(payload);
 
       const existing = await this.prisma.country.findMany({
         where: {
