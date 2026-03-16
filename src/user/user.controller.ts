@@ -8,6 +8,7 @@ import { AnyFilesInterceptor, FileFieldsInterceptor } from '@nestjs/platform-exp
 import { ImageUploadService } from '@/common/services/image-upload.service';
 import { ApiResponse } from '@/common/helper/response.helper';
 import { decryptData, encryptData } from '@/common/helper/common.helper';
+import { getCachedCurrentUserResponse, setCachedCurrentUserResponse } from '@/common/helper/current-user-cache.helper';
 import { Account, Onboarding } from '@/common/enum/account.enum';
 import { AccountStatus, OnboardingStatus } from '@/common/decorators/status.decorator';
 import { AccountStatusGuard, OnboardingStatusGuard } from '@/common/guards/status.guard';
@@ -27,11 +28,19 @@ export class UserController {
     @Res({ passthrough: true }) res: Response
   ) {
     try {
+      const cachedResponse = await getCachedCurrentUserResponse(userId);
+      console.log("cachedResponse", cachedResponse);
+
+      if (cachedResponse) {
+        return res.status(HttpStatus.OK).json({ data: cachedResponse });
+      }
+
       const userData = await this.userService.getCurrentUser(userId);
       let result = JSON.stringify(userData, (key, value) =>
         typeof value === 'bigint' ? value.toString() : value,
       );
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Fetched user data"));
+      await setCachedCurrentUserResponse(userId, resData);
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
       if (error.status && error.response) {

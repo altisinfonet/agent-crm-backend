@@ -6,6 +6,7 @@ import { SettingsService } from 'src/settings/settings.service';
 import Razorpay = require("razorpay");
 import * as crypto from "crypto";
 import { SubscriptionCycle } from '@generated/prisma';
+import { clearCurrentUserCache } from '@/common/helper/current-user-cache.helper';
 
 @Injectable()
 export class SubscriptionService {
@@ -305,6 +306,7 @@ export class SubscriptionService {
           TRIAL_DAYS,
         );
 
+        await this.invalidateCurrentUserCache(user_id);
         return {
           status: 'TRIAL',
           subscription_id: null
@@ -376,6 +378,7 @@ export class SubscriptionService {
         },
       });
 
+      await this.invalidateCurrentUserCache(user_id);
       return {
         subscription_id: rzpSub.id,
       };
@@ -388,6 +391,36 @@ export class SubscriptionService {
     return Math.floor(
       (Date.now() + minutes * 60 * 1000) / 1000
     );
+  }
+
+  private async invalidateCurrentUserCache(userId: bigint) {
+    await clearCurrentUserCache(userId);
+  }
+
+  private async invalidateCurrentUserCacheByOrgId(orgId: bigint) {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { created_by: true },
+    });
+
+    if (!organization) {
+      return;
+    }
+
+    await this.invalidateCurrentUserCache(organization.created_by);
+  }
+
+  private async invalidateCurrentUserCacheBySubscriptionId(subscriptionId: string) {
+    const orgSubscription = await this.prisma.organizationSubscription.findUnique({
+      where: { rzp_subscription_id: subscriptionId },
+      select: { org_id: true },
+    });
+
+    if (!orgSubscription) {
+      return;
+    }
+
+    await this.invalidateCurrentUserCacheByOrgId(orgSubscription.org_id);
   }
 
   async upgradeSubscription(agent_id: bigint, dto: CommonDto) {
@@ -499,6 +532,7 @@ export class SubscriptionService {
         },
       });
 
+      await this.invalidateCurrentUserCache(agent_id);
       return {
         subscription_id: rzpSub.id,
       };
@@ -599,6 +633,8 @@ export class SubscriptionService {
   async subscriptionPayment(dto: CommonDto) {
     try {
       const payload = decryptData(dto.data);
+      console.log("payload+++++++", payload);
+
       const { subscription_id, payment_id, payment_signature } = payload;
       const subscription = await this.prisma.organizationSubscription.findFirst({
         where: {
@@ -630,6 +666,10 @@ export class SubscriptionService {
             payload,
           }
         })
+
+        if (subscription?.org_id) {
+          await this.invalidateCurrentUserCacheByOrgId(subscription.org_id);
+        }
       }
 
       if (!subscription_id || !payment_id || !payment_signature) {
@@ -657,6 +697,7 @@ export class SubscriptionService {
         await this.prisma.organizationSubscription.findUnique({
           where: { rzp_subscription_id: subscription_id },
         });
+      console.log("orgSubscription+++++++", orgSubscription);
 
       if (!orgSubscription) {
         throw new NotFoundException("Subscription not found");
@@ -692,6 +733,8 @@ export class SubscriptionService {
           subscription_id: rzpSub?.id,
         },
       });
+
+      await this.invalidateCurrentUserCacheBySubscriptionId(subscription_id);
 
       const response = {
         subscription_id: rzpSubscription.id,
@@ -1016,6 +1059,8 @@ export class SubscriptionService {
               },
             });
           }
+
+          await this.invalidateCurrentUserCacheBySubscriptionId(subId);
           break;
         }
 
@@ -1040,6 +1085,7 @@ export class SubscriptionService {
               auto_renew: false,
             },
           });
+          await this.invalidateCurrentUserCacheBySubscriptionId(subId);
           break;
 
         /* ---------------- CANCELLED / HALTED ---------------- */
@@ -1066,6 +1112,7 @@ export class SubscriptionService {
               end_at: currentEnd,
             },
           });
+          await this.invalidateCurrentUserCacheBySubscriptionId(subId);
           break;
         }
 
@@ -1077,6 +1124,7 @@ export class SubscriptionService {
               auto_renew: false,
             },
           });
+          await this.invalidateCurrentUserCacheBySubscriptionId(subId);
           break;
         }
       }
@@ -1386,6 +1434,7 @@ export class SubscriptionService {
             end_at: new Date(),
           },
         });
+        await this.invalidateCurrentUserCache(user_id);
         return true;
       }
 
@@ -1442,6 +1491,8 @@ export class SubscriptionService {
         console.error("[RAZORPAY_TERMINATION_FAILED]", error?.error || error);
         throw new BadRequestException("Failed to cancel subscription");
       }
+
+      await this.invalidateCurrentUserCache(user_id);
       return true;
     } catch (error) {
       console.error("[CANCEL_SUBSCRIPTION_ERROR]", error);

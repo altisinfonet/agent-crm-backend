@@ -4,6 +4,7 @@ import { CommonDto } from 'src/auth/dto/common.dto';
 import * as bcrypt from 'bcrypt';
 import { decryptData, hashPassword } from '@/common/helper/common.helper';
 import { R2Service } from '@/common/helper/r2.helper';
+import { clearCurrentUserCache } from '@/common/helper/current-user-cache.helper';
 import { SubscriptionStatus } from '@generated/prisma';
 
 @Injectable()
@@ -115,7 +116,7 @@ export class UserService {
     }
   }
 
-  // async getCurrentUser(userId: bigint) {
+  //   async getCurrentUser(userId: bigint) {
   //   try {
   //     const user = await this.prisma.user.findUnique({
   //       where: { id: userId },
@@ -144,39 +145,133 @@ export class UserService {
   //     });
 
   //     if (!user) {
-  //       throw new NotFoundException("User not found");
+  //       throw new NotFoundException('User not found');
   //     }
 
-  //     const agentOrg = await this.prisma.organizationUser.findFirst({
-  //       where: {
-  //         user_id: userId,
-  //       },
-  //     })
+  //     let agentExtras = {};
 
-  //     const subscriptionCount = agentOrg
-  //       ? await this.prisma.organizationSubscription.count({
+  //     if (user.role?.name === 'AGENT') {
+  //       const agentData = await this.prisma.user.findUnique({
   //         where: {
-  //           org_id: agentOrg.org_id,
-  //           status: {
-  //             in: ['ACTIVE', 'UPGRADED'],
+  //           id: userId
+  //         },
+  //         select: {
+  //           organizations: {
+  //             select: {
+  //               subscription: {
+  //                 orderBy: {
+  //                   created_at: "desc"
+  //                 },
+  //                 where: {
+  //                   status: {
+  //                     in: [
+  //                       'ACTIVE',
+  //                       'UPGRADED',
+  //                       'PAUSED',
+  //                       'CANCELLED',
+  //                       "TRIAL",
+  //                       'PENDING',
+  //                       'EXPIRED',
+  //                       'INCOMPLETE',
+  //                     ],
+  //                   },
+  //                 },
+  //                 select: {
+  //                   status: true,
+  //                   end_at: true,
+  //                   source: true,
+  //                 },
+  //               },
+  //             },
   //           },
   //         },
-  //       })
-  //       : 0;
-
-  //     const isSubscribed = subscriptionCount > 0;
-
-  //     const isAgent = user.role?.name === 'AGENT';
-  //     let agentExtras = {};
-  //     if (isAgent) {
-  //       const agentData = await this.prisma.user.findUnique({
-  //         where: { id: userId },
-  //         select: {
-  //           country: true,
-  //           currency: true,
-  //         },
   //       });
-  //       agentExtras = agentData ?? {};
+
+  //       const subs = agentData?.organizations?.[0]?.subscription ?? [];
+  //       const now = new Date();
+
+  //       let subscriptionStatus: SubscriptionStatus | null = null;
+  //       let isSubscribed = false;
+
+  //       const isValidByDate = (endAt?: Date | null) => !endAt || endAt > now;
+
+  //       const active = subs.find(s => s.status === 'ACTIVE' && isValidByDate(s.end_at));
+  //       if (active) {
+  //         subscriptionStatus = 'ACTIVE';
+  //         isSubscribed = true;
+  //       }
+
+  //       if (!subscriptionStatus) {
+  //         const adminUpgraded = subs.find(s => s.status === 'UPGRADED' && s.source === 'ADMIN');
+  //         if (adminUpgraded) {
+  //           subscriptionStatus = 'UPGRADED';
+  //           isSubscribed = true;
+  //         }
+  //       }
+
+  //       if (!subscriptionStatus) {
+  //         const paused = subs.find(s => s.status === 'PAUSED' && isValidByDate(s.end_at));
+  //         if (paused) {
+  //           subscriptionStatus = 'PAUSED';
+  //           isSubscribed = true;
+  //         }
+  //       }
+
+  //       // Keep CANCELLED ahead of TRIAL so older trial rows do not override cancellation.
+  //       if (!subscriptionStatus) {
+  //         const cancelled = subs.find(s => s.status === 'CANCELLED');
+  //         if (cancelled) {
+  //           subscriptionStatus = cancelled.end_at && cancelled.end_at <= now ? 'EXPIRED' : 'CANCELLED';
+  //           isSubscribed = false;
+  //         }
+  //       }
+
+  //       if (!subscriptionStatus) {
+  //         const inTrial = subs.find(
+  //           s => s.status === 'TRIAL' && s.source === 'FREE' && isValidByDate(s.end_at)
+  //         );
+  //         if (inTrial) {
+  //           subscriptionStatus = 'TRIAL';
+  //           isSubscribed = true;
+  //         }
+  //       }
+
+  //       if (!subscriptionStatus) {
+  //         const expired = subs.find(
+  //           s =>
+  //             (s.status === 'ACTIVE' ||
+  //               s.status === 'PAUSED' ||
+  //               s.status === 'EXPIRED' ||
+  //               s.status === 'UPGRADED') &&
+  //             s.end_at &&
+  //             s.end_at <= now
+  //         );
+  //         if (expired) {
+  //           subscriptionStatus = 'EXPIRED';
+  //           isSubscribed = false;
+  //         }
+  //       }
+
+  //       if (!subscriptionStatus) {
+  //         const pending = subs.find(s => s.status === 'PENDING');
+  //         if (pending) {
+  //           subscriptionStatus = 'PENDING';
+  //           isSubscribed = false;
+  //         }
+  //       }
+
+  //       if (!subscriptionStatus) {
+  //         const incomplete = subs.find(s => s.status === 'INCOMPLETE');
+  //         if (incomplete) {
+  //           subscriptionStatus = 'INCOMPLETE';
+  //           isSubscribed = false;
+  //         }
+  //       }
+
+  //       agentExtras = {
+  //         subscriptionStatus,
+  //         isSubscribed,
+  //       };
   //     }
 
   //     let image = user.image;
@@ -188,11 +283,9 @@ export class UserService {
   //       ...user,
   //       ...agentExtras,
   //       image,
-  //       isSubscribed,
   //     };
-
   //   } catch (error) {
-  //     throw error
+  //     throw error;
   //   }
   // }
 
@@ -239,27 +332,13 @@ export class UserService {
             organizations: {
               select: {
                 subscription: {
+                  take: 1,
                   orderBy: {
-                    created_at: "desc"
-                  },
-                  where: {
-                    status: {
-                      in: [
-                        'ACTIVE',
-                        'UPGRADED',
-                        'PAUSED',
-                        'CANCELLED',
-                        "TRIAL",
-                        'PENDING',
-                        'EXPIRED',
-                        'INCOMPLETE',
-                      ],
-                    },
+                    created_at: 'desc'
                   },
                   select: {
                     status: true,
                     end_at: true,
-                    source: true,
                   },
                 },
               },
@@ -267,86 +346,38 @@ export class UserService {
           },
         });
 
-        const subs = agentData?.organizations?.[0]?.subscription ?? [];
+        const latestSubscription =
+          agentData?.organizations?.[0]?.subscription?.[0] ?? null;
         const now = new Date();
+        const expirableStatuses: SubscriptionStatus[] = [
+          'ACTIVE',
+          'PAUSED',
+          'TRIAL',
+          'UPGRADED',
+          'CANCELLED',
+        ];
+        const subscribedStatuses: SubscriptionStatus[] = [
+          'ACTIVE',
+          'PAUSED',
+          'TRIAL',
+          'UPGRADED',
+        ];
 
-        let subscriptionStatus: SubscriptionStatus | null = null;
-        let isSubscribed = false;
+        let subscriptionStatus: SubscriptionStatus | null =
+          latestSubscription?.status ?? null;
 
-        const isValidByDate = (endAt?: Date | null) => !endAt || endAt > now;
-
-        const active = subs.find(s => s.status === 'ACTIVE' && isValidByDate(s.end_at));
-        if (active) {
-          subscriptionStatus = 'ACTIVE';
-          isSubscribed = true;
+        if (
+          latestSubscription?.end_at &&
+          latestSubscription.end_at <= now &&
+          subscriptionStatus &&
+          expirableStatuses.includes(subscriptionStatus)
+        ) {
+          subscriptionStatus = 'EXPIRED';
         }
 
-        if (!subscriptionStatus) {
-          const adminUpgraded = subs.find(s => s.status === 'UPGRADED' && s.source === 'ADMIN');
-          if (adminUpgraded) {
-            subscriptionStatus = 'UPGRADED';
-            isSubscribed = true;
-          }
-        }
-
-        if (!subscriptionStatus) {
-          const paused = subs.find(s => s.status === 'PAUSED' && isValidByDate(s.end_at));
-          if (paused) {
-            subscriptionStatus = 'PAUSED';
-            isSubscribed = true;
-          }
-        }
-
-        // Keep CANCELLED ahead of TRIAL so older trial rows do not override cancellation.
-        if (!subscriptionStatus) {
-          const cancelled = subs.find(s => s.status === 'CANCELLED');
-          if (cancelled) {
-            subscriptionStatus = cancelled.end_at && cancelled.end_at <= now ? 'EXPIRED' : 'CANCELLED';
-            isSubscribed = false;
-          }
-        }
-
-        if (!subscriptionStatus) {
-          const inTrial = subs.find(
-            s => s.status === 'TRIAL' && s.source === 'FREE' && isValidByDate(s.end_at)
-          );
-          if (inTrial) {
-            subscriptionStatus = 'TRIAL';
-            isSubscribed = true;
-          }
-        }
-
-        if (!subscriptionStatus) {
-          const expired = subs.find(
-            s =>
-              (s.status === 'ACTIVE' ||
-                s.status === 'PAUSED' ||
-                s.status === 'EXPIRED' ||
-                s.status === 'UPGRADED') &&
-              s.end_at &&
-              s.end_at <= now
-          );
-          if (expired) {
-            subscriptionStatus = 'EXPIRED';
-            isSubscribed = false;
-          }
-        }
-
-        if (!subscriptionStatus) {
-          const pending = subs.find(s => s.status === 'PENDING');
-          if (pending) {
-            subscriptionStatus = 'PENDING';
-            isSubscribed = false;
-          }
-        }
-
-        if (!subscriptionStatus) {
-          const incomplete = subs.find(s => s.status === 'INCOMPLETE');
-          if (incomplete) {
-            subscriptionStatus = 'INCOMPLETE';
-            isSubscribed = false;
-          }
-        }
+        const isSubscribed =
+          subscriptionStatus !== null &&
+          subscribedStatuses.includes(subscriptionStatus);
 
         agentExtras = {
           subscriptionStatus,
@@ -475,6 +506,8 @@ export class UserService {
           },
         });
       }
+
+      await clearCurrentUserCache(userId);
       return this.getCurrentUser(userId);
     } catch (error) {
       throw error
@@ -498,6 +531,8 @@ export class UserService {
         data: dataToUpdate,
       });
 
+      await clearCurrentUserCache(userId);
+
       const { password, ...user } = res;
       return user;
     } catch (error) {
@@ -520,7 +555,7 @@ export class UserService {
       const organizationId = kycData?.organizationId ? BigInt(kycData.organizationId) : null;
       const entity_ids: bigint[] = kycData?.entity_ids || [];
 
-      return await this.prisma.$transaction(async (tx) => {
+      const kyc = await this.prisma.$transaction(async (tx) => {
         const user = await tx.user.findUnique({
           where: { id: userId },
         });
@@ -606,6 +641,9 @@ export class UserService {
 
         return kyc;
       });
+
+      await clearCurrentUserCache(userId);
+      return kyc;
     } catch (error) {
       throw error;
     }
@@ -733,4 +771,3 @@ export class UserService {
   }
 
 }
-
