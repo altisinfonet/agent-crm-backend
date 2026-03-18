@@ -45,7 +45,7 @@ async function bootstrap() {
   );
 
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://192.168.1.101:3030',
+    origin: process.env.WEB_BASE_PATH || 'http://192.168.1.101:3030',
     methods: 'GET,PUT,PATCH,POST,DELETE',
     credentials: true,
   });
