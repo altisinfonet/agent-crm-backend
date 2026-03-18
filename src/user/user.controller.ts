@@ -28,19 +28,19 @@ export class UserController {
     @Res({ passthrough: true }) res: Response
   ) {
     try {
-      const cachedResponse = await getCachedCurrentUserResponse(userId);
-      console.log("cachedResponse", cachedResponse);
+      // const cachedResponse = await getCachedCurrentUserResponse(userId);
+      // console.log("cachedResponse", cachedResponse);
 
-      if (cachedResponse) {
-        return res.status(HttpStatus.OK).json({ data: cachedResponse });
-      }
+      // if (cachedResponse) {
+      //   return res.status(HttpStatus.OK).json({ data: cachedResponse });
+      // }
 
       const userData = await this.userService.getCurrentUser(userId);
       let result = JSON.stringify(userData, (key, value) =>
         typeof value === 'bigint' ? value.toString() : value,
       );
       const resData = encryptData(new ApiResponse((JSON.parse(result)), "Fetched user data"));
-      await setCachedCurrentUserResponse(userId, resData);
+      // await setCachedCurrentUserResponse(userId, resData);
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
       if (error.status && error.response) {
