@@ -633,8 +633,6 @@ export class SubscriptionService {
   async subscriptionPayment(dto: CommonDto) {
     try {
       const payload = decryptData(dto.data);
-      console.log("payload+++++++", payload);
-
       const { subscription_id, payment_id, payment_signature } = payload;
       const subscription = await this.prisma.organizationSubscription.findFirst({
         where: {
@@ -697,7 +695,6 @@ export class SubscriptionService {
         await this.prisma.organizationSubscription.findUnique({
           where: { rzp_subscription_id: subscription_id },
         });
-      console.log("orgSubscription+++++++", orgSubscription);
 
       if (!orgSubscription) {
         throw new NotFoundException("Subscription not found");
@@ -1220,9 +1217,6 @@ export class SubscriptionService {
               const invoices = await razorpay.invoices.all({
                 subscription_id: sub.rzp_subscription_id,
               });
-
-              console.log("invoices++++++", invoices);
-
 
               invoiceUrls = invoices.items.map((invoice: any) => ({
                 invoice_url: invoice.short_url,

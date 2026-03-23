@@ -459,9 +459,6 @@ export class UserService {
         },
       });
 
-      console.log("agent++++++", agent);
-
-
       if (!agent) {
         throw new NotFoundException('Agent profile not found');
       }
@@ -1039,8 +1036,6 @@ export class UserService {
   }
 
   private groupAgentProductEntities(items: any[] = []) {
-    console.log("items+++++", items);
-
     return Object.values(
       items.reduce((acc: any, item: any) => {
         const product = item.productEntity.products;

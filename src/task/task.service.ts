@@ -111,7 +111,6 @@ export class TaskService {
     //                         current_cycle: rzpSub.paid_count ?? 0
     //                     }
     //                 });
-    //                 console.log("orgSub++++++++", orgSub);
 
     //                 if (orgSub.upgraded_from?.rzp_subscription_id) {
     //                     await this.razorpay.subscriptions.cancel(
