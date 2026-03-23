@@ -1,7 +1,16 @@
-import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+    BadRequestException,
+    Injectable,
+    UnauthorizedException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CryptoUtil } from 'src/common/utils/crypto.util';
-import { decryptData, encryptData, generateRandomID, hashPassword } from '@/common/helper/common.helper';
+import {
+    decryptData,
+    encryptData,
+    generateRandomID,
+    hashPassword,
+} from '@/common/helper/common.helper';
 import { CommonDto } from './dto/common.dto';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -12,7 +21,11 @@ import { Request } from 'express';
 import { verifyOtpDto } from 'src/otp/dto/verify-otp.dto';
 import { MailService } from '@/mail/mail.service';
 import { OtpService } from '@/otp/otp.service';
-import { handleAuthFailure, resetAuthLimits } from '@/common/helper/rate-limit.helper';
+import {
+    handleAuthFailure,
+    resetAuthLimits,
+} from '@/common/helper/rate-limit.helper';
+import { generateUniqueUsername } from '@/common/helper/username.helper';
 
 @Injectable()
 export class AuthService {
@@ -21,7 +34,7 @@ export class AuthService {
         private jwtService: JwtService,
         private config: ConfigService,
         private mailService: MailService,
-        private otpService: OtpService
+        private otpService: OtpService,
     ) { }
 
     async checkUser(commonDto: CommonDto) {
@@ -39,7 +52,7 @@ export class AuthService {
             const user = await this.prisma.user.findFirst({
                 where: {
                     OR: [
-                        { email: { equals: normalizedCredential, mode: "insensitive" } },
+                        { email: { equals: normalizedCredential, mode: 'insensitive' } },
                         { phone_no: normalizedCredential },
                     ],
                     is_deleted: false,
@@ -61,15 +74,14 @@ export class AuthService {
                 // email: user?.email,
                 // phone_no: user?.phone_no,
                 is_exists: !!user,
-                is_admin: user?.role?.name === "ADMIN",
-            }
+                is_admin: user?.role?.name === 'ADMIN',
+            };
 
             return data;
         } catch (error) {
             throw error;
         }
     }
-
 
     async auth(commonDto: CommonDto, req: Request): Promise<Tokens> {
         try {
@@ -100,7 +112,13 @@ export class AuthService {
 
             const where: any = {};
 
-            if ((auth_method === 'EMAIL_PW' || auth_method === 'EMAIL_OTP' || auth_method === 'GOOGLE' || auth_method === 'APPLE') && email) {
+            if (
+                (auth_method === 'EMAIL_PW' ||
+                    auth_method === 'EMAIL_OTP' ||
+                    auth_method === 'GOOGLE' ||
+                    auth_method === 'APPLE') &&
+                email
+            ) {
                 where.email = email.toLowerCase();
             }
 
@@ -114,6 +132,7 @@ export class AuthService {
                     id: true,
                     first_name: true,
                     last_name: true,
+                    user_name: true,
                     email: true,
                     phone_no: true,
                     provider_id: true,
@@ -128,7 +147,7 @@ export class AuthService {
                 },
             });
 
-            if (user?.status === "INACTIVE") {
+            if (user?.status === 'INACTIVE') {
                 throw new BadRequestException('Sorry, your account is Suspended.');
             }
 
@@ -137,11 +156,15 @@ export class AuthService {
                     throw new BadRequestException('Provider ID required');
                 }
 
-                if (user && user.auth_method === "EMAIL_OTP") {
-                    throw new BadRequestException('Invalid login method. Please log in using Email & OTP.');
+                if (user && user.auth_method === 'EMAIL_OTP') {
+                    throw new BadRequestException(
+                        'Invalid login method. Please log in using Email & OTP.',
+                    );
                 }
-                if (user && user.auth_method === "EMAIL_PW") {
-                    throw new BadRequestException('Invalid login method. Please log in using Email & Password.');
+                if (user && user.auth_method === 'EMAIL_PW') {
+                    throw new BadRequestException(
+                        'Invalid login method. Please log in using Email & Password.',
+                    );
                 }
 
                 if (user) {
@@ -168,12 +191,13 @@ export class AuthService {
                                 : null,
                         role_id: BigInt(2),
                         country_id: 1,
-                        currency_id: 1
+                        currency_id: 1,
                     },
                     select: {
                         id: true,
                         first_name: true,
                         last_name: true,
+                        user_name: true,
                         email: true,
                         phone_no: true,
                         role: {
@@ -182,7 +206,7 @@ export class AuthService {
                                 name: true,
                             },
                         },
-                        status: true
+                        status: true,
                     },
                 });
                 // const org = await this.prisma.organization.create({
@@ -197,6 +221,8 @@ export class AuthService {
                 // })
             }
 
+            user = await this.ensureAgentUserName(user);
+
             // 6️⃣ Generate tokens
             const role = {
                 id: user?.role.id.toString(),
@@ -209,7 +235,7 @@ export class AuthService {
                     sub: user?.id.toString(),
                     role,
                     sid: session.session_id,
-                    status: user?.status
+                    status: user?.status,
                 },
                 {
                     secret: this.config.get('JWT_SECRET'),
@@ -226,6 +252,45 @@ export class AuthService {
         }
     }
 
+    private async ensureAgentUserName(user: any) {
+        if (!user || user?.role?.name !== 'AGENT' || user?.user_name) {
+            return user;
+        }
+
+        const generatedUserName = await generateUniqueUsername(
+            this.prisma,
+            user?.first_name,
+            user?.last_name,
+            user?.id,
+        );
+
+        return this.prisma.user.update({
+            where: {
+                id: user.id,
+            },
+            data: {
+                user_name: generatedUserName,
+            },
+            select: {
+                id: true,
+                first_name: true,
+                last_name: true,
+                user_name: true,
+                email: true,
+                phone_no: true,
+                provider_id: true,
+                auth_method: true,
+                role: {
+                    select: {
+                        id: true,
+                        name: true,
+                    },
+                },
+                status: true,
+            },
+        });
+    }
+
     private async verifyAuth(payload: any, ip: string) {
         const { auth_method, otp, email, phone_no, password } = payload;
 
@@ -239,16 +304,15 @@ export class AuthService {
         try {
             // ========== EMAIL PASSWORD ==========
             if (auth_method === 'EMAIL_PW') {
-                const user =
-                    await this.prisma.user.findFirst({
-                        where: {
-                            auth_method: "EMAIL_PW",
-                            email: {
-                                equals: email,
-                                mode: 'insensitive',
-                            },
+                const user = await this.prisma.user.findFirst({
+                    where: {
+                        auth_method: 'EMAIL_PW',
+                        email: {
+                            equals: email,
+                            mode: 'insensitive',
                         },
-                    });
+                    },
+                });
 
                 if (!user) {
                     await handleAuthFailure(identifier, ip);
@@ -376,7 +440,7 @@ export class AuthService {
                     sub: session.user.id.toString(),
                     role,
                     sid: session.session_id,
-                    status: session.user.status
+                    status: session.user.status,
                 },
                 {
                     secret: this.config.get('JWT_SECRET'),
@@ -408,7 +472,7 @@ export class AuthService {
             });
             return true;
         } catch (error) {
-            throw error
+            throw error;
         }
     }
 
@@ -429,7 +493,7 @@ export class AuthService {
     async deleteAgentAccount(dto: CommonDto) {
         try {
             const payload = decryptData(dto.data);
-            console.log("payload", payload);
+            console.log('payload', payload);
 
             const rawEmail = payload?.email?.trim();
             const otp = payload?.otp?.trim();
@@ -455,6 +519,7 @@ export class AuthService {
                     id: true,
                     first_name: true,
                     last_name: true,
+                    user_name: true,
                     email: true,
                     phone_no: true,
                     provider_id: true,
@@ -482,16 +547,28 @@ export class AuthService {
             const targetEmail = agent.email ?? rawEmail;
             setImmediate(async () => {
                 try {
-                    await this.mailService.sendAccountDeletedEmail(targetEmail, displayName);
+                    await this.mailService.sendAccountDeletedEmail(
+                        targetEmail,
+                        displayName,
+                    );
                 } catch (error) {
                     console.error('Error sending account deleted email', error);
                 }
             });
 
             const deletedSuffix = `${Date.now()}_${agent.id.toString()}`;
-            const deletedEmail = this.buildDeletedFieldValue(agent.email, deletedSuffix);
-            const deletedPhone = this.buildDeletedFieldValue(agent.phone_no, deletedSuffix);
-            const deletedProviderId = this.buildDeletedFieldValue(agent.provider_id, deletedSuffix);
+            const deletedEmail = this.buildDeletedFieldValue(
+                agent.email,
+                deletedSuffix,
+            );
+            const deletedPhone = this.buildDeletedFieldValue(
+                agent.phone_no,
+                deletedSuffix,
+            );
+            const deletedProviderId = this.buildDeletedFieldValue(
+                agent.provider_id,
+                deletedSuffix,
+            );
 
             await this.prisma.$transaction(async (tx) => {
                 await tx.user.update({
@@ -517,11 +594,15 @@ export class AuthService {
                         },
                         data: {
                             pan_number:
-                                this.buildDeletedFieldValue(agent.agentKYC.pan_number, deletedSuffix) ??
-                                agent.agentKYC.pan_number,
+                                this.buildDeletedFieldValue(
+                                    agent.agentKYC.pan_number,
+                                    deletedSuffix,
+                                ) ?? agent.agentKYC.pan_number,
                             aadhar_number:
-                                this.buildDeletedFieldValue(agent.agentKYC.aadhar_number, deletedSuffix) ??
-                                agent.agentKYC.aadhar_number,
+                                this.buildDeletedFieldValue(
+                                    agent.agentKYC.aadhar_number,
+                                    deletedSuffix,
+                                ) ?? agent.agentKYC.aadhar_number,
                         },
                     });
                 }
@@ -578,6 +659,7 @@ export class AuthService {
                     id: true,
                     first_name: true,
                     last_name: true,
+                    user_name: true,
                     email: true,
                 },
             });
@@ -599,7 +681,11 @@ export class AuthService {
 
             setImmediate(async () => {
                 try {
-                    await this.mailService.sendDataExportEmail(rawEmail, displayName, reportText);
+                    await this.mailService.sendDataExportEmail(
+                        rawEmail,
+                        displayName,
+                        reportText,
+                    );
                 } catch (error) {
                     console.error('Error sending data export email', error);
                 }
@@ -639,6 +725,7 @@ export class AuthService {
                                             id: true,
                                             first_name: true,
                                             last_name: true,
+                                            user_name: true,
                                             email: true,
                                             phone_no: true,
                                         },
@@ -714,23 +801,28 @@ export class AuthService {
         };
     }
 
-
     async forgotPassword(dto: CommonDto) {
-        const paylaod = decryptData(dto?.data)
+        const paylaod = decryptData(dto?.data);
         const user = await this.prisma.user.findUnique({
             where: {
                 email: paylaod.email.toLowerCase(),
             },
         });
         if (!user?.email) {
-            throw new BadRequestException(`Email address not found.`)
-        }
-        else {
-            if (user?.auth_method !== 'EMAIL_OTP' && user?.auth_method !== 'EMAIL_PW') {
-                if (user?.auth_method === "APPLE") {
-                    throw new BadRequestException(`Account created with 'Continue with Apple'`)
-                } else if (user?.auth_method === "GOOGLE") {
-                    throw new BadRequestException(`Account created with 'Continue with Google'`)
+            throw new BadRequestException(`Email address not found.`);
+        } else {
+            if (
+                user?.auth_method !== 'EMAIL_OTP' &&
+                user?.auth_method !== 'EMAIL_PW'
+            ) {
+                if (user?.auth_method === 'APPLE') {
+                    throw new BadRequestException(
+                        `Account created with 'Continue with Apple'`,
+                    );
+                } else if (user?.auth_method === 'GOOGLE') {
+                    throw new BadRequestException(
+                        `Account created with 'Continue with Google'`,
+                    );
                 }
             }
 
@@ -748,25 +840,29 @@ export class AuthService {
             setImmediate(async () => {
                 try {
                     if (!user?.email) {
-                        throw new BadRequestException(`Email address not found.`)
+                        throw new BadRequestException(`Email address not found.`);
                     }
-                    await this.mailService.sendResetPasswordEmail(user?.email, resetLink, token, expiry_minutes);
+                    await this.mailService.sendResetPasswordEmail(
+                        user?.email,
+                        resetLink,
+                        token,
+                        expiry_minutes,
+                    );
                 } catch (error) {
-                    console.error("Error sending email", error);
+                    console.error('Error sending email', error);
                 }
             });
             return true;
         }
     }
 
-
     async resetPassword(dto: CommonDto) {
-        const paylaod = decryptData(dto?.data)
+        const paylaod = decryptData(dto?.data);
         const user = await this.prisma.user.findFirst({
             where: {
                 reset_token: paylaod.token,
                 reset_token_exp: { gt: new Date() },
-            }
+            },
         });
 
         if (!user) {
@@ -787,12 +883,11 @@ export class AuthService {
         return true;
     }
 
-
     async TestEncryption(body: any) {
         try {
             return await encryptData(body);
         } catch (error) {
-            throw error
+            throw error;
         }
     }
 
@@ -801,7 +896,7 @@ export class AuthService {
             const data = await decryptData(body.data);
             return data;
         } catch (error) {
-            throw error
+            throw error;
         }
     }
 
@@ -852,7 +947,8 @@ export class AuthService {
             lines,
             'Organizations (Owned)',
             user?.organizations,
-            (org: any) => `${this.formatValue(org?.name)} [${this.formatValue(org?.id)}]`,
+            (org: any) =>
+                `${this.formatValue(org?.name)} [${this.formatValue(org?.id)}]`,
         );
         this.appendCollectionSection(
             lines,
@@ -886,19 +982,22 @@ export class AuthService {
             lines,
             'Meetings',
             user?.meetings,
-            (meeting: any) => `${this.formatValue(meeting?.title)} (${this.formatValue(meeting?.status)})`,
+            (meeting: any) =>
+                `${this.formatValue(meeting?.title)} (${this.formatValue(meeting?.status)})`,
         );
         this.appendCollectionSection(
             lines,
             'ToDo',
             user?.toDos,
-            (todo: any) => `${this.formatValue(todo?.title)} (${this.formatValue(todo?.priority)})`,
+            (todo: any) =>
+                `${this.formatValue(todo?.title)} (${this.formatValue(todo?.priority)})`,
         );
         this.appendCollectionSection(
             lines,
             'Notifications',
             user?.inAppNotifications,
-            (note: any) => `${this.formatValue(note?.title)} (${this.formatValue(note?.type)})`,
+            (note: any) =>
+                `${this.formatValue(note?.title)} (${this.formatValue(note?.type)})`,
         );
 
         lines.push('===== END OF REPORT =====');
@@ -966,12 +1065,14 @@ export class AuthService {
             .join('\n');
     }
 
-    private buildDeletedFieldValue(value: string | null | undefined, suffix: string) {
+    private buildDeletedFieldValue(
+        value: string | null | undefined,
+        suffix: string,
+    ) {
         if (!value) {
             return null;
         }
 
         return `deleted_${suffix}_${value}`;
     }
-
 }

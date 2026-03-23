@@ -276,6 +276,7 @@ model User {
     id                      BigInt                  @id @default(autoincrement())
     first_name              String?
     last_name               String?
+    user_name               String?                 @unique
     email                   String?                 @unique
     password                String?                 @db.Text()
     role_id                 BigInt
@@ -306,6 +307,7 @@ model User {
     customerStatusHistories CustomerStatusHistory[] @relation("changedByAgent")
     agentProductEntities    AgentProductEntity[]
     sessions                UserSession[]
+    agentProfile            AgentProfile?
     agentKYC                AgentKYC?
     agentSales              AgentSale[]
     meetings                Meeting[]
@@ -320,7 +322,7 @@ model User {
 model AgentKYC {
     id             BigInt         @id @default(autoincrement())
     agent_id       BigInt         @unique
-    agent          User           @relation(fields: [agent_id], references: [id])
+    agent          User           @relation(fields: [agent_id], references: [id], onDelete: Cascade)
     kyc_status     ApprovalStatus @default(PENDING)
     pan_number     String
     pan_image      String?
@@ -339,6 +341,23 @@ model AgentKYC {
 
     @@index([pan_number, aadhar_number, bank_name, branch_name, ifsc_code, upi_id])
     @@map("tbl_agent_kyc")
+}
+
+model AgentProfile {
+    id                     BigInt   @id @default(autoincrement())
+    agent_id               BigInt   @unique
+    agent                  User     @relation(fields: [agent_id], references: [id], onDelete: Cascade)
+    social_media           Json?
+    brand_name             String
+    brand_logo             String
+    promotional_heading    String
+    promotional_subheading String
+    promotional_banner     String
+    created_at             DateTime @default(now())
+    updated_at             DateTime @updatedAt
+
+    @@index([brand_name, promotional_heading, promotional_subheading])
+    @@map("tbl_agent_profile")
 }
 
 model OTP {

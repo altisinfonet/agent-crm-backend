@@ -1,17 +1,43 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, HttpStatus, Res, BadRequestException, UploadedFile, UseInterceptors, Req, UploadedFiles, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  UseGuards,
+  HttpStatus,
+  Res,
+  BadRequestException,
+  UploadedFile,
+  UseInterceptors,
+  Req,
+  UploadedFiles,
+  Query,
+} from '@nestjs/common';
 import { UserService } from './user.service';
 import { GetCurrentUserId } from 'src/common/decorators/current-user-id.decorator';
 import type { Request, Response } from 'express';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { CommonDto } from 'src/auth/dto/common.dto';
-import { AnyFilesInterceptor, FileFieldsInterceptor } from '@nestjs/platform-express';
+import {
+  AnyFilesInterceptor,
+  FileFieldsInterceptor,
+} from '@nestjs/platform-express';
 import { ImageUploadService } from '@/common/services/image-upload.service';
 import { ApiResponse } from '@/common/helper/response.helper';
 import { decryptData, encryptData } from '@/common/helper/common.helper';
 import { getCachedCurrentUserResponse, setCachedCurrentUserResponse } from '@/common/helper/current-user-cache.helper';
 import { Account, Onboarding } from '@/common/enum/account.enum';
-import { AccountStatus, OnboardingStatus } from '@/common/decorators/status.decorator';
-import { AccountStatusGuard, OnboardingStatusGuard } from '@/common/guards/status.guard';
+import {
+  AccountStatus,
+  OnboardingStatus,
+} from '@/common/decorators/status.decorator';
+import {
+  AccountStatusGuard,
+  OnboardingStatusGuard,
+} from '@/common/guards/status.guard';
 import { upload } from '@/common/config/multer.config';
 import { R2Service } from '@/common/helper/r2.helper';
 import slugify from 'slugify';
@@ -25,7 +51,7 @@ export class UserController {
   @Get('me')
   async getCurrentUser(
     @GetCurrentUserId() userId: bigint,
-    @Res({ passthrough: true }) res: Response
+    @Res({ passthrough: true }) res: Response,
   ) {
     try {
       // const cachedResponse = await getCachedCurrentUserResponse(userId);
@@ -39,17 +65,41 @@ export class UserController {
       let result = JSON.stringify(userData, (key, value) =>
         typeof value === 'bigint' ? value.toString() : value,
       );
-      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Fetched user data"));
+      const resData = encryptData(
+        new ApiResponse(JSON.parse(result), 'Fetched user data'),
+      );
       // await setCachedCurrentUserResponse(userId, resData);
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }
-      throw new BadRequestException("Failed to read user data.");
+      throw new BadRequestException('Failed to read user data.');
     }
   }
 
+  @Get('agent-profile/:user_name')
+  async getAgentPublicProfile(
+    @Param('user_name') userName: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    try {
+      const userData =
+        await this.userService.getAgentPublicProfileByUserName(userName);
+      const result = JSON.stringify(userData, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+      const resData = encryptData(
+        new ApiResponse(JSON.parse(result), 'Fetched agent profile data.'),
+      );
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error: any) {
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException('Failed to fetch agent profile data.');
+    }
+  }
 
   @UseGuards(JwtAuthGuard, AccountStatusGuard)
   @AccountStatus(Account.ACTIVE)
@@ -57,48 +107,55 @@ export class UserController {
   async updateUserProfile(
     @GetCurrentUserId() userId: bigint,
     @Body() dto: CommonDto,
-    @Res({ passthrough: true }) res: Response
+    @Res({ passthrough: true }) res: Response,
   ) {
     try {
       const userData = await this.userService.updateUserProfile(userId, dto);
       let result = JSON.stringify(userData, (key, value) =>
         typeof value === 'bigint' ? value.toString() : value,
       );
-      const resData = encryptData(new ApiResponse((JSON.parse(result)), "User profile updated successfully."));
+      const resData = encryptData(
+        new ApiResponse(
+          JSON.parse(result),
+          'User profile updated successfully.',
+        ),
+      );
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }
-      throw new BadRequestException("Failed to update user profile.");
+      throw new BadRequestException('Failed to update user profile.');
     }
   }
 
   @UseGuards(JwtAuthGuard, AccountStatusGuard)
   @AccountStatus(Account.ACTIVE)
-  @Patch("profile-pic")
+  @Patch('profile-pic')
   @UseInterceptors(AnyFilesInterceptor())
   async editUser(
     @GetCurrentUserId() userId: bigint,
     @Body() commonDto: CommonDto,
     @Res() res: Response,
-    @Req() req: Request
+    @Req() req: Request,
   ) {
     try {
       const data = decryptData(commonDto.data);
 
       if (!data?.image) {
-        throw new BadRequestException("Image is required");
+        throw new BadRequestException('Image is required');
       }
 
       const findUser = await this.userService.getUserForUpload(userId);
       const panNumber = findUser?.agentKYC?.pan_number;
 
-      if (findUser?.role?.name === "AGENT" && !panNumber) {
-        throw new BadRequestException("PAN not found. Complete KYC first.");
+      if (findUser?.role?.name === 'AGENT' && !panNumber) {
+        throw new BadRequestException('PAN not found. Complete KYC first.');
       }
-      const safeName = slugify(`${findUser.first_name} ${findUser.last_name}`, { lower: true });
-      const safePan = panNumber ?? "admin".toUpperCase().replace(/\s+/g, "");
+      const safeName = slugify(`${findUser.first_name} ${findUser.last_name}`, {
+        lower: true,
+      });
+      const safePan = panNumber ?? 'admin'.toUpperCase().replace(/\s+/g, '');
 
       // const rootFolder = buildUserRootFolder(
       //   `${findUser.first_name} ${findUser.last_name}`,
@@ -106,8 +163,7 @@ export class UserController {
       //   userId.toString()
       // );
 
-      const rootFolder =
-        `${process.env.ROOT_FOLDER}/
+      const rootFolder = `${process.env.ROOT_FOLDER}/
       ${process.env.IMAGE_PATH}/
       ${process.env.USER_IMAGE_PATH}/
       ${safeName}_${safePan}_${userId.toString()}`;
@@ -115,19 +171,26 @@ export class UserController {
       const uploadResult = await ImageUploadService.uploadBase64ImageToR2(
         data.image,
         rootFolder,
-        `profile`
+        `profile`,
       );
 
-      const user = await this.userService.updateProfileImage(userId, data?.delete, {
-        key: uploadResult.key,
-      });
+      const user = await this.userService.updateProfileImage(
+        userId,
+        data?.delete,
+        {
+          key: uploadResult.key,
+        },
+      );
 
       const result = JSON.stringify(user, (key, value) =>
-        typeof value === "bigint" ? value.toString() : value
+        typeof value === 'bigint' ? value.toString() : value,
       );
 
       const resData = encryptData(
-        new ApiResponse(JSON.parse(result), "User profile updated successfully.")
+        new ApiResponse(
+          JSON.parse(result),
+          'User profile updated successfully.',
+        ),
       );
 
       return res.status(HttpStatus.OK).json({ data: resData });
@@ -135,126 +198,212 @@ export class UserController {
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }
-      throw new BadRequestException("Failed to update user profile.");
+      throw new BadRequestException('Failed to update user profile.');
     }
   }
 
-
   @UseGuards(JwtAuthGuard, AccountStatusGuard)
   @AccountStatus(Account.ACTIVE)
-  @Post("kyc")
+  @Post('kyc')
   @UseInterceptors(
     FileFieldsInterceptor(
       [
-        { name: "pan_image", maxCount: 1 },
-        { name: "aadhar_front", maxCount: 1 },
-        { name: "aadhar_back", maxCount: 1 },
-        { name: "qr_code", maxCount: 1 },
+        { name: 'pan_image', maxCount: 1 },
+        { name: 'aadhar_front', maxCount: 1 },
+        { name: 'aadhar_back', maxCount: 1 },
+        { name: 'qr_code', maxCount: 1 },
       ],
-      upload
-    )
+      upload,
+    ),
   )
   async submitKyc(
     @GetCurrentUserId() userId: bigint,
     @UploadedFiles() files: any,
     @Body() kycDto: CommonDto,
-    @Res() res: Response
+    @Res() res: Response,
   ) {
     try {
       const uploads: any = {};
       const kycData = decryptData(kycDto.data);
 
       const safeName = slugify(kycData.username, { lower: true });
-      const safePan = kycData.pan_number.toUpperCase().replace(/\s+/g, "");
+      const safePan = kycData.pan_number.toUpperCase().replace(/\s+/g, '');
 
-      const rootFolder =
-        `${process.env.ROOT_FOLDER}/
+      const rootFolder = `${process.env.ROOT_FOLDER}/
       ${process.env.IMAGE_PATH}/
       ${process.env.USER_IMAGE_PATH}/
       ${safeName}_${safePan}_${userId.toString()}`;
-      const basePath = `${safeName}_${safePan}_${userId.toString()}`
+      const basePath = `${safeName}_${safePan}_${userId.toString()}`;
 
       if (files.pan_image?.[0]) {
-        const ext = files.pan_image[0].mimetype.split("/")[1];
+        const ext = files.pan_image[0].mimetype.split('/')[1];
         uploads.pan_image = `${rootFolder}/pan.${ext}`;
 
         await R2Service.upload(
           files.pan_image[0].buffer,
           uploads.pan_image,
-          files.pan_image[0].mimetype
+          files.pan_image[0].mimetype,
         );
       }
 
       if (files.aadhar_front?.[0]) {
-        const ext = files.aadhar_front[0].mimetype.split("/")[1];
+        const ext = files.aadhar_front[0].mimetype.split('/')[1];
         uploads.aadhar_front = `${rootFolder}/aadhar_front.${ext}`;
 
         await R2Service.upload(
           files.aadhar_front[0].buffer,
           uploads.aadhar_front,
-          files.aadhar_front[0].mimetype
+          files.aadhar_front[0].mimetype,
         );
       }
 
       if (files.aadhar_back?.[0]) {
-        const ext = files.aadhar_back[0].mimetype.split("/")[1];
+        const ext = files.aadhar_back[0].mimetype.split('/')[1];
         uploads.aadhar_back = `${rootFolder}/aadhar_back.${ext}`;
 
         await R2Service.upload(
           files.aadhar_back[0].buffer,
           uploads.aadhar_back,
-          files.aadhar_back[0].mimetype
+          files.aadhar_back[0].mimetype,
         );
       }
 
       if (files.qr_code?.[0]) {
-        const ext = files.qr_code[0].mimetype.split("/")[1];
+        const ext = files.qr_code[0].mimetype.split('/')[1];
         uploads.qr_code = `${rootFolder}/qr.${ext}`;
 
         await R2Service.upload(
           files.qr_code[0].buffer,
           uploads.qr_code,
-          files.qr_code[0].mimetype
+          files.qr_code[0].mimetype,
         );
       }
 
-      const saved = await this.userService.saveKyc(userId, kycData, uploads, basePath);
+      const saved = await this.userService.saveKyc(
+        userId,
+        kycData,
+        uploads,
+        basePath,
+      );
 
       return res.status(HttpStatus.OK).json({
         data: encryptData(
-          new ApiResponse(saved, "KYC details updated successfully")
+          new ApiResponse(saved, 'KYC details updated successfully'),
         ),
       });
     } catch (error: any) {
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }
-      throw new BadRequestException("Failed to submit KYC details.");
+      throw new BadRequestException('Failed to submit KYC details.');
     }
   }
 
   @UseGuards(JwtAuthGuard, AccountStatusGuard)
   @AccountStatus(Account.ACTIVE)
-  @Get("kyc")
+  @Patch('agent-profile')
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'brand_logo', maxCount: 1 },
+        { name: 'promotional_banner', maxCount: 1 },
+      ],
+      upload,
+    ),
+  )
+  async updateAgentProfile(
+    @GetCurrentUserId() userId: bigint,
+    @UploadedFiles() files: any,
+    @Body() agentProfileDto: CommonDto,
+    @Res() res: Response,
+  ) {
+    try {
+      const uploads: any = {};
+      const agentProfileData = agentProfileDto?.data
+        ? decryptData(agentProfileDto.data)
+        : {};
+
+      const uploadContext =
+        await this.userService.getAgentProfileUploadContext(userId);
+      const rootFolder = [
+        process.env.ROOT_FOLDER,
+        process.env.IMAGE_PATH,
+        process.env.USER_IMAGE_PATH,
+        uploadContext.base_img_path,
+      ]
+        .filter(Boolean)
+        .join('/');
+
+      if (files?.brand_logo?.[0]) {
+        const ext = files.brand_logo[0].mimetype.split('/')[1];
+        uploads.brand_logo = `${rootFolder}/profile/brand_logo.${ext}`;
+
+        await R2Service.upload(
+          files.brand_logo[0].buffer,
+          uploads.brand_logo,
+          files.brand_logo[0].mimetype,
+        );
+      }
+
+      if (files?.promotional_banner?.[0]) {
+        const ext = files.promotional_banner[0].mimetype.split('/')[1];
+        uploads.promotional_banner = `${rootFolder}/profile/banner.${ext}`;
+
+        await R2Service.upload(
+          files.promotional_banner[0].buffer,
+          uploads.promotional_banner,
+          files.promotional_banner[0].mimetype,
+        );
+      }
+
+      const saved = await this.userService.updateAgentProfile(
+        userId,
+        agentProfileData,
+        uploads,
+      );
+
+      const result = JSON.stringify(saved, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value,
+      );
+      const resData = encryptData(
+        new ApiResponse(
+          JSON.parse(result),
+          'Agent profile updated successfully.',
+        ),
+      );
+
+      return res.status(HttpStatus.OK).json({ data: resData });
+    } catch (error: any) {
+      if (error.status && error.response) {
+        return res.status(error.status).json(error.response);
+      }
+      throw new BadRequestException('Failed to update agent profile.');
+    }
+  }
+
+  @UseGuards(JwtAuthGuard, AccountStatusGuard)
+  @AccountStatus(Account.ACTIVE)
+  @Get('kyc')
   async getAgentKYCDetails(
     @GetCurrentUserId() userId: bigint,
-    @Res({ passthrough: true }) res: Response
+    @Res({ passthrough: true }) res: Response,
   ) {
     try {
       const userData = await this.userService.getAgentKYCDetails(userId);
       let result = JSON.stringify(userData, (key, value) =>
         typeof value === 'bigint' ? value.toString() : value,
       );
-      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Fetched agent KYC details."));
+      const resData = encryptData(
+        new ApiResponse(JSON.parse(result), 'Fetched agent KYC details.'),
+      );
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }
-      throw new BadRequestException("Failed to fetch agent KYC details.");
+      throw new BadRequestException('Failed to fetch agent KYC details.');
     }
   }
-
 
   @Get('faq/list')
   async clientFaq(@Res() res: Response) {
@@ -263,13 +412,13 @@ export class UserController {
       let result = JSON.stringify(faq, (key, value) =>
         typeof value === 'bigint' ? value.toString() : value,
       );
-      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Faqs."));
+      const resData = encryptData(new ApiResponse(JSON.parse(result), 'Faqs.'));
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }
-      throw new BadRequestException("Failed to read FAQs.");
+      throw new BadRequestException('Failed to read FAQs.');
     }
   }
 
@@ -285,16 +434,17 @@ export class UserController {
       let result = JSON.stringify(data, (key, value) =>
         typeof value === 'bigint' ? value.toString() : value,
       );
-      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Fetched country lists"));
+      const resData = encryptData(
+        new ApiResponse(JSON.parse(result), 'Fetched country lists'),
+      );
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }
-      throw new BadRequestException("Failed to read country lists.");
+      throw new BadRequestException('Failed to read country lists.');
     }
   }
-
 
   @Get('currency/list')
   async getCurrencies(
@@ -308,14 +458,15 @@ export class UserController {
       let result = JSON.stringify(data, (key, value) =>
         typeof value === 'bigint' ? value.toString() : value,
       );
-      const resData = encryptData(new ApiResponse((JSON.parse(result)), "Fetched currency lists"));
+      const resData = encryptData(
+        new ApiResponse(JSON.parse(result), 'Fetched currency lists'),
+      );
       return res.status(HttpStatus.OK).json({ data: resData });
     } catch (error: any) {
       if (error.status && error.response) {
         return res.status(error.status).json(error.response);
       }
-      throw new BadRequestException("Failed to read currency lists.");
+      throw new BadRequestException('Failed to read currency lists.');
     }
   }
-
 }

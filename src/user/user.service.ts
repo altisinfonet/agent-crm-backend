@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CommonDto } from 'src/auth/dto/common.dto';
 import * as bcrypt from 'bcrypt';
@@ -6,18 +11,18 @@ import { decryptData, hashPassword } from '@/common/helper/common.helper';
 import { R2Service } from '@/common/helper/r2.helper';
 import { clearCurrentUserCache } from '@/common/helper/current-user-cache.helper';
 import { SubscriptionStatus } from '@generated/prisma';
+import {
+  assertUsernameAvailable,
+  generateUniqueUsername,
+  isValidUsername,
+  normalizeUsername,
+} from '@/common/helper/username.helper';
 
 @Injectable()
 export class UserService {
-  constructor(
-    private prisma: PrismaService,
-  ) { }
+  constructor(private prisma: PrismaService) { }
 
-  async getCountryLists(
-    page = 1,
-    limit = 10,
-    search?: string,
-  ) {
+  async getCountryLists(page = 1, limit = 10, search?: string) {
     try {
       const skip = (page - 1) * limit;
 
@@ -61,18 +66,14 @@ export class UserService {
 
       return {
         Countries: countries,
-        Total: total
+        Total: total,
       };
     } catch (error) {
       throw error;
     }
   }
 
-  async getCurrencyLists(
-    page = 1,
-    limit = 10,
-    search?: string,
-  ) {
+  async getCurrencyLists(page = 1, limit = 10, search?: string) {
     try {
       const skip = (page - 1) * limit;
 
@@ -109,7 +110,7 @@ export class UserService {
 
       return {
         Currencies: currencies,
-        Total: total
+        Total: total,
       };
     } catch (error) {
       throw error;
@@ -297,6 +298,7 @@ export class UserService {
           id: true,
           first_name: true,
           last_name: true,
+          user_name: true,
           email: true,
           phone_no: true,
           image: true,
@@ -326,7 +328,7 @@ export class UserService {
       if (user.role?.name === 'AGENT') {
         const agentData = await this.prisma.user.findUnique({
           where: {
-            id: userId
+            id: userId,
           },
           select: {
             organizations: {
@@ -334,7 +336,7 @@ export class UserService {
                 subscription: {
                   take: 1,
                   orderBy: {
-                    created_at: 'desc'
+                    created_at: 'desc',
                   },
                   select: {
                     status: true,
@@ -400,6 +402,102 @@ export class UserService {
     }
   }
 
+  async getAgentPublicProfileByUserName(userName: string) {
+    try {
+      const normalizedUserName = this.normalizeUsernameOrThrow(userName);
+
+      const agent = await this.prisma.user.findFirst({
+        where: {
+          user_name: normalizedUserName,
+          is_deleted: false,
+          status: 'ACTIVE',
+          role: {
+            name: 'AGENT',
+          },
+        },
+        select: {
+          id: true,
+          first_name: true,
+          last_name: true,
+          user_name: true,
+          email: true,
+          phone_no: true,
+          image: true,
+          agentProfile: {
+            select: {
+              id: true,
+              social_media: true,
+              brand_name: true,
+              brand_logo: true,
+              promotional_heading: true,
+              promotional_subheading: true,
+              promotional_banner: true,
+              created_at: true,
+            },
+          },
+          agentProductEntities: {
+            orderBy: {
+              created_at: 'asc',
+            },
+            select: {
+              productEntity: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                  products: {
+                    select: {
+                      id: true,
+                      name: true,
+                      slug: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      console.log("agent++++++", agent);
+
+
+      if (!agent) {
+        throw new NotFoundException('Agent profile not found');
+      }
+
+      const [profileImage, brandLogo, promotionalBanner] = await Promise.all([
+        agent.image ? R2Service.getSignedUrl(agent.image) : null,
+        agent.agentProfile?.brand_logo
+          ? R2Service.getSignedUrl(agent.agentProfile.brand_logo)
+          : null,
+        agent.agentProfile?.promotional_banner
+          ? R2Service.getSignedUrl(agent.agentProfile.promotional_banner)
+          : null,
+      ]);
+
+      return {
+        id: agent.id,
+        first_name: agent.first_name,
+        last_name: agent.last_name,
+        user_name: agent.user_name,
+        image: profileImage,
+        agentProfile: agent.agentProfile
+          ? {
+            ...agent.agentProfile,
+            brand_logo: brandLogo,
+            promotional_banner: promotionalBanner,
+          }
+          : null,
+        selectedProducts: this.groupAgentProductEntities(
+          agent.agentProductEntities,
+        ),
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
   async getUserForUpload(userId: bigint) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -411,19 +509,19 @@ export class UserService {
           select: {
             id: true,
             name: true,
-          }
+          },
         },
         agentKYC: {
           select: {
             pan_number: true,
-          }
+          },
         },
         created_at: true,
       },
     });
 
     if (!user) {
-      throw new NotFoundException("User not found");
+      throw new NotFoundException('User not found');
     }
 
     return user;
@@ -438,12 +536,13 @@ export class UserService {
         phone_no,
         first_name,
         last_name,
+        user_name,
         dob,
         old_password,
         new_password,
         onboardingStatus,
         country_id,
-        currency_id
+        currency_id,
       } = payload;
 
       const findUser = await this.prisma.user.findUnique({
@@ -464,6 +563,25 @@ export class UserService {
       if (onboardingStatus) updateData.onboardingStatus = onboardingStatus;
       if (country_id) updateData.country_id = country_id;
       if (currency_id) updateData.currency_id = currency_id;
+
+      if (user_name !== undefined) {
+        updateData.user_name = await this.validateAndPrepareUsername(
+          user_name,
+          userId,
+        );
+      } else if (!findUser.user_name) {
+        const nextFirstName = first_name ?? findUser.first_name;
+        const nextLastName = last_name ?? findUser.last_name;
+
+        if (nextFirstName || nextLastName) {
+          updateData.user_name = await generateUniqueUsername(
+            this.prisma,
+            nextFirstName,
+            nextLastName,
+            userId,
+          );
+        }
+      }
 
       const hasOld = !!old_password;
       const hasNew = !!new_password;
@@ -510,11 +628,15 @@ export class UserService {
       await clearCurrentUserCache(userId);
       return this.getCurrentUser(userId);
     } catch (error) {
-      throw error
+      throw error;
     }
   }
 
-  async updateProfileImage(userId: bigint, isDelete: boolean, file: { key?: string }) {
+  async updateProfileImage(
+    userId: bigint,
+    isDelete: boolean,
+    file: { key?: string },
+  ) {
     try {
       let dataToUpdate: any = {};
 
@@ -540,6 +662,126 @@ export class UserService {
     }
   }
 
+  async getAgentProfileUploadContext(userId: bigint) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        role: {
+          select: {
+            name: true,
+          },
+        },
+        agentKYC: {
+          select: {
+            base_img_path: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (user.role?.name !== 'AGENT') {
+      throw new BadRequestException('Only agents can update agent profile');
+    }
+
+    if (!user.agentKYC?.base_img_path) {
+      throw new BadRequestException(
+        'KYC base image path not found. Complete KYC first.',
+      );
+    }
+
+    return {
+      base_img_path: user.agentKYC.base_img_path,
+    };
+  }
+
+  async updateAgentProfile(
+    userId: bigint,
+    profileData: any,
+    files: {
+      brand_logo?: string;
+      promotional_banner?: string;
+    },
+  ) {
+    try {
+      await this.getAgentProfileUploadContext(userId);
+
+      const existingProfile = await this.prisma.agentProfile.findUnique({
+        where: {
+          agent_id: userId,
+        },
+      });
+
+      const normalizedSocialMedia = this.normalizeAgentSocialMedia(
+        profileData?.social_media,
+      );
+
+      const mergedProfile = {
+        brand_name:
+          profileData?.brand_name !== undefined
+            ? profileData.brand_name
+            : existingProfile?.brand_name,
+        promotional_heading:
+          profileData?.promotional_heading !== undefined
+            ? profileData.promotional_heading
+            : existingProfile?.promotional_heading,
+        promotional_subheading:
+          profileData?.promotional_subheading !== undefined
+            ? profileData.promotional_subheading
+            : existingProfile?.promotional_subheading,
+        social_media:
+          profileData?.social_media !== undefined
+            ? normalizedSocialMedia
+            : existingProfile?.social_media,
+        brand_logo: files?.brand_logo ?? existingProfile?.brand_logo,
+        promotional_banner:
+          files?.promotional_banner ?? existingProfile?.promotional_banner,
+      };
+
+      const missingFields = [
+        ['brand_name', mergedProfile.brand_name],
+        ['brand_logo', mergedProfile.brand_logo],
+        ['promotional_heading', mergedProfile.promotional_heading],
+        ['promotional_subheading', mergedProfile.promotional_subheading],
+        ['promotional_banner', mergedProfile.promotional_banner],
+      ]
+        .filter(([, value]) => this.isMissingAgentProfileValue(value))
+        .map(([field]) => field);
+
+      if (missingFields.length) {
+        throw new BadRequestException(
+          `Missing required agent profile fields: ${missingFields.join(', ')}`,
+        );
+      }
+
+      const createProfileData = {
+        agent_id: userId,
+        brand_name: mergedProfile.brand_name,
+        brand_logo: mergedProfile.brand_logo as string,
+        promotional_heading: mergedProfile.promotional_heading,
+        promotional_subheading: mergedProfile.promotional_subheading,
+        promotional_banner: mergedProfile.promotional_banner as string,
+        social_media: mergedProfile.social_media,
+      };
+
+      const profile = await this.prisma.agentProfile.upsert({
+        where: {
+          agent_id: userId,
+        },
+        update: mergedProfile,
+        create: createProfileData,
+      });
+
+      await clearCurrentUserCache(userId);
+      return this.formatAgentProfileResponse(profile);
+    } catch (error) {
+      throw error;
+    }
+  }
 
   async saveKyc(userId: bigint, kycData: any, files: any, path: string) {
     try {
@@ -551,8 +793,10 @@ export class UserService {
         branch_name: kycData?.branch_name,
         ifsc_code: kycData?.ifsc_code,
         upi_id: kycData?.upi_id,
-      }
-      const organizationId = kycData?.organizationId ? BigInt(kycData.organizationId) : null;
+      };
+      const organizationId = kycData?.organizationId
+        ? BigInt(kycData.organizationId)
+        : null;
       const entity_ids: bigint[] = kycData?.entity_ids || [];
 
       const kyc = await this.prisma.$transaction(async (tx) => {
@@ -561,7 +805,7 @@ export class UserService {
         });
 
         if (!user) {
-          throw new UnauthorizedException("Unauthorized");
+          throw new UnauthorizedException('Unauthorized');
         }
         const kyc = await tx.agentKYC.upsert({
           where: { agent_id: userId },
@@ -571,7 +815,7 @@ export class UserService {
             aadhar_front: files?.aadhar_front,
             aadhar_back: files?.aadhar_back,
             qr_code: files?.qr_code,
-            base_img_path: path
+            base_img_path: path,
           },
           create: {
             agent_id: userId,
@@ -580,7 +824,7 @@ export class UserService {
             aadhar_front: files?.aadhar_front,
             aadhar_back: files?.aadhar_back,
             qr_code: files?.qr_code,
-            base_img_path: path
+            base_img_path: path,
           },
         });
 
@@ -607,9 +851,9 @@ export class UserService {
                 org_id: organizationId,
                 user_id: userId,
                 role_id: user?.role_id,
-                is_owner: false
-              }
-            })
+                is_owner: false,
+              },
+            });
           }
         } else {
           const existingOrg = await tx.organization.findFirst({
@@ -626,16 +870,16 @@ export class UserService {
                 contact_phone: user?.phone_no,
                 gst_number: kycData?.pan_number,
                 pan_number: kycData?.aadhar_number,
-              }
-            })
+              },
+            });
             await tx.organizationUser.create({
               data: {
                 org_id: org.id,
                 user_id: userId,
                 role_id: user?.role_id,
-                is_owner: true
-              }
-            })
+                is_owner: true,
+              },
+            });
           }
         }
 
@@ -656,6 +900,7 @@ export class UserService {
         select: {
           first_name: true,
           last_name: true,
+          user_name: true,
           email: true,
           phone_no: true,
           image: true,
@@ -684,29 +929,22 @@ export class UserService {
       });
 
       if (!agent) return null;
-      const [
-        profileImage,
-        panImage,
-        aadhar_front,
-        aadhar_back,
-        qrCode,
-      ] = await Promise.all([
-        agent.image
-          ? R2Service.getSignedUrl(agent.image)
-          : null,
-        agent.agentKYC?.pan_image
-          ? R2Service.getSignedUrl(agent.agentKYC.pan_image)
-          : null,
-        agent.agentKYC?.aadhar_front
-          ? R2Service.getSignedUrl(agent.agentKYC.aadhar_front)
-          : null,
-        agent.agentKYC?.aadhar_back
-          ? R2Service.getSignedUrl(agent.agentKYC.aadhar_back)
-          : null,
-        agent.agentKYC?.qr_code
-          ? R2Service.getSignedUrl(agent.agentKYC.qr_code)
-          : null,
-      ]);
+      const [profileImage, panImage, aadhar_front, aadhar_back, qrCode] =
+        await Promise.all([
+          agent.image ? R2Service.getSignedUrl(agent.image) : null,
+          agent.agentKYC?.pan_image
+            ? R2Service.getSignedUrl(agent.agentKYC.pan_image)
+            : null,
+          agent.agentKYC?.aadhar_front
+            ? R2Service.getSignedUrl(agent.agentKYC.aadhar_front)
+            : null,
+          agent.agentKYC?.aadhar_back
+            ? R2Service.getSignedUrl(agent.agentKYC.aadhar_back)
+            : null,
+          agent.agentKYC?.qr_code
+            ? R2Service.getSignedUrl(agent.agentKYC.qr_code)
+            : null,
+        ]);
 
       return {
         ...agent,
@@ -726,15 +964,14 @@ export class UserService {
     }
   }
 
-
   async clientFaq() {
     try {
       const allFaqs = await this.prisma.fAQModule.findMany({
         where: {
-          status: "ACTIVE",
+          status: 'ACTIVE',
         },
         orderBy: {
-          rank: 'asc'
+          rank: 'asc',
         },
         select: {
           id: true,
@@ -745,14 +982,14 @@ export class UserService {
           _count: {
             select: {
               FAQ: true,
-            }
+            },
           },
           FAQ: {
             where: {
-              status: "ACTIVE",
+              status: 'ACTIVE',
             },
             orderBy: {
-              rank: 'asc'
+              rank: 'asc',
             },
             select: {
               id: true,
@@ -760,14 +997,112 @@ export class UserService {
               answer: true,
               rank: true,
               status: true,
-            }
-          }
-        }
-      })
+            },
+          },
+        },
+      });
       return allFaqs;
     } catch (error) {
-      throw error
+      throw error;
     }
   }
 
+  private async validateAndPrepareUsername(userName: string, userId: bigint) {
+    const normalizedUserName = this.normalizeUsernameOrThrow(userName);
+    const isAvailable = await assertUsernameAvailable(
+      this.prisma,
+      normalizedUserName,
+      userId,
+    );
+
+    if (!isAvailable) {
+      throw new BadRequestException('Username is already taken');
+    }
+
+    return normalizedUserName;
+  }
+
+  private normalizeUsernameOrThrow(userName: string) {
+    if (typeof userName !== 'string') {
+      throw new BadRequestException('Username must be a valid string');
+    }
+
+    const normalizedUserName = normalizeUsername(userName);
+
+    if (!normalizedUserName || !isValidUsername(normalizedUserName)) {
+      throw new BadRequestException(
+        'Username can only contain letters, numbers, periods, and underscores, cannot start or end with a period, cannot contain consecutive periods, and must be at most 30 characters.',
+      );
+    }
+
+    return normalizedUserName;
+  }
+
+  private groupAgentProductEntities(items: any[] = []) {
+    console.log("items+++++", items);
+
+    return Object.values(
+      items.reduce((acc: any, item: any) => {
+        const product = item.productEntity.products;
+
+        if (!acc[product.id]) {
+          acc[product.id] = {
+            product: {
+              id: product.id,
+              name: product.name,
+              slug: product.slug,
+            },
+            entities: [],
+          };
+        }
+
+        acc[product.id].entities.push({
+          id: item.productEntity.id,
+          name: item.productEntity.name,
+          slug: item.productEntity.slug,
+        });
+
+        return acc;
+      }, {}),
+    );
+  }
+
+  private normalizeAgentSocialMedia(value: any) {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (value === null || value === '') {
+      return null;
+    }
+
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value);
+      } catch (error) {
+        return value;
+      }
+    }
+
+    return value;
+  }
+
+  private isMissingAgentProfileValue(value: any) {
+    return value === undefined || value === null || value === '';
+  }
+
+  private async formatAgentProfileResponse(profile: any) {
+    const [brandLogo, promotionalBanner] = await Promise.all([
+      profile?.brand_logo ? R2Service.getSignedUrl(profile.brand_logo) : null,
+      profile?.promotional_banner
+        ? R2Service.getSignedUrl(profile.promotional_banner)
+        : null,
+    ]);
+
+    return {
+      ...profile,
+      brand_logo: brandLogo,
+      promotional_banner: promotionalBanner,
+    };
+  }
 }

@@ -77,7 +77,7 @@ export class AuthController {
             const resData = encryptData(new ApiResponse((JSON.parse(result)), "Login successful."));
             return res.status(HttpStatus.OK).json({ data: resData });
         } catch (error: any) {
-            console.log("error", error);
+            console.log("error++++++++++", error);
             if (error.status && error.response) {
                 return res.status(error.status).json(error.response);
             }
