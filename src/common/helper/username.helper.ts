@@ -59,10 +59,10 @@ async function isUsernameTaken(
       user_name: userName,
       ...(excludeUserId !== undefined
         ? {
-            id: {
-              not: excludeUserId,
-            },
-          }
+          id: {
+            not: excludeUserId,
+          },
+        }
         : {}),
     },
     select: {
